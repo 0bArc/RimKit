@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>11.0</LangVersion>
+    <AssemblyName>DontEat</AssemblyName>
+    <RootNamespace>DontEatMod</RootNamespace>
+    <OutputPath>..\Assemblies\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\RimWorld</RimWorldDir>
+    <HarmonyWorkshopDir Condition="'$(HarmonyWorkshopDir)' == ''">C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077</HarmonyWorkshopDir>
+    <HarmonyPath Condition="'$(HarmonyPath)' == '' and Exists('$(HarmonyWorkshopDir)\Current\Assemblies\0Harmony.dll')">$(HarmonyWorkshopDir)\Current\Assemblies\0Harmony.dll</HarmonyPath>
+    <HarmonyPath Condition="'$(HarmonyPath)' == '' and Exists('$(HarmonyWorkshopDir)\1.5\Assemblies\0Harmony.dll')">$(HarmonyWorkshopDir)\1.5\Assemblies\0Harmony.dll</HarmonyPath>
+    <HarmonyPath Condition="'$(HarmonyPath)' == '' and Exists('$(HarmonyWorkshopDir)\1.4\Assemblies\0Harmony.dll')">$(HarmonyWorkshopDir)\1.4\Assemblies\0Harmony.dll</HarmonyPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Enables net48 builds via dotnet even if local .NET Framework targeting packs are missing. -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <Reference Include="0Harmony">
+      <HintPath>$(HarmonyPath)</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="ValidateRimWorldReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(RimWorldDir)\RimWorldWin64_Data\Managed\Assembly-CSharp.dll')"
+           Text="Assembly-CSharp.dll not found. Set RimWorldDir, e.g. /p:RimWorldDir=C:\Program Files (x86)\Steam\steamapps\common\RimWorld" />
+    <Error Condition="!Exists('$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll')"
+           Text="UnityEngine.CoreModule.dll not found. Set RimWorldDir to your RimWorld install path." />
+        <Error Condition="!Exists('$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll')"
+          Text="UnityEngine.IMGUIModule.dll not found. Set RimWorldDir to your RimWorld install path." />
+        <Error Condition="!Exists('$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.InputLegacyModule.dll')"
+          Text="UnityEngine.InputLegacyModule.dll not found. Set RimWorldDir to your RimWorld install path." />
+    <Error Condition="'$(HarmonyPath)' == '' or !Exists('$(HarmonyPath)')"
+           Text="0Harmony.dll not found. Install Harmony workshop mod (2009463077) or pass /p:HarmonyPath=..." />
+  </Target>
+</Project>

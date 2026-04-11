@@ -1,0 +1,7 @@
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Source\obj\Release\DontEat.csproj.AssemblyReference.cache
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Source\obj\Release\DontEat.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Source\obj\Release\DontEat.csproj.CoreCompileInputs.cache
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Assemblies\DontEat.dll
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Assemblies\DontEat.pdb
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Source\obj\Release\DontEat.dll
+C:\Users\sandk\Documents\Games\RimWorld\Modding\DontEat\Source\obj\Release\DontEat.pdb
