@@ -1,17 +1,9 @@
-# Welcome to MkDocs
+# RimLuaKit
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+Lua mods for RimWorld.
 
-## Commands
+Stack: Lua scripts, C++ core (`src/native`), thin C# host (`src/host`) that RimWorld can load.
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+Mod identity comes from `meta.lua`. Run `rimkit mod sync` (or `rimkit mod ship`) so RimWorld gets About.xml.
 
-## Project layout
-
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+See [meta.lua](meta.md), [Lua API](lua-api.md), [Hello Lua](example-hello.md), [Jobs Test](example-jobs.md).

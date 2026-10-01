@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+  <JobDef>
+    <defName>RimLua_Scripted</defName>
+    <driverClass>RimLuaKit.JobDriver_RimLua</driverClass>
+    <reportString>doing scripted work.</reportString>
+    <allowOpportunisticPrefix>true</allowOpportunisticPrefix>
+    <casualInterruptible>true</casualInterruptible>
+  </JobDef>
+</Defs>

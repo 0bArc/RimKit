@@ -1,0 +1,39 @@
+# Build / IDE
+.vs/
+.vscode/
+**/obj/
+**/bin/
+!bin/.gitkeep
+src/native/build/
+build/
+site/
+
+# Native / managed outputs (rebuild via rimkit build)
+Assemblies/*.dll
+Assemblies/*.pdb
+Assemblies/*.xml
+!Assemblies/.gitkeep
+Native/*.dll
+Native/*.pdb
+!Native/.gitkeep
+bin/*.exe
+bin/*.pdb
+
+# Scrape / scratch / local agent junk
+.firecrawl/
+.agents/
+skills-lock.json
+*.user
+*.suo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Extension pack artifacts (keep sources)
+vscode-rimkit/node_modules/
+vscode-rimkit/*.vsix
+
+# Generated About can stay tracked; ignore accidental dumps
+*.log
+Player.log

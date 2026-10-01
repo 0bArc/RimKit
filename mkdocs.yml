@@ -1,1 +1,12 @@
-site_name: My Docs
+site_name: RimLuaKit
+site_description: Lua modding kit for RimWorld
+nav:
+  - Home: index.md
+  - Mod structure: mod-structure.md
+  - meta.lua: meta.md
+  - Defs: defs-xml.md
+  - Lua API: lua-api.md
+  - Hooks: hooks.md
+  - Build: build.md
+  - Hello example: example-hello.md
+  - Jobs test: example-jobs.md

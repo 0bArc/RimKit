@@ -1,90 +1,115 @@
-# Don't Eat (RimWorld 1.6)
+# RimLuaKit
 
-A small Harmony mod that blocks player-controlled humanlike pawns from taking self-feeding jobs when colony food reserves are low.
+[![RimWorld](https://img.shields.io/badge/RimWorld-1.6-brightgreen?style=for-the-badge&logo=steam&logoColor=white)](https://rimworldgame.com/)
+[![Lua](https://img.shields.io/badge/Lua-5.4-blue?style=for-the-badge&logo=lua&logoColor=white)](https://www.lua.org/)
+[![Harmony](https://img.shields.io/badge/Harmony-required-orange?style=for-the-badge)](https://github.com/pardeike/HarmonyRimWorld)
+[![C++](https://img.shields.io/badge/core-C%2B%2B-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)](https://isocpp.org/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-lightgrey?style=for-the-badge)](LICENSE)
 
-## What this mod currently does
+**Write RimWorld mods in Lua.** Script behavior and patches without a C# project for every change.
 
-- Patches `JobGiver_GetFood.TryGiveJob` with a Harmony Prefix.
-- If a pawn is:
-  - humanlike,
-  - in the player faction,
-  - on a map with a resource counter,
-- then food seeking is blocked when `TotalHumanEdibleNutrition < 10`.
-- Adds an in-game dev GUI window for live testing and tuning.
-- Provides a keybinding def: `DontEat_ToggleDevWindow` (default `F8`).
-- Provides fallback hotkey `Ctrl+F8` if keybinding defs are not loaded yet.
+`stratware.rimkit` · Team Stratware.win
 
-## Folder structure
+---
 
-- `About/About.xml` - mod metadata and dependency declaration.
-- `Source/DontEat.csproj` - C# project for compiling the mod DLL.
-- `Source/DontEatLogic.cs` - Harmony startup and patch logic.
-- `Assemblies/` - output folder for built DLL.
+## Why this exists
 
-## Build
+RimWorld modding usually means C#, Harmony, and a rebuild loop. RimLuaKit flips that:
 
-From this mod root folder:
+- **Lua first** for behavior, events, jobs, UI hooks
+- **C++ core** (Lua 5.4 + sol2) for the runtime
+- **Thin C# host** so RimWorld can load the kit
 
-```powershell
-dotnet build .\Source\DontEat.csproj -c Release
+```lua
+function on_pawn_spawned(pawn)
+  if pawn.is_colonist then
+    pawn:give_item("Component", 1)
+    log.info(pawn.name .. " got a component")
+  end
+end
+
+events.on("pawn_died", function(pawn)
+  log.info(pawn.name .. " died")
+end)
+
+rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(pawn)
+  return true  -- false = skip original
+end
 ```
 
-Output DLL:
+Give items. Register jobs. Open debug windows. Patch with `rim.prefix`. One language for gameplay logic.
 
-- `Assemblies/DontEat.dll`
+---
 
-## Build path overrides (if needed)
-
-The project auto-detects common Windows Steam paths. If your install is different, pass these:
+## Quick start
 
 ```powershell
-dotnet build .\Source\DontEat.csproj -c Release /p:RimWorldDir="D:\SteamLibrary\steamapps\common\RimWorld" /p:HarmonyPath="D:\SteamLibrary\steamapps\workshop\content\294100\2009463077\Current\Assemblies\0Harmony.dll"
+# build kit
+cmd /c src\native\build_release.bat
+dotnet build .\src\host\RimLuaHost.csproj -c Release
+
+# copy kit + a sample into RimWorld Mods/
+.\bin\rimkit.exe mod ship .
+.\bin\rimkit.exe mod ship .\src\examples\jobs
 ```
 
-## In-game setup
+In-game load order: **Harmony, then RimLuaKit, then your mod**.
 
-1. Subscribe to or install Harmony (`brrainz.harmony`).
-2. Put this mod folder in your RimWorld `Mods` directory (or symlink it).
-3. Enable mods in this order:
-   1. Harmony
-   2. Don't Eat
-4. Restart when prompted by RimWorld.
+Close RimWorld before copying if `Native\rimlua_core.dll` is locked.
 
-## In-game controls
+```powershell
+rimkit mod create MyMod
+rimkit mod sync
+rimkit mod ship
+```
 
-- Press `F8` to toggle the Don't Eat dev GUI window.
-- You can rebind the key from RimWorld's Controls menu:
-  - search for `toggle don't eat dev window`
-- Fallback shortcut: `Ctrl+F8`
+---
 
-## GUI features
+## What you can do
 
-- View current map human-edible nutrition.
-- View selected pawn hunger percentage.
-- Recount map food immediately.
-- Spawn 10 simple meals near selected pawn.
-- Tune food threshold and emergency hunger override live.
-- Toggle debug logging and in-game debug messages.
+| Surface | Examples |
+|---------|----------|
+| Pawn | `give_item`, traits, hediffs, draft, kill, `start_job` |
+| Events | `on_pawn_spawned`, `pawn_died`, timers |
+| Jobs | `jobs.register` + scripted `JobDriver_RimLua` |
+| Map | spawn things, `find_cells` by terrain |
+| UI | window, float menu, messages, letters |
+| Config | Mod settings from Lua |
+| Defs | `defs.lua` to XML on `rimkit mod sync` |
+| Escape | `rim.reflect.*`, raw Harmony prefixes |
 
-## Learn RimWorld modding properly (recommended path)
+Samples: `src/examples/hello_lua`, `src/examples/jobs` (F8 debug UI).
 
-1. Start with mod folder and About.xml fundamentals.
-2. Set up a C# class library that outputs to `Assemblies`.
-3. Reference game managed DLLs + Harmony DLL (without bundling Harmony in your mod).
-4. Use decompiled game code to verify patch targets and signatures before patching.
-5. Prefer Postfix patches when possible for compatibility; use Prefix skip only when necessary.
-6. Re-test after each game update and review the RimWorld 1.6 mod update notes.
+Docs: [docs/](docs/index.md) · API: [docs/lua-api.md](docs/lua-api.md)
 
-## Notes for maintainability
+---
 
-- Harmony patch methods are static by design.
-- Prefix methods returning `false` skip the original method.
-- Keep patch scope narrow (faction/map/condition checks) to reduce mod conflicts.
+## Editor
 
-## RimWorld 1.6 troubleshooting notes
+Pack VSIX from `vscode-rimkit/` for Lua stubs and auto-copy to Mods on save.
 
-- `ResourceCounter.TotalFood` is gone in 1.6. Use `TotalHumanEdibleNutrition`.
-- Do not add unsupported fields to `About.xml` (for example `modClass` in this setup); unsupported fields can break metadata loading.
-- For GUI windows and keyboard polling, make sure your project references:
-  - `UnityEngine.IMGUIModule.dll`
-  - `UnityEngine.InputLegacyModule.dll`
+```powershell
+code --install-extension .\vscode-rimkit\rimkit-0.1.0.vsix
+```
+
+Workspace settings live under `.cursor/` (Lua stub library + CMake path).
+
+---
+
+## Layout
+
+```text
+src/host/          thin C# host (Harmony, GameApi, UI)
+src/native/        C++ Lua core + rimkit CLI
+src/examples/      hello_lua, jobs
+vscode-rimkit/     editor stubs / extension
+Native/            rimlua_core.dll (out of Assemblies/)
+Assemblies/        RimLuaHost.dll only
+meta.lua           mod identity (rimkit writes About.xml)
+```
+
+---
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).

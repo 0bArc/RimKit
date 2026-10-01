@@ -1,0 +1,6 @@
+{
+  "cmake.sourceDirectory": "${workspaceFolder}/src/native",
+  "Lua.workspace.library": [
+    "${workspaceFolder}/vscode-rimkit/stubs"
+  ]
+}

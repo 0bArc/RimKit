@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<Defs>
-  <KeyBindingDef>
-    <defName>DontEat_ToggleDevWindow</defName>
-    <label>toggle don't eat dev window</label>
-    <category>Game</category>
-    <defaultKeyCodeA>F8</defaultKeyCodeA>
-  </KeyBindingDef>
-</Defs>
