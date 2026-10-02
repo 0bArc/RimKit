@@ -5,9 +5,7 @@ using Verse.AI;
 
 namespace RimLuaKit
 {
-    /// <summary>
-    /// Binds a RimWorld Job instance to a Lua jobs.register name.
-    /// </summary>
+    // Job handle -> Lua job name.
     internal static class LuaJobBridge
     {
         private static readonly Dictionary<int, string> NamesByJobHandle = new Dictionary<int, string>();
@@ -73,7 +71,7 @@ namespace RimLuaKit
                 }
                 catch (Exception e)
                 {
-                    Log.Error("[RimLuaKit] JobDriver_RimLua tick failed: " + e);
+                    Log.Error("[RimKit] JobDriver_RimLua tick failed: " + e);
                     EndJobWith(JobCondition.Errored);
                 }
             };

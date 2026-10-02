@@ -55,4 +55,8 @@ RIMLUA_API void rimlua_ui_invoke(int callback_id) {
     rimlua::Engine::instance().ui_invoke(callback_id);
 }
 
+RIMLUA_API const char* rimlua_collect_map_float_menu(int clicked_handle, int hauler_handle) {
+    return rimlua::Engine::instance().collect_map_float_menu(clicked_handle, hauler_handle);
+}
+
 }  // extern "C"

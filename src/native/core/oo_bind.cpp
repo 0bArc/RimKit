@@ -145,6 +145,77 @@ void Engine::bind_oo_types() {
             return host_call("pawn.set_drafted", a);
         },
         "seek_medical_help", [this](RimPawn& p) { return host_call_h("pawn.seek_medical", p.h); },
+        "position",
+        sol::property([this](RimPawn& p) -> sol::object {
+            sol::object o = host_call_h("pawn.pos", p.h);
+            if (!o.is<std::string>()) {
+                return sol::make_object(*lua_, sol::lua_nil);
+            }
+            std::string s = o.as<std::string>();
+            auto comma = s.find(',');
+            if (comma == std::string::npos) {
+                return sol::make_object(*lua_, sol::lua_nil);
+            }
+            sol::table cell = lua_->create_table();
+            cell["x"] = std::stoi(s.substr(0, comma));
+            cell["z"] = std::stoi(s.substr(comma + 1));
+            return sol::make_object(*lua_, cell);
+        }),
+        "is_moving",
+        sol::property([this](RimPawn& p) -> bool {
+            sol::object o = host_call_h("pawn.is_moving", p.h);
+            return o.is<bool>() && o.as<bool>();
+        }),
+        "can_reach",
+        [this](RimPawn& p, int x, int z) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["x"] = x;
+            a["z"] = z;
+            sol::object o = host_call("pawn.can_reach", a);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "walk_to",
+        [this](RimPawn& p, int x, int z, sol::optional<bool> sprint) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["x"] = x;
+            a["z"] = z;
+            if (sprint && *sprint) {
+                a["sprint"] = true;
+            }
+            sol::object o = host_call("pawn.walk_to", a);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "wander",
+        [this](RimPawn& p, sol::optional<int> radius) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["radius"] = radius.value_or(12);
+            sol::object o = host_call("pawn.wander", a);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "stop", [this](RimPawn& p) { return host_call_h("pawn.stop", p.h); },
+        "equip_weapon",
+        [this](RimPawn& p, sol::optional<std::string> def) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            if (def) {
+                a["def"] = *def;
+            }
+            sol::object o = host_call("pawn.equip_weapon", a);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "shoot_hostiles",
+        [this](RimPawn& p, sol::optional<bool> instant) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            if (instant && *instant) {
+                a["instant"] = true;
+            }
+            sol::object o = host_call("pawn.shoot_hostiles", a);
+            return o.is<int>() ? o.as<int>() : 0;
+        },
         "start_job",
         [this](RimPawn& p, const std::string& job_name) {
             sol::table a = lua_->create_table();
@@ -192,6 +263,23 @@ void Engine::bind_oo_types() {
             sol::object o = host_call("map.spawn", a);
             int th = o.is<int>() ? o.as<int>() : 0;
             return th == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_thing(th));
+        },
+        "spawn_pawn",
+        [this](RimMap& m, const std::string& kind, sol::optional<std::string> faction, sol::optional<int> x,
+               sol::optional<int> z) {
+            sol::table a = lua_->create_table();
+            a["h"] = m.h;
+            a["kind"] = kind;
+            if (faction) {
+                a["faction"] = *faction;
+            }
+            if (x && z) {
+                a["x"] = *x;
+                a["z"] = *z;
+            }
+            sol::object o = host_call("map.spawn_pawn", a);
+            int ph = o.is<int>() ? o.as<int>() : 0;
+            return ph == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_pawn(ph));
         },
         "find_cells",
         [this](RimMap& m, sol::optional<sol::table> opts) {
@@ -341,6 +429,80 @@ void Engine::bind_jobs_and_faction() {
         sol::object o = host_call("job.start_lua", a);
         return o.is<bool>() && o.as<bool>();
     };
+
+    sol::table path = lua_->create_named_table("path");
+    path["can_reach"] = [this](RimPawn pawn, int x, int z) {
+        sol::table a = lua_->create_table();
+        a["h"] = pawn.h;
+        a["x"] = x;
+        a["z"] = z;
+        sol::object o = host_call("pawn.can_reach", a);
+        return o.is<bool>() && o.as<bool>();
+    };
+    path["walk"] = [this](RimPawn pawn, int x, int z, sol::optional<bool> sprint) {
+        sol::table a = lua_->create_table();
+        a["h"] = pawn.h;
+        a["x"] = x;
+        a["z"] = z;
+        if (sprint && *sprint) {
+            a["sprint"] = true;
+        }
+        sol::object o = host_call("pawn.walk_to", a);
+        return o.is<bool>() && o.as<bool>();
+    };
+    path["wander"] = [this](RimPawn pawn, sol::optional<int> radius) {
+        sol::table a = lua_->create_table();
+        a["h"] = pawn.h;
+        a["radius"] = radius.value_or(12);
+        sol::object o = host_call("pawn.wander", a);
+        return o.is<bool>() && o.as<bool>();
+    };
+    path["compute"] = [this](RimPawn pawn, int x, int z) {
+        sol::table a = lua_->create_table();
+        a["h"] = pawn.h;
+        a["x"] = x;
+        a["z"] = z;
+        sol::object o = host_call("path.compute", a);
+        sol::table out = lua_->create_table();
+        if (o.is<sol::table>()) {
+            sol::table arr = o.as<sol::table>();
+            int i = 1;
+            for (const auto& kv : arr) {
+                if (!kv.second.is<std::string>()) {
+                    continue;
+                }
+                std::string s = kv.second.as<std::string>();
+                auto comma = s.find(',');
+                if (comma == std::string::npos) {
+                    continue;
+                }
+                sol::table cell = lua_->create_table();
+                cell["x"] = std::stoi(s.substr(0, comma));
+                cell["z"] = std::stoi(s.substr(comma + 1));
+                out[i++] = cell;
+            }
+        }
+        return out;
+    };
+    path["stop"] = [this](RimPawn pawn) { return host_call_h("pawn.stop", pawn.h); };
+
+    sol::table control = lua_->create_named_table("control");
+    control["claim"] = [this](RimPawn pawn, sol::optional<bool> click_walk) {
+        sol::table a = lua_->create_table();
+        a["h"] = pawn.h;
+        a["click_walk"] = click_walk.value_or(true);
+        sol::object o = host_call("control.set", a);
+        return o.is<bool>() && o.as<bool>();
+    };
+    control["clear"] = [this]() { return host_call("control.clear", lua_->create_table()); };
+    control["get"] = [this]() -> sol::object {
+        sol::object o = host_call("control.get", lua_->create_table());
+        int h = o.is<int>() ? o.as<int>() : 0;
+        if (h == 0) {
+            return sol::make_object(*lua_, sol::lua_nil);
+        }
+        return sol::make_object(*lua_, wrap_pawn(h));
+    };
 }
 
 int Engine::register_ui_callback(sol::protected_function fn) {
@@ -358,6 +520,62 @@ void Engine::ui_invoke(int callback_id) {
     if (!r.valid()) {
         log_lua_error("[RimLuaKit] ui callback " + std::to_string(callback_id), r);
     }
+}
+
+const char* Engine::collect_map_float_menu(int clicked_handle, int hauler_handle) {
+    float_menu_blob_cache_.clear();
+    if (!ready_ || !lua_ || map_float_menu_handlers_.empty()) {
+        return float_menu_blob_cache_.c_str();
+    }
+
+    for (sol::protected_function& fn : map_float_menu_handlers_) {
+        sol::table ctx = lua_->create_table();
+        ctx["clicked"] = clicked_handle;
+        ctx["hauler"] = hauler_handle;
+        sol::protected_function_result r = fn(ctx);
+        if (!r.valid()) {
+            log_lua_error("[RimLuaKit] on_map_float_menu", r);
+            continue;
+        }
+        sol::object obj = r;
+        if (!obj.is<sol::table>()) {
+            continue;
+        }
+        sol::table opts = obj.as<sol::table>();
+        for (const auto& kv : opts) {
+            if (!kv.second.is<sol::table>()) {
+                continue;
+            }
+            sol::table b = kv.second.as<sol::table>();
+            std::string label = "Option";
+            sol::object lo = b["label"];
+            if (lo.is<std::string>()) {
+                label = lo.as<std::string>();
+            }
+            bool disabled = false;
+            sol::object dobj = b["disabled"];
+            if (dobj.is<bool>()) {
+                disabled = dobj.as<bool>();
+            }
+            int id = 0;
+            if (!disabled) {
+                sol::object click = b["on_click"];
+                if (!click.valid()) {
+                    click = b["action"];
+                }
+                if (click.is<sol::protected_function>()) {
+                    id = register_ui_callback(click.as<sol::protected_function>());
+                }
+            }
+            if (!float_menu_blob_cache_.empty()) {
+                float_menu_blob_cache_ += "\n";
+            }
+            float_menu_blob_cache_ += label;
+            float_menu_blob_cache_ += "\t";
+            float_menu_blob_cache_ += std::to_string(id);
+        }
+    }
+    return float_menu_blob_cache_.c_str();
 }
 
 void Engine::bind_ui_config_defs() {
@@ -420,6 +638,10 @@ void Engine::bind_ui_config_defs() {
         sol::table a = lua_->create_table();
         a["buttons"] = build_button_blob(options);
         return host_call("ui.float_menu", a);
+    };
+    // Right-click map thing: fn(ctx) -> { {label=, on_click=, disabled?}, ... }
+    ui["on_map_float_menu"] = [this](sol::protected_function fn) {
+        map_float_menu_handlers_.push_back(std::move(fn));
     };
 
     sol::table config = lua_->create_named_table("config");
@@ -517,6 +739,264 @@ void Engine::bind_ui_config_defs() {
         sol::object o = host_call("input.binding_just_pressed", a);
         return o.is<bool>() && o.as<bool>();
     };
+}
+
+void Engine::bind_strong_api() {
+    auto call1 = [this](const char* op, const std::string& key, const std::string& val) {
+        sol::table a = lua_->create_table();
+        a[key] = val;
+        return host_call(op, a);
+    };
+
+    sol::table data = lua_->create_named_table("data");
+    data["get"] = [this](const std::string& package_id, const std::string& key) {
+        sol::table a = lua_->create_table();
+        a["package_id"] = package_id;
+        a["key"] = key;
+        return host_call("data.get", a);
+    };
+    data["set"] = [this](const std::string& package_id, const std::string& key, const std::string& value) {
+        sol::table a = lua_->create_table();
+        a["package_id"] = package_id;
+        a["key"] = key;
+        a["value"] = value;
+        return host_call("data.set", a);
+    };
+    data["remove"] = [this](const std::string& package_id, const std::string& key) {
+        sol::table a = lua_->create_table();
+        a["package_id"] = package_id;
+        a["key"] = key;
+        return host_call("data.remove", a);
+    };
+    data["keys"] = [this](const std::string& package_id) {
+        sol::table a = lua_->create_table();
+        a["package_id"] = package_id;
+        return host_call("data.keys", a);
+    };
+
+    sol::table health = lua_->create_named_table("health");
+    health["has_hediff"] = [this](int h, const std::string& def) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["def"] = def;
+        return host_call("health.has_hediff", a);
+    };
+    health["hediff_severity"] = [this](int h, const std::string& def) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["def"] = def;
+        return host_call("health.hediff_severity", a);
+    };
+    health["set_hediff_severity"] = [this](int h, const std::string& def, double sev) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["def"] = def;
+        a["severity"] = sev;
+        return host_call("health.set_hediff_severity", a);
+    };
+    health["tend"] = [this](int h, sol::optional<double> quality) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["quality"] = quality.value_or(0.5);
+        return host_call("health.tend", a);
+    };
+
+    sol::table surgery = lua_->create_named_table("surgery");
+    surgery["queue_operation"] = [this](int h, const std::string& recipe) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["recipe"] = recipe;
+        return host_call("surgery.queue_operation", a);
+    };
+
+    // General draftable control on rim.pawn (also mirrored as global pawn).
+    sol::table rim_tbl = (*lua_)["rim"];
+    sol::table pawn_tbl = rim_tbl.get<sol::table>("pawn");
+    if (pawn_tbl.valid()) {
+        pawn_tbl["make_controllable"] = [this](int h) {
+            sol::table a = lua_->create_table();
+            a["h"] = h;
+            return host_call("pawn.make_controllable", a);
+        };
+        pawn_tbl["release_control"] = [this](int h) {
+            sol::table a = lua_->create_table();
+            a["h"] = h;
+            return host_call("pawn.release_control", a);
+        };
+        pawn_tbl["is_controllable"] = [this](int h) {
+            sol::table a = lua_->create_table();
+            a["h"] = h;
+            return host_call("pawn.is_controllable", a);
+        };
+        (*lua_)["pawn"] = pawn_tbl;
+    }
+
+    sol::table anomaly = lua_->create_named_table("anomaly");
+    anomaly["dlc_active"] = [this]() { return host_call("anomaly.dlc_active", lua_->create_table()); };
+    anomaly["is_entity"] = [this](int h) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        return host_call("anomaly.is_entity", a);
+    };
+    anomaly["try_set_faction_player"] = [this](int h) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        return host_call("anomaly.try_set_faction_player", a);
+    };
+    anomaly["release_to_hostile"] = [this](int h) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        return host_call("anomaly.release_to_hostile", a);
+    };
+    anomaly["list_on_map"] = [this](sol::optional<int> map_h) {
+        sol::table a = lua_->create_table();
+        if (map_h) a["h"] = *map_h;
+        return host_call("anomaly.list_on_map", a);
+    };
+    anomaly["knock_out"] = [this](int h, sol::optional<double> severity) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["severity"] = severity.value_or(1.0);
+        return host_call("anomaly.knock_out", a);
+    };
+    anomaly["find_platform"] = [this](int hauler_h, sol::optional<int> entity_h) {
+        sol::table a = lua_->create_table();
+        a["h"] = hauler_h;
+        if (entity_h) a["entity"] = *entity_h;
+        return host_call("anomaly.find_platform", a);
+    };
+    anomaly["start_capture"] = [this](int hauler_h, int entity_h, sol::optional<int> platform_h) {
+        sol::table a = lua_->create_table();
+        a["h"] = hauler_h;
+        a["entity"] = entity_h;
+        if (platform_h) a["platform"] = *platform_h;
+        return host_call("anomaly.start_capture", a);
+    };
+    anomaly["recruit"] = [this](int h) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        return host_call("anomaly.recruit", a);
+    };
+
+    sol::table util = lua_->create_named_table("util");
+    util["open_folder"] = [this](const std::string& target, sol::optional<std::string> package_id) {
+        sol::table a = lua_->create_table();
+        a["target"] = target;
+        if (package_id) a["package_id"] = *package_id;
+        return host_call("util.open_folder", a);
+    };
+    util["write_export"] = [this](const std::string& package_id, const std::string& file, const std::string& content) {
+        sol::table a = lua_->create_table();
+        a["package_id"] = package_id;
+        a["file"] = file;
+        a["content"] = content;
+        return host_call("util.write_export", a);
+    };
+
+    sol::table building = lua_->create_named_table("building");
+    building["power_on"] = [this](int h) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        return host_call("building.power_on", a);
+    };
+    building["set_power"] = [this](int h, bool v) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["v"] = v ? "true" : "false";
+        return host_call("building.set_power", a);
+    };
+    building["flick"] = [this](int h, bool v) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["v"] = v ? "true" : "false";
+        return host_call("building.flick", a);
+    };
+
+    sol::table work = lua_->create_named_table("work");
+    work["get_priority"] = [this](int h, const std::string& wt) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["work"] = wt;
+        return host_call("work.get_priority", a);
+    };
+    work["set_priority"] = [this](int h, const std::string& wt, int pri) {
+        sol::table a = lua_->create_table();
+        a["h"] = h;
+        a["work"] = wt;
+        a["priority"] = pri;
+        return host_call("work.set_priority", a);
+    };
+    work["list_types"] = [this]() { return host_call("work.list_types", lua_->create_table()); };
+
+    sol::table world = lua_->create_named_table("world_api");
+    world["weather"] = [this](sol::optional<int> map_h) {
+        sol::table a = lua_->create_table();
+        if (map_h) a["h"] = *map_h;
+        return host_call("world.weather", a);
+    };
+    world["set_weather"] = [this](const std::string& def, sol::optional<int> map_h) {
+        sol::table a = lua_->create_table();
+        a["def"] = def;
+        if (map_h) a["h"] = *map_h;
+        return host_call("world.set_weather", a);
+    };
+    (*lua_)["world_api"] = world;
+
+    sol::table incident = lua_->create_named_table("incident");
+    incident["try_fire"] = [this](const std::string& def, sol::optional<int> map_h) {
+        sol::table a = lua_->create_table();
+        a["def"] = def;
+        if (map_h) a["h"] = *map_h;
+        return host_call("incident.try_fire", a);
+    };
+    incident["list"] = [this]() { return host_call("incident.list", lua_->create_table()); };
+
+    sol::table audio = lua_->create_named_table("audio");
+    audio["play"] = [this](const std::string& def) {
+        sol::table a = lua_->create_table();
+        a["def"] = def;
+        return host_call("audio.play", a);
+    };
+
+    sol::table ui = (*lua_)["ui"];
+    if (ui.valid()) {
+        ui["panel"] = [this](sol::table spec) {
+            sol::table a = lua_->create_table();
+            sol::object title = spec["title"];
+            a["title"] = title.is<std::string>() ? title.as<std::string>() : "RimKit";
+            sol::object body = spec["body"];
+            a["body"] = body.is<std::string>() ? body.as<std::string>() : "";
+            std::string checks;
+            sol::object checks_obj = spec["checks"];
+            if (checks_obj.is<sol::table>()) {
+                sol::table checks_tbl = checks_obj.as<sol::table>();
+                for (const auto& kv : checks_tbl) {
+                    if (kv.second.is<std::string>()) {
+                        if (!checks.empty()) checks += "\n";
+                        checks += kv.second.as<std::string>();
+                    }
+                }
+            }
+            a["checks"] = checks;
+            std::string list;
+            sol::object list_obj = spec["list"];
+            if (list_obj.is<sol::table>()) {
+                sol::table list_tbl = list_obj.as<sol::table>();
+                for (const auto& kv : list_tbl) {
+                    if (kv.second.is<std::string>()) {
+                        if (!list.empty()) list += "\n";
+                        list += kv.second.as<std::string>();
+                    }
+                }
+            }
+            a["list"] = list;
+            return host_call("ui.panel", a);
+        };
+    }
+
+    if (callbacks_.log) {
+        callbacks_.log("[RimLuaKit] strong API domains bound (data/health/anomaly/util/building/work/...)");
+    }
 }
 
 int Engine::job_call(const std::string& name, const std::string& phase, int pawn_handle, int* out_result) {

@@ -40,6 +40,34 @@ std::string json_escape(const std::string& s) {
     return out;
 }
 
+// rim.invoke allowlist: api.list or reflect.<op>
+static bool invoke_op_allowed(const std::string& op) {
+    if (op.empty()) {
+        return false;
+    }
+    for (unsigned char c : op) {
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.')) {
+            return false;
+        }
+    }
+    if (op == "api.list") {
+        return true;
+    }
+    static const char kReflect[] = "reflect.";
+    constexpr size_t n = sizeof(kReflect) - 1;
+    if (op.size() <= n || op.compare(0, n, kReflect) != 0) {
+        return false;
+    }
+    const std::string suffix = op.substr(n);
+    if (suffix.empty() || suffix.front() == '.' || suffix.back() == '.') {
+        return false;
+    }
+    if (suffix.find("..") != std::string::npos) {
+        return false;
+    }
+    return true;
+}
+
 std::string extract_string_field(const std::string& json, const char* key) {
     std::string pat = std::string("\"") + key + "\":\"";
     auto pos = json.find(pat);
@@ -108,16 +136,19 @@ int Engine::init(const rimlua_callbacks* cb) {
     }
     callbacks_ = *cb;
     lua_ = std::make_unique<sol::state>();
+    // Strip io/os/debug/bit32.
     lua_->open_libraries(sol::lib::base, sol::lib::package, sol::lib::coroutine, sol::lib::string, sol::lib::table,
                          sol::lib::math, sol::lib::utf8);
+    apply_sandbox();
     bind_rim_api();
     bind_oo_types();
     bind_events_and_timer();
     bind_jobs_and_faction();
     bind_ui_config_defs();
+    bind_strong_api();
     ready_ = true;
     if (callbacks_.log) {
-        callbacks_.log("[RimLuaKit] C++ core initialized (wide API)");
+        callbacks_.log("[RimLuaKit] C++ core initialized (sandboxed Lua)");
     }
     return 0;
 }
@@ -130,8 +161,166 @@ void Engine::shutdown() {
     lua_jobs_.clear();
     ui_callbacks_.clear();
     timers_.clear();
+    allowed_lua_roots_.clear();
     lua_.reset();
     ready_ = false;
+}
+
+void Engine::apply_sandbox() {
+    if (!lua_) {
+        return;
+    }
+    // Strip loaders.
+    (*lua_)["dofile"] = sol::lua_nil;
+    (*lua_)["loadfile"] = sol::lua_nil;
+    (*lua_)["load"] = sol::lua_nil;
+    (*lua_)["loadstring"] = sol::lua_nil;  // alias on older Lua; harmless if absent
+    (*lua_)["io"] = sol::lua_nil;
+    (*lua_)["os"] = sol::lua_nil;
+    (*lua_)["debug"] = sol::lua_nil;
+
+    sol::table package = (*lua_)["package"];
+    package["loadlib"] = sol::lua_nil;
+    package["cpath"] = "";
+    package["path"] = "";
+
+    // Keep Lua searchers only.
+    sol::object searchers_obj = package["searchers"];
+    if (searchers_obj.is<sol::table>()) {
+        sol::table searchers = searchers_obj.as<sol::table>();
+        for (int i = 3; i <= 8; ++i) {
+            searchers[i] = sol::lua_nil;
+        }
+    }
+
+    // require only under allowed Lua roots.
+    package["searchers"][2] = [this](const std::string& modname) -> sol::object {
+        if (!lua_) {
+            return sol::make_object(*lua_, "RimLuaKit sandbox: no state");
+        }
+        std::string dotted = modname;
+        for (char& c : dotted) {
+            if (c == '.') {
+                c = '/';
+            }
+        }
+        std::vector<std::string> candidates;
+        candidates.push_back(dotted + ".lua");
+        candidates.push_back(dotted + "/init.lua");
+        for (const std::string& root : allowed_lua_roots_) {
+            for (const std::string& rel : candidates) {
+                fs::path full = fs::path(root) / rel;
+                std::error_code ec;
+                if (!fs::is_regular_file(full, ec)) {
+                    continue;
+                }
+                std::string resolved = fs::weakly_canonical(full, ec).string();
+                if (ec || !is_lua_path_allowed(resolved)) {
+                    continue;
+                }
+                sol::load_result lr = lua_->load_file(resolved);
+                if (!lr.valid()) {
+                    sol::error e = lr;
+                    return sol::make_object(*lua_, std::string(e.what()));
+                }
+                return lr.get<sol::object>();
+            }
+        }
+        return sol::make_object(*lua_, "RimLuaKit sandbox: module not in allowed Lua roots: " + modname);
+    };
+
+    // Freeze _G after stripping.
+    try {
+        lua_->script(R"LUA(
+local frozen = {
+  dofile=true, loadfile=true, load=true, loadstring=true,
+  io=true, os=true, debug=true
+}
+local g = _G
+local rawget, rawset, type = rawget, rawset, type
+local mt = {
+  __newindex = function(t, k, v)
+    if frozen[k] then return end
+    rawset(t, k, v)
+  end,
+  __index = function(t, k)
+    return rawget(t, k)
+  end
+}
+-- Preserve existing non-frozen entries; lock dangerous names to nil permanently.
+for k,_ in pairs(frozen) do
+  rawset(g, k, nil)
+end
+setmetatable(g, mt)
+package.loadlib = nil
+package.cpath = ""
+)LUA");
+    } catch (const sol::error& e) {
+        if (callbacks_.log) {
+            callbacks_.log((std::string("[RimLuaKit] sandbox freeze warn: ") + e.what()).c_str());
+        }
+    }
+
+    if (callbacks_.log) {
+        callbacks_.log("[RimLuaKit] Lua sandbox on (no io/os/dofile/loadlib; require jailed; _G frozen)");
+    }
+}
+
+void Engine::allow_lua_root(const std::string& dir) {
+    std::error_code ec;
+    fs::path p = fs::weakly_canonical(fs::path(dir), ec);
+    if (ec) {
+        p = fs::absolute(fs::path(dir), ec);
+    }
+    std::string root = p.string();
+    while (!root.empty() && (root.back() == '/' || root.back() == '\\')) {
+        root.pop_back();
+    }
+    for (const std::string& existing : allowed_lua_roots_) {
+        if (existing == root) {
+            return;
+        }
+    }
+    allowed_lua_roots_.push_back(root);
+    if (lua_) {
+        sol::table package = (*lua_)["package"];
+        std::string path = package["path"].get_or(std::string{});
+        std::string add = root + "/?.lua;" + root + "/?/init.lua";
+        if (path.empty()) {
+            package["path"] = add;
+        } else {
+            package["path"] = path + ";" + add;
+        }
+    }
+}
+
+bool Engine::is_lua_path_allowed(const std::string& path) const {
+    std::error_code ec;
+    fs::path cand = fs::weakly_canonical(fs::path(path), ec);
+    if (ec) {
+        cand = fs::path(path);
+    }
+    std::string c = cand.string();
+    for (char& ch : c) {
+        if (ch == '\\') {
+            ch = '/';
+        }
+    }
+    for (const std::string& root : allowed_lua_roots_) {
+        std::string r = root;
+        for (char& ch : r) {
+            if (ch == '\\') {
+                ch = '/';
+            }
+        }
+        if (c == r) {
+            return true;
+        }
+        if (c.size() > r.size() && c.compare(0, r.size(), r) == 0 && c[r.size()] == '/') {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string Engine::table_to_json(const sol::table& args) {
@@ -282,7 +471,21 @@ void Engine::bind_rim_api() {
     rim["on_load"] = [this](sol::protected_function fn) { on_load_.push_back(std::move(fn)); };
     rim["on_tick"] = [this](sol::protected_function fn) { on_tick_.push_back(std::move(fn)); };
 
-    rim["invoke"] = [this](const std::string& op, sol::variadic_args va) {
+    rim["invoke"] = [this](sol::object op_obj, sol::variadic_args va) {
+        if (!op_obj.valid() || !op_obj.is<std::string>()) {
+            if (callbacks_.log) {
+                callbacks_.log("[RimKit] rim.invoke denied: op must be a non-empty string");
+            }
+            return sol::make_object(*lua_, sol::lua_nil);
+        }
+        const std::string op = op_obj.as<std::string>();
+        if (!invoke_op_allowed(op)) {
+            if (callbacks_.log) {
+                std::string msg = "[RimKit] rim.invoke denied: " + op + " (use rim.<domain>.*; escape is api.list / reflect.* only)";
+                callbacks_.log(msg.c_str());
+            }
+            return sol::make_object(*lua_, sol::lua_nil);
+        }
         sol::table args = lua_->create_table();
         if (va.size() >= 1 && va[0].is<sol::table>()) {
             args = va[0].as<sol::table>();
@@ -302,7 +505,7 @@ void Engine::bind_rim_api() {
                     args[hk] = va[0].as<int>();
                 }
             }
-            // Optional second string arg as "def" or "v" or "member"
+            // optional 2nd arg
             if (va.size() >= 2 && !va[0].is<sol::table>()) {
                 if (va[1].is<std::string>()) {
                     args["def"] = va[1].as<std::string>();
@@ -736,9 +939,21 @@ int Engine::load_script(const std::string& path) {
     if (!ready_ || !lua_) {
         return 1;
     }
-    sol::protected_function_result result = lua_->safe_script_file(path, sol::script_pass_on_error);
+    std::error_code ec;
+    std::string resolved = fs::weakly_canonical(fs::path(path), ec).string();
+    if (ec) {
+        resolved = path;
+    }
+    if (!allowed_lua_roots_.empty() && !is_lua_path_allowed(resolved)) {
+        if (callbacks_.log) {
+            std::string msg = "[RimLuaKit] sandbox blocked load outside Lua roots: " + resolved;
+            callbacks_.log(msg.c_str());
+        }
+        return 3;
+    }
+    sol::protected_function_result result = lua_->safe_script_file(resolved, sol::script_pass_on_error);
     if (!result.valid()) {
-        log_lua_error(std::string("[RimLuaKit] load ") + path, result);
+        log_lua_error(std::string("[RimLuaKit] load ") + resolved, result);
         return 2;
     }
     return 0;
@@ -752,6 +967,7 @@ int Engine::load_directory(const std::string& dir) {
     if (!fs::exists(dir, ec)) {
         return 1;
     }
+    allow_lua_root(dir);
     std::vector<fs::path> files;
     for (auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); ++it) {
         if (!it->is_regular_file()) {

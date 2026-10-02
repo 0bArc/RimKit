@@ -1,6 +1,8 @@
 # Lua API
 
-Prefer the high-level OO surface. Handles still exist under `rim.*` as an escape hatch.
+Prefer the high-level OO surface and bound `rim.*` tables. Handles still exist under `rim.pawn` / `rim.map` / … as the normal handle API.
+
+`rim.invoke` is an **escape interface** for explicitly designated operations (`api.list`, `reflect.*`) and is **not** a general mechanism for calling GameApi operations.
 
 ## OO (Phase 1)
 
@@ -69,6 +71,23 @@ end
 
 Kit ships `Defs/JobDefs/RimLua_Jobs.xml` (`RimLua_Scripted` + `JobDriver_RimLua`).
 
+## Path / NPC movement
+
+Uses RimWorld `JobDefOf.Goto` + `PathFinder.FindPathNow` (1.6). No official multiplayer; singleplayer path jobs are fine.
+
+```lua
+local p = selected_pawn
+local pos = p.position  -- { x, z }
+if p:can_reach(40, 40) then
+  local nodes = path.compute(p, 40, 40)
+  log.info("nodes=" .. #nodes)
+  p:walk_to(40, 40)           -- optional 3rd arg: sprint=true
+end
+p:wander(14)
+p:stop()
+-- aliases: path.walk / path.wander / path.compute / path.stop
+```
+
 ## UI / Config / Defs (Phase 3)
 
 ```lua
@@ -119,13 +138,27 @@ Aliases: `rim.prefixes` = `rim.prefix`, `rim.postfixes` = `rim.postfix`.
 
 Legacy: `rim.hooks.prefix(type, method, fn)`.
 
-## Core (legacy)
+## Core
 
-`rim.log`, `rim.message`, `rim.on_load`, `rim.on_tick`, `rim.invoke`
+`rim.log`, `rim.message`, `rim.on_load`, `rim.on_tick`
+
+### `rim.invoke` (escape only)
+
+```lua
+rim.invoke("api.list")
+rim.invoke("reflect.get", { h = h, member = "def" })
+```
+
+Allowed ops: exact `api.list`, or case-sensitive `reflect.<suffix>` with no whitespace / empty / `..` segments. Gameplay ops (`pawn.*`, `anomaly.*`, …) must use bound tables:
+
+```lua
+rim.pawn.is_humanlike(h)
+rim.pawn.faction_is_player(h)
+```
 
 ## Find / Map / Pawn / Reflect (handle-based)
 
-`rim.find.*`, `rim.map.*`, `rim.pawn.*`, `rim.reflect.*` still work with integer handles.
+`rim.find.*`, `rim.map.*`, `rim.pawn.*` are the normal handle API. Prefer `rim.reflect.*` bindings; `rim.invoke("reflect…")` is the same escape path. Reflect needs `developer_reflect` where gated.
 
 ## Find
 
@@ -168,6 +201,11 @@ Skills/jobs: `skill`, `set_skill`, `job_def`, `end_job`, `drafted`, `set_drafted
 
 ## Reflect (`rim.reflect` / `rim.cs`)
 
+**Off by default.** Enable RimKit setting `developer_reflect` (hub Settings or Mod options) for authors.
+
+When enabled: gameplay types only (`Verse` / `RimWorld` / `UnityEngine` / `HarmonyLib`).
+Blocked: `System.Diagnostics`, `System.IO`, `System.Net`, `Assembly`/`Type` meta, process start, raw file IO.
+
 ```lua
 rim.reflect.type(h)
 rim.reflect.members(h)
@@ -175,3 +213,16 @@ rim.reflect.get(h, "Label")
 rim.reflect.set(h, "HitPoints", 10)
 rim.reflect.call(h, "Kill", "")
 ```
+
+## Security model
+
+Builtin pAuth in RimKit. Load order: **Harmony then RimKit**.
+
+1. **AuthGate**: allowlist hashes (Harmony + host + native). Must match or no Lua loads.
+2. **Lua quarantine**: each enabled `Lua/**/*.lua` pack is scanned; hostile packs are skipped; clean packs still load.
+3. **Sandboxed VM**: no `io` / `os` / `debug` / `dofile` / `load` / `loadlib`; `require` only under that mod's `Lua/`
+4. **GameApi allowlist**: unknown ops fail; domain modules via `ApiRegistry`; `rim.invoke` only `api.list` / `reflect.*`; def/export writes path-jailed
+
+**What Lua mods cannot be:** keyloggers, free Process/cmdline, arbitrary filesystem, silent unrestricted net, runtime `load()`. Least-privilege utils (`util.open_folder`, `util.write_export`) are named and jailed. See [api](api/index.md).
+
+`rimkit build` regenerates `Auth/allowlist.json`.

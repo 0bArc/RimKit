@@ -1,0 +1,31 @@
+---
+alwaysApply: true
+---
+
+# Punctuation and prose
+
+## No em dashes or en dashes (hard ban)
+
+Never use:
+
+- em dash: `—` (U+2014)
+- en dash: `–` (U+2013)
+
+This applies **everywhere**: chat replies, commits, comments, UI strings, and **all docs** (`docs/**`, README, About text, meta descriptions).
+
+Use instead:
+
+| Intent | Use |
+|--------|-----|
+| Break or aside | period, comma, colon, or parentheses |
+| Range | `to` or hyphen-minus `-` (e.g. `1.5-1.6`, `Phase 1-3`) |
+| List gloss | colon or hyphen-minus (`AuthGate: …` or `- item`) |
+
+Wrong: `RimKit — the Lua host`  
+Right: `RimKit: the Lua host` or `RimKit (the Lua host)`
+
+Before finishing any doc or markdown edit, search the changed files for `—` and `–` and remove them.
+
+## Tone
+
+Write formally, precisely, and consistently. Prefer short professional sentences. No filler.

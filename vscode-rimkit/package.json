@@ -2,7 +2,7 @@
   "name": "rimkit",
   "displayName": "RimKit (RimWorld Lua)",
   "description": "Completions and auto-ship for Stratware RimLuaKit mods.",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "publisher": "stratware",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages", "Other"],

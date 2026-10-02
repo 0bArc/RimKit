@@ -2,8 +2,8 @@
 <Defs>
   <KeyBindingDef>
     <defName>RimLua_JobsOpenDebug</defName>
-    <label>Open Jobs Test debug window</label>
+    <label>Open Jobs Test debug / fun menu</label>
     <category>Game</category>
-    <defaultKeyCodeA>F8</defaultKeyCodeA>
+    <defaultKeyCodeA>F10</defaultKeyCodeA>
   </KeyBindingDef>
 </Defs>

@@ -28,4 +28,8 @@ rimkit build
 
 Lua mods do not compile. `mod sync` / `mod ship` write About.xml from meta.lua.
 
-Install kit repo + shipped mod under RimWorld `Mods/`. Enable Harmony → RimLuaKit → mod.
+Install kit repo + shipped mod under RimWorld `Mods/`. Enable Harmony → RimKit → mod.
+
+`rimkit build` also regenerates `Auth/allowlist.json` (Harmony + host + native SHA256).
+
+New authors: [Create a safe mod](mod-create/index.md).

@@ -146,8 +146,20 @@ namespace RimLuaKit
         {
             Listing_Standard list = new Listing_Standard();
             list.Begin(inRect);
-            list.Label("RimLuaKit config (Lua config.register)");
+            list.Label("RimKit config");
             list.GapLine();
+
+            bool reflect = Settings != null &&
+                           Settings.Bools.TryGetValue("rimkit.developer_reflect", out bool rv) && rv;
+            list.CheckboxLabeled("Developer reflect (rim.reflect / rim.cs), off by default", ref reflect);
+            if (Settings != null)
+            {
+                bool prev = Settings.Bools.TryGetValue("rimkit.developer_reflect", out bool p) && p;
+                Settings.Bools["rimkit.developer_reflect"] = reflect;
+                if (prev != reflect) Settings.Write();
+            }
+            list.GapLine();
+            list.Label("Lua config.register keys");
             if (Entries.Count == 0)
             {
                 list.Label("No config keys registered yet. Load a Lua mod that calls config.register.");

@@ -1,0 +1,31 @@
+---
+description: Keep vscode-rimkit VSIX and completions in sync with the Lua API
+alwaysApply: true
+---
+
+# RimKit VSIX always current
+
+When this session changes anything Lua authors see (host ops, OO bindings, docs/api, examples that introduce new `rim.*` / `anomaly.*` / `ui.*` / `pawn.*` surfaces), update the VS Code extension **before ending the turn**.
+
+## Checklist (do all)
+
+1. Update `vscode-rimkit/stubs/rimkit.lua` and completions in `vscode-rimkit/extension.js` for new/changed APIs.
+2. Bump `vscode-rimkit/package.json` `version` (patch for API docs/completions; minor for extension behavior).
+3. Repackage from `vscode-rimkit`:
+
+```powershell
+cd vscode-rimkit
+npx --yes @vscode/vsce package --no-dependencies
+```
+
+4. Confirm `vscode-rimkit/rimkit-<version>.vsix` exists and matches the new version. Remove or leave stale `rimkit-*.vsix` only if README points at the latest.
+5. If README / `docs/**` mention a VSIX path or version, update that path.
+
+## Skip only when
+
+- Change is host/native internals with **no** new Lua-facing name.
+- Pure ship/allowlist/DLL copy with no API surface change.
+
+## Install note
+
+Do not require reinstall every time. Say: reload window or `cursor --install-extension .\vscode-rimkit\rimkit-<version>.vsix` if user needs fresh completions.

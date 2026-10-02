@@ -1,12 +1,45 @@
 using System;
+using System.Collections.Concurrent;
 using HarmonyLib;
+using RimWorld;
 using Verse;
 
 namespace RimLuaKit
 {
-    /// <summary>
-    /// Fixed Harmony patches that emit semantic Lua events (pawn_spawned, pawn_died).
-    /// </summary>
+    // SpawnSetup can run off the main thread; queue and drain later.
+    internal static class LuaEventQueue
+    {
+        private static readonly ConcurrentQueue<(string name, int handle)> Pending =
+            new ConcurrentQueue<(string, int)>();
+
+        public static void Enqueue(string name, int handle)
+        {
+            if (string.IsNullOrEmpty(name) || handle == 0)
+            {
+                return;
+            }
+
+            Pending.Enqueue((name, handle));
+        }
+
+        public static void Drain()
+        {
+            int n = 0;
+            while (n < 64 && Pending.TryDequeue(out var ev))
+            {
+                n++;
+                try
+                {
+                    NativeAbi.rimlua_emit_event(ev.name, ev.handle);
+                }
+                catch (Exception e)
+                {
+                    Log.Error("[RimKit] event drain " + ev.name + " failed: " + e);
+                }
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(Pawn), nameof(Pawn.SpawnSetup))]
     internal static class EventBridge_PawnSpawnSetup
     {
@@ -17,13 +50,19 @@ namespace RimLuaKit
                 return;
             }
 
+            // Off main thread during map gen.
+            if (Current.ProgramState != ProgramState.Playing)
+            {
+                return;
+            }
+
             try
             {
-                NativeAbi.rimlua_emit_event("pawn_spawned", ObjectHandles.GetOrAdd(__instance));
+                LuaEventQueue.Enqueue("pawn_spawned", ObjectHandles.GetOrAdd(__instance));
             }
             catch (Exception e)
             {
-                Log.Error("[RimLuaKit] pawn_spawned emit failed: " + e);
+                Log.Error("[RimKit] pawn_spawned queue failed: " + e);
             }
         }
     }
@@ -40,11 +79,11 @@ namespace RimLuaKit
 
             try
             {
-                NativeAbi.rimlua_emit_event("pawn_died", ObjectHandles.GetOrAdd(__instance));
+                LuaEventQueue.Enqueue("pawn_died", ObjectHandles.GetOrAdd(__instance));
             }
             catch (Exception e)
             {
-                Log.Error("[RimLuaKit] pawn_died emit failed: " + e);
+                Log.Error("[RimKit] pawn_died queue failed: " + e);
             }
         }
     }

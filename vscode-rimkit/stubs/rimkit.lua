@@ -1,5 +1,5 @@
 --- RimKit Lua stubs (EmmyLua / LuaLS). Author: Team Stratware.win
---- High-level OO API (Phase 1–3) + escape hatch rim.invoke / rim.prefix / rim.reflect
+--- Bound rim.* tables are the normal API. rim.invoke is escape-only (api.list / reflect.*).
 
 ---@class RimFaction
 ---@field handle integer
@@ -21,6 +21,8 @@ function RimFaction:set_relation(other, kind) end
 ---@field is_humanlike boolean
 ---@field map RimMap|nil
 ---@field faction RimFaction|nil
+---@field position RimCell|nil
+---@field is_moving boolean
 local RimPawn = {}
 ---@param def string
 ---@param stack integer|nil
@@ -38,6 +40,19 @@ function RimPawn:kill() end
 ---@param drafted boolean|nil
 function RimPawn:draft(drafted) end
 function RimPawn:seek_medical_help() end
+---@param x integer
+---@param z integer
+---@return boolean
+function RimPawn:can_reach(x, z) end
+---@param x integer
+---@param z integer
+---@param sprint boolean|nil
+---@return boolean
+function RimPawn:walk_to(x, z, sprint) end
+---@param radius integer|nil
+---@return boolean
+function RimPawn:wander(radius) end
+function RimPawn:stop() end
 ---@param job_name string
 ---@return boolean
 function RimPawn:start_job(job_name) end
@@ -113,6 +128,30 @@ function jobs.register(name, spec) end
 ---@return boolean
 function jobs.start(pawn, name) end
 
+path = {}
+---@param pawn RimPawn
+---@param x integer
+---@param z integer
+---@return boolean
+function path.can_reach(pawn, x, z) end
+---@param pawn RimPawn
+---@param x integer
+---@param z integer
+---@param sprint boolean|nil
+---@return boolean
+function path.walk(pawn, x, z, sprint) end
+---@param pawn RimPawn
+---@param radius integer|nil
+---@return boolean
+function path.wander(pawn, radius) end
+---@param pawn RimPawn
+---@param x integer
+---@param z integer
+---@return RimCell[]
+function path.compute(pawn, x, z) end
+---@param pawn RimPawn
+function path.stop(pawn) end
+
 ui = {}
 ---@param text string
 function ui.message(text) end
@@ -123,6 +162,11 @@ function ui.letter(label, text) end
 function ui.window(spec) end
 ---@param options table
 function ui.float_menu(options) end
+---@param spec {title:string|nil, body:string|nil, checks:string[]|nil, list:string[]|nil}
+function ui.panel(spec) end
+--- Right-click map menus. Humans recruit/capture; entities are commandable only.
+---@param fn fun(ctx:{clicked:integer, hauler:integer}): table[]|nil
+function ui.on_map_float_menu(fn) end
 
 config = {}
 ---@param key string
@@ -217,3 +261,161 @@ function rim.map.nutrition(h) end
 rim.find = {}
 ---@return integer
 function rim.find.current_map() end
+---@return integer
+function rim.find.selected() end
+---@return integer
+function rim.find.tick() end
+
+---@param op string Escape only: "api.list" or "reflect.<suffix>" (case-sensitive; no whitespace)
+---@param args table|nil
+---@return any
+function rim.invoke(op, args) end
+
+rim.reflect = {}
+---@param h integer
+---@param member string
+---@return any
+function rim.reflect.get(h, member) end
+---@param h integer
+---@param method string
+---@param args string|nil
+---@return any
+function rim.reflect.call(h, method, args) end
+
+-- Strong API domains (Wave 0-3). Prefer these tables; do not rim.invoke gameplay ops.
+
+data = {}
+---@param package_id string
+---@param key string
+---@return string|nil
+function data.get(package_id, key) end
+---@param package_id string
+---@param key string
+---@param value string
+function data.set(package_id, key, value) end
+---@param package_id string
+---@param key string
+function data.remove(package_id, key) end
+---@param package_id string
+---@return string[]
+function data.keys(package_id) end
+
+health = {}
+---@param h integer
+---@param defName string
+---@return boolean
+function health.has_hediff(h, defName) end
+---@param h integer
+---@param defName string
+---@return number
+function health.hediff_severity(h, defName) end
+---@param h integer
+---@param defName string
+---@param severity number
+function health.set_hediff_severity(h, defName, severity) end
+---@param h integer
+---@param quality number|nil
+function health.tend(h, quality) end
+
+surgery = {}
+---@param h integer
+---@param recipeDefName string
+---@return boolean
+function surgery.queue_operation(h, recipeDefName) end
+
+---@param h integer
+---@return boolean
+function rim.pawn.make_controllable(h) end
+---@param h integer
+---@return boolean
+function rim.pawn.release_control(h) end
+---@param h integer
+---@return boolean
+function rim.pawn.is_controllable(h) end
+
+--- Free-function mirror of rim.pawn (handle APIs).
+pawn = rim.pawn
+
+anomaly = {}
+---@return boolean
+function anomaly.dlc_active() end
+---@param h integer
+---@return boolean
+function anomaly.is_entity(h) end
+---@param mapHandle integer|nil
+---@return integer[]
+function anomaly.list_on_map(mapHandle) end
+---@param h integer
+---@param severity number|nil
+function anomaly.knock_out(h, severity) end
+---@param hauler_h integer
+---@param entity_h integer|nil
+---@return integer
+function anomaly.find_platform(hauler_h, entity_h) end
+---@param hauler_h integer
+---@param entity_h integer
+---@param platform_h integer|nil
+---@return boolean
+function anomaly.start_capture(hauler_h, entity_h, platform_h) end
+--- Same as pawn.make_controllable. Draft/move like an animal.
+---@param h integer
+---@return boolean
+function anomaly.recruit(h) end
+---@param h integer
+---@return boolean
+function anomaly.try_set_faction_player(h) end
+---@param h integer
+---@return boolean
+function anomaly.release_to_hostile(h) end
+
+util = {}
+---@param target "ModRoot"|"Saves"|"PlayerLog"|"RimKit"
+---@param package_id string|nil
+function util.open_folder(target, package_id) end
+---@param package_id string
+---@param file string
+---@param content string
+function util.write_export(package_id, file, content) end
+
+building = {}
+---@param h integer
+---@return boolean
+function building.power_on(h) end
+---@param h integer
+---@param on boolean
+function building.set_power(h, on) end
+---@param h integer
+---@param on boolean
+function building.flick(h, on) end
+
+work = {}
+---@param h integer
+---@param workType string
+---@return integer
+function work.get_priority(h, workType) end
+---@param h integer
+---@param workType string
+---@param priority integer
+function work.set_priority(h, workType, priority) end
+---@return string[]
+function work.list_types() end
+
+world_api = {}
+---@param map integer|nil
+---@return string
+function world_api.weather(map) end
+---@param def string
+---@param map integer|nil
+function world_api.set_weather(def, map) end
+
+incident = {}
+---@param def string
+---@param map integer|nil
+---@return boolean
+function incident.try_fire(def, map) end
+---@return string[]
+function incident.list() end
+
+audio = {}
+---@param soundDef string
+function audio.play(soundDef) end

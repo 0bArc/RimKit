@@ -18,4 +18,6 @@ src/examples/
 src/templates/
 ```
 
-Load order: Harmony, RimLuaKit, your mod.
+Load order: Harmony → RimKit → your mod.
+
+Write clean mods: [Create a safe mod](mod-create/index.md).

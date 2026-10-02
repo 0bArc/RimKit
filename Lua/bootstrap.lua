@@ -1,4 +1,4 @@
--- Optional kit bootstrap. Runs when RimLuaKit's own Lua/ folder is loaded.
-rim.on_load(function()
-  rim.log("[RimLuaKit] bootstrap ok")
-end)
+-- Optional kit bootstrap. Runs when RimKit's own Lua/ folder is loaded.
+if rim and rim.log then
+  rim.log("[RimKit] bootstrap ok")
+end

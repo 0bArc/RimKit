@@ -7,16 +7,17 @@
     <li>1.6</li>
   </supportedVersions>
   <packageId>stratware.jobs</packageId>
-  <description>RimLuaKit Phase 1-3 test mod: jobs, UI window, float menu, config, defs, logs.</description>
+  <description>RimKit Phase 1-3 test mod: jobs, UI window, float menu, config, defs, logs.</description>
   <modDependencies>
     <li>
       <packageId>brrainz.harmony</packageId>
       <displayName>Harmony</displayName>
       <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+      <downloadUrl>https://github.com/pardeike/HarmonyRimWorld</downloadUrl>
     </li>
     <li>
       <packageId>stratware.rimkit</packageId>
-      <displayName>RimLuaKit</displayName>
+      <displayName>RimKit</displayName>
       <downloadUrl>https://github.com/stratware/RimWorldModKit</downloadUrl>
     </li>
   </modDependencies>

@@ -27,14 +27,14 @@ namespace RimLuaKit
                 Type type = AccessTools.TypeByName(typeName);
                 if (type == null)
                 {
-                    Log.Error("[RimLuaKit] Type not found: " + typeName);
+                    Log.Error("[RimKit] Type not found: " + typeName);
                     return 0;
                 }
 
                 MethodInfo method = AccessTools.Method(type, methodName);
                 if (method == null)
                 {
-                    Log.Error("[RimLuaKit] Method not found: " + typeName + "." + methodName);
+                    Log.Error("[RimKit] Method not found: " + typeName + "." + methodName);
                     return 0;
                 }
 
@@ -61,12 +61,12 @@ namespace RimLuaKit
                 }
 
                 HookToMethod[hookId] = method;
-                Log.Message("[RimLuaKit] Hooked " + (prefix ? "prefix" : "postfix") + " " + typeName + "." + methodName + " id=" + hookId);
+                Log.Message("[RimKit] Hooked " + (prefix ? "prefix" : "postfix") + " " + typeName + "." + methodName + " id=" + hookId);
                 return 1;
             }
             catch (Exception e)
             {
-                Log.Error("[RimLuaKit] RegisterHook failed: " + e);
+                Log.Error("[RimKit] RegisterHook failed: " + e);
                 return 0;
             }
         }
@@ -160,31 +160,46 @@ namespace RimLuaKit
     {
         private static int tickCounter;
         private static bool onLoadFired;
+        private static bool luaLoadAttempted;
 
         public static void Postfix()
         {
+            if (!luaLoadAttempted)
+            {
+                luaLoadAttempted = true;
+                try
+                {
+                    HostMain.TryLoadLuaModsGated();
+                }
+                catch (Exception e)
+                {
+                    Log.Error("[RimKit] gated Lua load failed: " + e);
+                }
+            }
+
             if (!onLoadFired)
             {
                 onLoadFired = true;
                 try
                 {
                     NativeAbi.rimlua_call_on_load();
-                    Log.Message("[RimLuaKit] Host ready (wide API).");
+                    Log.Message("[RimKit] Host ready (wide API).");
                 }
                 catch (Exception e)
                 {
-                    Log.Error("[RimLuaKit] on_load failed: " + e);
+                    Log.Error("[RimKit] on_load failed: " + e);
                 }
             }
 
             tickCounter++;
             try
             {
+                LuaEventQueue.Drain();
                 NativeAbi.rimlua_call_on_tick();
             }
             catch (Exception e)
             {
-                Log.Error("[RimLuaKit] on_tick failed: " + e);
+                Log.Error("[RimKit] on_tick failed: " + e);
             }
         }
     }

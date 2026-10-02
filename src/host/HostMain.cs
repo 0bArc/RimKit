@@ -23,13 +23,51 @@ namespace RimLuaKit
                 harmony.PatchAll();
 
                 BindCallbacksAndInit();
-                LoadAllLuaMods();
-                // Defer on_load until play loop: Messages/UI not ready in StaticConstructorOnStartup.
-                Log.Message("[RimLuaKit] Host assembled. Waiting for play to fire on_load.");
+                // Wait until play + auth.
+                BrandOptionsCategory();
+                RunStartupAuthCheck();
+                Log.Message("[RimKit] Host assembled. Waiting for play + builtin pAuth gate.");
             }
             catch (Exception e)
             {
-                Log.Error("[RimLuaKit] Failed to start: " + e);
+                Log.Error("[RimKit] Failed to start: " + e);
+            }
+        }
+
+        private static void RunStartupAuthCheck()
+        {
+            try
+            {
+                AuthGate.Ensure(force: true);
+                if (AuthGate.IsAuthorized())
+                {
+                    Log.Message("[RimKit] pAuth gate OPEN (Lua may load on play).");
+                }
+                else
+                {
+                    Log.Error("[RimKit] pAuth gate CLOSED. Lua will not load.\n" + AuthGate.FailureReason() +
+                              "\nFull report:\n" + AuthGate.Report());
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error("[RimKit] startup pAuth check failed: " + e.Message);
+            }
+        }
+
+        private static void BrandOptionsCategory()
+        {
+            try
+            {
+                OptionCategoryDef mods = DefDatabase<OptionCategoryDef>.GetNamedSilentFail("Mods");
+                if (mods != null)
+                {
+                    mods.label = "RimKit";
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Warning("[RimKit] could not brand Options category: " + e.Message);
             }
         }
 
@@ -41,7 +79,7 @@ namespace RimLuaKit
                 throw new InvalidOperationException("Cannot resolve Assemblies directory");
             }
 
-            // RimWorld loads every Assemblies/*.dll as managed. Native core must live in Native/.
+            // Native DLL lives under Native/, not Assemblies/.
             string modRoot = Directory.GetParent(assembliesDir)?.FullName;
             string nativeDir = Path.Combine(modRoot ?? assembliesDir, "Native");
             string nativeDll = Path.Combine(nativeDir, "rimlua_core.dll");
@@ -63,7 +101,7 @@ namespace RimLuaKit
                 Environment.SetEnvironmentVariable("PATH", nativeDir + Path.PathSeparator + pathEnv);
             }
 
-            Log.Message("[RimLuaKit] Native loaded from " + nativeDll);
+            Log.Message("[RimKit] Native loaded from " + nativeDll);
         }
 
         [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -80,7 +118,7 @@ namespace RimLuaKit
                 string text = NativeAbi.ReadCString(msg);
                 try
                 {
-                    // Messages.Message NREs during StaticConstructorOnStartup / early init.
+                    // Messages.Message can NRE during early init.
                     if (Current.ProgramState == ProgramState.Playing)
                     {
                         Messages.Message(text, MessageTypeDefOf.NeutralEvent, false);
@@ -131,8 +169,44 @@ namespace RimLuaKit
             }
         }
 
+        internal static void TryLoadLuaModsGated()
+        {
+            if (!PAuthProbe.AllowLuaLoad(out string reason))
+            {
+                string shortReason = reason ?? "unauthorized";
+                if (shortReason.Length > 180)
+                {
+                    shortReason = shortReason.Substring(0, 177) + "...";
+                }
+                Log.Error("[RimKit] LUA BLOCKED by builtin pAuth: " + shortReason);
+                Log.Error("[RimKit] Lua mods blocked (full):\n" + (reason ?? ""));
+                try
+                {
+                    Messages.Message("[RimKit] LUA BLOCKED: " + shortReason, MessageTypeDefOf.ThreatBig, true);
+                    if (Find.LetterStack != null)
+                    {
+                        Find.LetterStack.ReceiveLetter(
+                            "RimKit: Lua blocked",
+                            "Builtin pAuth refused to load Lua mods.\n\n" +
+                            (reason ?? "unauthorized") +
+                            "\n\nDisable hostile Lua mods (for example Bad Probe), or fix Auth/allowlist.json after a rebuild. Then restart.",
+                            LetterDefOf.ThreatBig);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Warning("[RimKit] could not show block UI: " + e.Message);
+                }
+                return;
+            }
+
+            LoadAllLuaMods();
+        }
+
         private static void LoadAllLuaMods()
         {
+            int loaded = 0;
+            int skipped = 0;
             foreach (ModContentPack pack in LoadedModManager.RunningMods)
             {
                 if (pack?.RootDir == null)
@@ -146,8 +220,30 @@ namespace RimLuaKit
                     continue;
                 }
 
-                Log.Message("[RimLuaKit] Loading Lua from " + pack.PackageId + " -> " + luaDir);
+                if (LuaThreatScanner.IsQuarantined(pack.PackageId))
+                {
+                    skipped++;
+                    Log.Warning("[RimKit] Quarantined Lua skipped: " + pack.PackageId + " -> " + luaDir);
+                    continue;
+                }
+
+                Log.Message("[RimKit] Loading Lua from " + pack.PackageId + " -> " + luaDir);
                 NativeAbi.rimlua_load_directory(luaDir);
+                loaded++;
+            }
+
+            if (skipped > 0)
+            {
+                try
+                {
+                    Messages.Message(
+                        "[RimKit] Loaded " + loaded + " Lua pack(s); quarantined " + skipped + " (see log / Hub).",
+                        MessageTypeDefOf.NeutralEvent,
+                        false);
+                }
+                catch
+                {
+                }
             }
         }
     }
@@ -161,13 +257,20 @@ namespace RimLuaKit
 
         public override void DoSettingsWindowContents(UnityEngine.Rect inRect)
         {
-            LuaConfigBridge.DrawSettings(inRect);
+            float topH = 170f;
+            var listing = new Listing_Standard();
+            listing.Begin(new UnityEngine.Rect(inRect.x, inRect.y, inRect.width, topH));
+            AuthenticityWatermark.DrawSettings(listing);
+            listing.End();
+
+            UnityEngine.Rect rest = new UnityEngine.Rect(inRect.x, inRect.y + topH + 8f, inRect.width, inRect.height - topH - 8f);
+            LuaConfigBridge.DrawSettings(rest);
             base.DoSettingsWindowContents(inRect);
         }
 
         public override string SettingsCategory()
         {
-            return "RimLuaKit";
+            return "RimKit";
         }
     }
 }

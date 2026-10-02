@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 
 static void usage() {
     std::cout
-        << "rimkit - RimLuaKit CLI\n\n"
+        << "rimkit - RimKit CLI\n\n"
         << "  rimkit init [name]              Init Lua mod in cwd (or ./name)\n"
         << "  rimkit build                    Build native core + C# host\n"
         << "  rimkit mod create <name> [dir]  Create Lua mod folder\n"
@@ -148,7 +148,10 @@ static std::vector<DepInfo> field_deps(const sol::table& t) {
                 d.steam = "steam://url/CommunityFilePage/2009463077";
             } else if (d.id == "stratware.rimkit" || d.id == "sandk.rimluakit") {
                 d.id = "stratware.rimkit";
-                d.name = "RimLuaKit";
+                d.name = "RimKit";
+                d.download = "https://github.com/stratware/RimWorldModKit";
+            } else if (d.id == "stratware.pauth") {
+                d.name = "pAuth";
                 d.download = "https://github.com/stratware/RimWorldModKit";
             } else {
                 d.name = d.id;
@@ -165,6 +168,21 @@ static std::vector<DepInfo> field_deps(const sol::table& t) {
             d.download = field_str(dep, "download", "downloadUrl");
             if (d.name.empty()) {
                 d.name = d.id;
+            }
+            if (d.download.empty()) {
+                if (d.id == "stratware.rimkit" || d.id == "stratware.pauth") {
+                    d.download = "https://github.com/stratware/RimWorldModKit";
+                } else if (d.id == "brrainz.harmony") {
+                    d.download = "https://github.com/pardeike/HarmonyRimWorld";
+                    if (d.steam.empty()) {
+                        d.steam = "steam://url/CommunityFilePage/2009463077";
+                    }
+                }
+            }
+            if (d.name == d.id || d.name.empty()) {
+                if (d.id == "stratware.rimkit") d.name = "RimKit";
+                if (d.id == "stratware.pauth") d.name = "pAuth";
+                if (d.id == "brrainz.harmony") d.name = "Harmony";
             }
             if (!d.id.empty()) {
                 out.push_back(d);
@@ -431,7 +449,7 @@ static int create_mod_at(const fs::path& out, const std::string& name) {
           << "meta.author = \"Team Stratware.win\"\n"
           << "meta.package_id = \"" << package_id << "\"\n"
           << "meta.version = \"1.6\"\n"
-          << "meta.description = \"Lua mod powered by RimLuaKit.\"\n"
+          << "meta.description = \"Lua mod powered by RimKit.\"\n"
           << "meta.depends = { \"brrainz.harmony\", \"stratware.rimkit\" }\n"
           << "meta.load_after = { \"brrainz.harmony\", \"stratware.rimkit\" }\n"
           << "return meta\n";
@@ -471,7 +489,7 @@ static void copy_tree(const fs::path& from, const fs::path& to) {
 
 static bool is_ship_root_name(const std::string& name) {
     static const char* keep[] = {"About", "Assemblies", "Native", "Lua", "Defs", "Patches", "Textures",
-                                 "Sounds", "Languages", "News", "LoadFolders.xml", "meta.lua"};
+                                 "Sounds", "Languages", "News", "Auth", "LoadFolders.xml", "meta.lua"};
     for (const char* k : keep) {
         if (name == k) {
             return true;
@@ -590,6 +608,84 @@ static int cmd_mod_check(const fs::path& target) {
     return failures == 0 ? 0 : 1;
 }
 
+static std::string sha256_file_powershell(const fs::path& path) {
+    if (!fs::exists(path)) {
+        return {};
+    }
+    // Prefer PowerShell Get-FileHash (always on Win RimWorld hosts).
+    fs::path tmp = fs::temp_directory_path() / "rimkit_sha256.txt";
+    std::string cmd = "powershell -NoProfile -Command \"(Get-FileHash -LiteralPath '" + path.string() +
+                      "' -Algorithm SHA256).Hash.ToLower() | Set-Content -LiteralPath '" + tmp.string() + "'\"";
+    if (std::system(cmd.c_str()) != 0) {
+        return {};
+    }
+    std::ifstream in(tmp);
+    std::string hash;
+    std::getline(in, hash);
+    while (!hash.empty() && (hash.back() == '\r' || hash.back() == '\n' || hash.back() == ' ')) {
+        hash.pop_back();
+    }
+    for (char& c : hash) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return hash;
+}
+
+static fs::path find_harmony_dll() {
+    const char* env = std::getenv("HARMONY_PATH");
+    if (env && fs::exists(env)) {
+        return fs::path(env);
+    }
+    std::vector<fs::path> candidates = {
+        fs::path("C:/Program Files (x86)/Steam/steamapps/workshop/content/294100/2009463077/Current/Assemblies/0Harmony.dll"),
+        fs::path("C:/Program Files (x86)/Steam/steamapps/workshop/content/294100/2009463077/1.5/Assemblies/0Harmony.dll"),
+        fs::path("C:/Program Files (x86)/Steam/steamapps/workshop/content/294100/2009463077/1.4/Assemblies/0Harmony.dll"),
+        fs::path("C:/Program Files (x86)/Steam/steamapps/workshop/content/294100/2009463077/Assemblies/0Harmony.dll"),
+    };
+    for (const auto& p : candidates) {
+        if (fs::exists(p)) {
+            return p;
+        }
+    }
+    return {};
+}
+
+static int regenerate_allowlist(const fs::path& root) {
+    fs::path host = root / "Assemblies" / "RimLuaHost.dll";
+    fs::path native = root / "Native" / "rimlua_core.dll";
+    fs::path harmony = find_harmony_dll();
+    if (!fs::exists(host) || !fs::exists(native)) {
+        std::cerr << "allowlist: missing host or native DLL under " << root << "\n";
+        return 1;
+    }
+    if (harmony.empty()) {
+        std::cerr << "allowlist: Harmony 0Harmony.dll not found. Set HARMONY_PATH.\n";
+        return 1;
+    }
+    std::string hSha = sha256_file_powershell(harmony);
+    std::string hostSha = sha256_file_powershell(host);
+    std::string nativeSha = sha256_file_powershell(native);
+    if (hSha.empty() || hostSha.empty() || nativeSha.empty()) {
+        std::cerr << "allowlist: hash failed\n";
+        return 1;
+    }
+    fs::path authDir = root / "Auth";
+    fs::create_directories(authDir);
+    fs::path out = authDir / "allowlist.json";
+    std::ofstream f(out);
+    f << "{\n"
+      << "  \"version\": 1,\n"
+      << "  \"note\": \"Accepted SHA256 digests for a Stratware release. Rebuild/ship updates this file.\",\n"
+      << "  \"harmony\": [\"" << hSha << "\"],\n"
+      << "  \"rimkit_host\": [\"" << hostSha << "\"],\n"
+      << "  \"rimkit_native\": [\"" << nativeSha << "\"]\n"
+      << "}\n";
+    std::cout << "Wrote " << out << "\n";
+    std::cout << "  harmony=" << hSha.substr(0, 8) << " host=" << hostSha.substr(0, 8)
+              << " native=" << nativeSha.substr(0, 8) << "\n";
+    return 0;
+}
+
 static int cmd_mod_ship(fs::path modDir, fs::path modsDir) {
     if (sync_mod(modDir) != 0) {
         return 1;
@@ -637,7 +733,11 @@ static int cmd_build() {
     fs::path hostProj = root / "src" / "host" / "RimLuaHost.csproj";
     std::string dotnet = "dotnet build \"" + hostProj.string() + "\" -c Release";
     std::cout << "Running " << dotnet << "\n";
-    return std::system(dotnet.c_str());
+    rc = std::system(dotnet.c_str());
+    if (rc != 0) {
+        return rc;
+    }
+    return regenerate_allowlist(root);
 }
 
 static int cmd_init(int argc, char** argv) {

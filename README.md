@@ -89,7 +89,7 @@ Docs: [docs/](docs/index.md) · API: [docs/lua-api.md](docs/lua-api.md)
 Pack VSIX from `vscode-rimkit/` for Lua stubs and auto-copy to Mods on save.
 
 ```powershell
-code --install-extension .\vscode-rimkit\rimkit-0.1.0.vsix
+cursor --install-extension .\vscode-rimkit\rimkit-0.2.1.vsix
 ```
 
 Workspace settings live under `.cursor/` (Lua stub library + CMake path).

@@ -33,7 +33,7 @@ namespace RimLuaKit
                     }
                     catch (Exception e)
                     {
-                        Log.Error("[RimLuaKit] ui float callback failed: " + e);
+                        Log.Error("[RimKit] ui float callback failed: " + e);
                     }
                 }));
             }
@@ -88,44 +88,80 @@ namespace RimLuaKit
             absorbInputAroundWindow = false;
         }
 
-        public override Vector2 InitialSize => new Vector2(420f, 360f);
+        public override Vector2 InitialSize => new Vector2(460f, 520f);
 
         public override void DoWindowContents(Rect inRect)
         {
             Text.Font = GameFont.Medium;
-            Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 32f), title);
+            Widgets.Label(new Rect(inRect.x, inRect.y, inRect.width, 28f), title);
             Text.Font = GameFont.Small;
 
-            float y = inRect.y + 40f;
-            float btnH = 32f;
-            float gap = 6f;
-            float listH = buttons.Count * (btnH + gap) + 8f;
-            Rect view = new Rect(0f, 0f, inRect.width - 16f, listH);
-            Rect scrollRect = new Rect(inRect.x, y, inRect.width, Math.Min(160f, listH + 4f));
-            Widgets.BeginScrollView(scrollRect, ref scroll, view);
-            float by = 0f;
-            foreach (var (label, id) in buttons)
+            // Live selection (Lua body string is frozen at open).
+            string liveSel = "nil";
+            Pawn livePawn = null;
+            var sel = Find.Selector;
+            if (sel?.SelectedPawns != null)
             {
-                if (Widgets.ButtonText(new Rect(0f, by, view.width - 4f, btnH), label))
+                foreach (Pawn p in sel.SelectedPawns)
                 {
-                    try
+                    if (p != null && !p.Destroyed)
                     {
-                        NativeAbi.rimlua_ui_invoke(id);
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error("[RimLuaKit] ui button callback failed: " + e);
+                        livePawn = p;
+                        break;
                     }
                 }
+            }
+            if (livePawn == null && sel?.FirstSelectedObject is Pawn fp)
+            {
+                livePawn = fp;
+            }
+            if (livePawn != null)
+            {
+                liveSel = livePawn.LabelShortCap + " @" + livePawn.Position.x + "," + livePawn.Position.z;
+            }
 
-                by += btnH + gap;
+            float y = inRect.y + 30f;
+            Widgets.Label(new Rect(inRect.x, y, inRect.width, 22f), "LIVE selected: " + liveSel);
+            y += 24f;
+
+            float btnH = 30f;
+            float gap = 4f;
+            int count = buttons?.Count ?? 0;
+            float listH = Math.Max(count * (btnH + gap) + 8f, 40f);
+            float scrollH = Math.Min(inRect.height * 0.55f, listH + 4f);
+            Rect scrollRect = new Rect(inRect.x, y, inRect.width, scrollH);
+            Rect view = new Rect(0f, 0f, inRect.width - 20f, listH);
+            Widgets.BeginScrollView(scrollRect, ref scroll, view);
+            float by = 0f;
+            if (count == 0)
+            {
+                Widgets.Label(new Rect(0f, 0f, view.width, 28f), "(no buttons)");
+            }
+            else
+            {
+                foreach (var (label, id) in buttons)
+                {
+                    if (Widgets.ButtonText(new Rect(0f, by, view.width - 4f, btnH), label))
+                    {
+                        try
+                        {
+                            NativeAbi.rimlua_ui_invoke(id);
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error("[RimKit] ui button callback failed: " + e);
+                        }
+                    }
+
+                    by += btnH + gap;
+                }
             }
 
             Widgets.EndScrollView();
 
-            y = scrollRect.yMax + 10f;
+            y = scrollRect.yMax + 8f;
             Rect bodyRect = new Rect(inRect.x, y, inRect.width, inRect.yMax - y);
-            Widgets.Label(bodyRect, body);
+            Widgets.Label(bodyRect, body ?? "");
         }
     }
 }

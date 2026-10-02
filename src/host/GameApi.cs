@@ -12,9 +12,7 @@ using Verse.AI;
 
 namespace RimLuaKit
 {
-    /// <summary>
-    /// Wide RimWorld + Harmony surface for Lua via host_invoke(op, json).
-    /// </summary>
+    // Lua host ops (op name + json args).
     internal static class GameApi
     {
         public static string Invoke(string op, string argsJson)
@@ -22,9 +20,12 @@ namespace RimLuaKit
             try
             {
                 var args = JsonLite.ParseObject(argsJson ?? "{}");
+                if (ApiRegistry.TryInvoke(op, args, out string domainResult))
+                {
+                    return domainResult;
+                }
                 switch (op)
                 {
-                    // ---- find / world ----
                     case "find.tick": return OkInt(Find.TickManager?.TicksGame ?? 0);
                     case "find.current_map": return OkHandle(Find.CurrentMap);
                     case "find.world": return OkHandle(Find.World);
@@ -33,18 +34,26 @@ namespace RimLuaKit
                     {
                         var sel = Find.Selector;
                         if (sel == null) return OkHandle(null);
-                        // Prefer a pawn (SingleSelectedThing is null if 0 or >1 selected).
-                        if (sel.SelectedObjects != null)
+                        if (sel.SelectedPawns != null)
                         {
-                            foreach (object o in sel.SelectedObjects)
+                            foreach (Pawn p in sel.SelectedPawns)
                             {
-                                if (o is Pawn p) return OkHandle(p);
-                            }
-                            foreach (object o in sel.SelectedObjects)
-                            {
-                                if (o is Thing t) return OkHandle(t);
+                                if (p != null && !p.Destroyed) return OkHandle(p);
                             }
                         }
+                        if (sel.SelectedObjectsListForReading != null)
+                        {
+                            foreach (object o in sel.SelectedObjectsListForReading)
+                            {
+                                if (o is Pawn p && !p.Destroyed) return OkHandle(p);
+                            }
+                            foreach (object o in sel.SelectedObjectsListForReading)
+                            {
+                                if (o is Thing t && !t.Destroyed) return OkHandle(t);
+                            }
+                        }
+                        if (sel.FirstSelectedObject is Pawn fp) return OkHandle(fp);
+                        if (sel.FirstSelectedObject is Thing ft) return OkHandle(ft);
                         return OkHandle(sel.SingleSelectedThing);
                     }
                     case "find.selected_things":
@@ -62,13 +71,11 @@ namespace RimLuaKit
                     case "find.maps": return OkHandles(Find.Maps);
                     case "find.any_player_pawn": return OkHandle(Find.AnyPlayerHomeMap?.mapPawns?.FreeColonists?.FirstOrDefault());
 
-                    // ---- defs ----
                     case "defs.get": return OkHandle(GetDef(Str(args, "type"), Str(args, "name")));
                     case "defs.exists": return OkBool(GetDef(Str(args, "type"), Str(args, "name")) != null);
                     case "defs.list": return OkStringList(ListDefNames(Str(args, "type")));
                     case "defs.label": return OkStr(ObjectHandles.Get<Def>(Int(args, "h"))?.label ?? "");
 
-                    // ---- map ----
                     case "map.nutrition": return OkFloat(MapOf(args)?.resourceCounter?.TotalHumanEdibleNutrition ?? 0f);
                     case "map.width": return OkInt(MapOf(args)?.Size.x ?? 0);
                     case "map.height": return OkInt(MapOf(args)?.Size.z ?? 0);
@@ -129,7 +136,6 @@ namespace RimLuaKit
                         return OkStringList(cells);
                     }
 
-                    // ---- thing ----
                     case "thing.def": return OkStr(ThingOf(args)?.def?.defName ?? "");
                     case "thing.label": return OkStr(ThingOf(args)?.LabelCap ?? "");
                     case "thing.label_short": return OkStr(ThingOf(args)?.LabelShort ?? "");
@@ -184,7 +190,6 @@ namespace RimLuaKit
                     case "thing.map": return OkHandle(ThingOf(args)?.Map);
                     case "thing.spawned": return OkBool(ThingOf(args)?.Spawned == true);
 
-                    // ---- pawn ----
                     case "pawn.is_humanlike": return OkBool(PawnOf(args)?.RaceProps?.Humanlike == true);
                     case "pawn.is_colonist": return OkBool(PawnOf(args)?.IsColonist == true);
                     case "pawn.is_prisoner": return OkBool(PawnOf(args)?.IsPrisoner == true);
@@ -264,13 +269,20 @@ namespace RimLuaKit
                     case "pawn.give_item":
                     {
                         var p = PawnOf(args);
-                        var def = DefDatabase<ThingDef>.GetNamedSilentFail(Str(args, "def"));
-                        if (p == null || def == null) return Err("bad pawn/def");
+                        string want = Str(args, "def");
+                        var def = ResolveThingDef(want,
+                            "ComponentIndustrial", "Component", "ComponentSpacer",
+                            "Steel", "Silver");
+                        if (p == null || def == null) return Err("bad pawn/def:" + want);
                         Thing t = ThingMaker.MakeThing(def);
-                        if (args.ContainsKey("stack")) t.stackCount = Int(args, "stack");
+                        if (args.ContainsKey("stack")) t.stackCount = Math.Max(1, Int(args, "stack"));
+                        if (t.def.stackLimit > 0 && t.stackCount > t.def.stackLimit)
+                        {
+                            t.stackCount = t.def.stackLimit;
+                        }
                         if (p.inventory == null || !p.inventory.innerContainer.TryAdd(t))
                         {
-                            GenPlace.TryPlaceThing(t, p.Position, p.Map, ThingPlaceMode.Near);
+                            GenPlace.TryPlaceThing(t, p.PositionHeld, p.MapHeld, ThingPlaceMode.Near);
                         }
                         return OkHandle(t);
                     }
@@ -322,6 +334,199 @@ namespace RimLuaKit
                         Job job = JobMaker.MakeJob(jobDef);
                         return OkBool(p.jobs.TryTakeOrderedJob(job));
                     }
+                    case "pawn.pos":
+                    {
+                        var p = PawnOf(args);
+                        return p == null ? OkStr("") : OkStr(p.Position.x + "," + p.Position.z);
+                    }
+                    case "pawn.is_moving": return OkBool(PawnOf(args)?.pather?.Moving == true);
+                    case "pawn.can_reach":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.Map == null) return OkBool(false);
+                        IntVec3 cell = new IntVec3(Int(args, "x"), 0, Int(args, "z"));
+                        if (!cell.InBounds(p.Map)) return OkBool(false);
+                        return OkBool(p.CanReach(cell, PathEndMode.OnCell, Danger.Deadly));
+                    }
+                    case "pawn.walk_to":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.jobs == null || p.Map == null) return Err("no pawn/map");
+                        IntVec3 cell = new IntVec3(Int(args, "x"), 0, Int(args, "z"));
+                        if (!cell.InBounds(p.Map)) return Err("out of bounds");
+                        if (!p.CanReach(cell, PathEndMode.OnCell, Danger.Deadly)) return OkBool(false);
+                        if (p.drafter != null) p.drafter.Drafted = true;
+                        Job job = JobMaker.MakeJob(JobDefOf.Goto, cell);
+                        job.locomotionUrgency = (args.ContainsKey("sprint") && Bool(args, "sprint"))
+                            ? LocomotionUrgency.Sprint
+                            : LocomotionUrgency.Jog;
+                        return OkBool(p.jobs.TryTakeOrderedJob(job, JobTag.DraftedOrder));
+                    }
+                    case "pawn.wander":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.jobs == null || p.Map == null) return Err("no pawn/map");
+                        int radius = args.ContainsKey("radius") ? Int(args, "radius") : 12;
+                        if (radius < 1) radius = 12;
+                        if (p.drafter != null) p.drafter.Drafted = true;
+                        IntVec3 dest = IntVec3.Invalid;
+                        bool found = CellFinder.TryFindRandomCellNear(p.Position, p.Map, radius,
+                            c => c.Standable(p.Map) && p.CanReach(c, PathEndMode.OnCell, Danger.Deadly),
+                            out dest);
+                        if (!found || !dest.IsValid) return OkBool(false);
+                        Job job = JobMaker.MakeJob(JobDefOf.Goto, dest);
+                        job.locomotionUrgency = LocomotionUrgency.Jog;
+                        return OkBool(p.jobs.TryTakeOrderedJob(job, JobTag.DraftedOrder));
+                    }
+                    case "pawn.stop":
+                    {
+                        PawnOf(args)?.jobs?.EndCurrentJob(JobCondition.InterruptForced);
+                        return OkBool(true);
+                    }
+                    case "pawn.equip_weapon":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.equipment == null) return Err("no equipment");
+                        string defName = Str(args, "def");
+                        if (string.IsNullOrEmpty(defName)) defName = "Gun_AssaultRifle";
+                        ThingDef def = ResolveThingDef(defName,
+                            "Gun_AssaultRifle", "Gun_Revolver", "Gun_BoltActionRifle");
+                        if (def == null) return Err("no weapon def");
+                        if (p.equipment.Primary != null)
+                        {
+                            p.equipment.TryDropEquipment(p.equipment.Primary, out _, p.PositionHeld);
+                        }
+                        ThingWithComps gun = (ThingWithComps)ThingMaker.MakeThing(def);
+                        p.equipment.AddEquipment(gun);
+                        return OkBool(true);
+                    }
+                    case "pawn.shoot_hostiles":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.Map == null || p.jobs == null) return Err("no pawn/map");
+                        if (p.drafter != null) p.drafter.Drafted = true;
+                        bool instant = args.ContainsKey("instant") && Bool(args, "instant");
+                        // Snapshot before TakeDamage mutates the list.
+                        List<Pawn> hostiles = new List<Pawn>();
+                        foreach (Pawn other in p.Map.mapPawns.AllPawnsSpawned.ToList())
+                        {
+                            if (other == null || other == p || other.Dead || other.Destroyed) continue;
+                            if (!other.HostileTo(p)) continue;
+                            hostiles.Add(other);
+                        }
+                        int n = 0;
+                        if (instant)
+                        {
+                            foreach (Pawn other in hostiles)
+                            {
+                                if (other.Dead || other.Destroyed) continue;
+                                other.TakeDamage(new DamageInfo(DamageDefOf.Bullet, 999f, 0f, -1f, p));
+                                n++;
+                            }
+                            return OkInt(n);
+                        }
+                        Pawn nearest = null;
+                        float best = float.MaxValue;
+                        foreach (Pawn other in hostiles)
+                        {
+                            float d = other.Position.DistanceToSquared(p.Position);
+                            if (d < best)
+                            {
+                                best = d;
+                                nearest = other;
+                            }
+                        }
+                        if (nearest == null) return OkInt(0);
+                        JobDef attackDef = JobDefOf.AttackStatic ?? JobDefOf.AttackMelee;
+                        Job job = JobMaker.MakeJob(attackDef, nearest);
+                        if (p.jobs.TryTakeOrderedJob(job, JobTag.DraftedOrder)) n = 1;
+                        return OkInt(n);
+                    }
+                    case "control.set":
+                    {
+                        var p = PawnOf(args);
+                        bool walk = !args.ContainsKey("click_walk") || Bool(args, "click_walk");
+                        ControlBridge.Set(p, walk);
+                        // Close debug windows so map clicks work.
+                        if (Find.WindowStack != null)
+                        {
+                            for (int i = Find.WindowStack.Count - 1; i >= 0; i--)
+                            {
+                                Window w = Find.WindowStack[i];
+                                if (w is RimLuaDebugWindow)
+                                {
+                                    w.Close(false);
+                                }
+                            }
+                        }
+                        return OkBool(p != null);
+                    }
+                    case "control.clear":
+                    {
+                        ControlBridge.Clear();
+                        return OkBool(true);
+                    }
+                    case "control.get": return OkHandle(ControlBridge.ControlledPawn);
+                    case "path.compute":
+                    {
+                        var p = PawnOf(args);
+                        if (p?.Map == null) return OkStringList(null);
+                        IntVec3 dest = new IntVec3(Int(args, "x"), 0, Int(args, "z"));
+                        if (!dest.InBounds(p.Map)) return OkStringList(null);
+                        var cells = new List<string>();
+                        PawnPath path = p.Map.pathFinder.FindPathNow(p.Position, dest, TraverseParms.For(p), null, PathEndMode.OnCell);
+                        try
+                        {
+                            if (path == null || !path.Found) return OkStringList(cells);
+                            var nodes = path.NodesReversed;
+                            for (int i = nodes.Count - 1; i >= 0; i--)
+                            {
+                                IntVec3 c = nodes[i];
+                                cells.Add(c.x.ToString(CultureInfo.InvariantCulture) + "," +
+                                          c.z.ToString(CultureInfo.InvariantCulture));
+                            }
+                        }
+                        finally
+                        {
+                            path?.ReleaseToPool();
+                        }
+                        return OkStringList(cells);
+                    }
+                    case "map.spawn_pawn":
+                    {
+                        var map = MapOf(args);
+                        if (map == null) return Err("no map");
+                        string kindName = Str(args, "kind");
+                        if (string.IsNullOrEmpty(kindName)) kindName = "Villager";
+                        PawnKindDef kind = DefDatabase<PawnKindDef>.GetNamedSilentFail(kindName)
+                            ?? DefDatabase<PawnKindDef>.GetNamedSilentFail("Tribesperson")
+                            ?? DefDatabase<PawnKindDef>.GetNamedSilentFail("Colonist");
+                        if (kind == null) return Err("bad pawn kind");
+                        string side = Str(args, "faction");
+                        Faction fac = Faction.OfPlayer;
+                        if (side.Equals("hostile", StringComparison.OrdinalIgnoreCase))
+                        {
+                            fac = Find.FactionManager?.RandomEnemyFaction(allowHidden: false, allowDefeated: false, allowNonHumanlike: false)
+                                  ?? Faction.OfAncientsHostile;
+                        }
+                        else if (side.Equals("neutral", StringComparison.OrdinalIgnoreCase))
+                        {
+                            fac = Faction.OfAncients;
+                        }
+                        IntVec3 cell;
+                        if (args.ContainsKey("x") && args.ContainsKey("z"))
+                        {
+                            cell = new IntVec3(Int(args, "x"), 0, Int(args, "z"));
+                        }
+                        else
+                        {
+                            cell = DropCellFinder.RandomDropSpot(map);
+                        }
+                        if (!cell.InBounds(map)) cell = CellFinder.RandomEdgeCell(map);
+                        Pawn np = PawnGenerator.GeneratePawn(kind, fac);
+                        GenSpawn.Spawn(np, cell, map);
+                        return OkHandle(np);
+                    }
                     case "pawn.strip":
                     {
                         var p = PawnOf(args);
@@ -338,7 +543,6 @@ namespace RimLuaKit
                         return OkBool(true);
                     }
 
-                    // ---- faction ----
                     case "faction.player": return OkHandle(Faction.OfPlayer);
                     case "faction.of_def":
                     {
@@ -372,7 +576,6 @@ namespace RimLuaKit
                         return OkBool(true);
                     }
 
-                    // ---- job ----
                     case "job.make":
                     {
                         var def = DefDatabase<JobDef>.GetNamedSilentFail(Str(args, "def"));
@@ -412,7 +615,6 @@ namespace RimLuaKit
                         return OkBool(true);
                     }
 
-                    // ---- messages / UI ----
                     case "ui.message":
                     {
                         Messages.Message(Str(args, "text"), MessageTypeDefOf.NeutralEvent, false);
@@ -435,7 +637,6 @@ namespace RimLuaKit
                         return OkBool(true);
                     }
 
-                    // ---- config ----
                     case "config.register":
                     {
                         LuaConfigBridge.Register(Str(args, "key"), Str(args, "type"), Str(args, "label"), Str(args, "default"));
@@ -448,14 +649,13 @@ namespace RimLuaKit
                         return OkBool(true);
                     }
 
-                    // ---- defs write (Phase 3; requires restart) ----
+                    // defs write (needs restart)
                     case "defs.write_thing":
                     {
                         string packageId = Str(args, "package_id");
                         if (string.IsNullOrEmpty(packageId)) packageId = "stratware.rimkit";
                         ModContentPack pack = LoadedModManager.RunningModsListForReading
                             .FirstOrDefault(m => m.PackageIdPlayerFacing == packageId || m.PackageId == packageId);
-                        // PackageId is lowercased often
                         if (pack == null)
                         {
                             pack = LoadedModManager.RunningModsListForReading
@@ -463,17 +663,29 @@ namespace RimLuaKit
                         }
                         if (pack == null) return Err("mod not found: " + packageId);
                         string defName = Str(args, "defName");
-                        if (string.IsNullOrEmpty(defName)) return Err("missing defName");
+                        if (!LuaSandbox.IsSafeDefName(defName)) return Err("sandbox: bad defName");
                         string label = Str(args, "label");
                         if (string.IsNullOrEmpty(label)) label = defName;
                         string desc = Str(args, "description");
                         if (string.IsNullOrEmpty(desc)) desc = label;
                         string tex = Str(args, "texPath");
                         if (string.IsNullOrEmpty(tex)) tex = "Things/Item/Resource/Steel";
+                        // content path only, no traversal
+                        if (tex.IndexOfAny(new[] { ':', '*', '?', '"', '<', '>', '|' }) >= 0 ||
+                            tex.Contains(".."))
+                        {
+                            return Err("sandbox: bad texPath");
+                        }
                         int stack = args.ContainsKey("stackLimit") ? Int(args, "stackLimit") : 75;
+                        if (stack < 1) stack = 1;
+                        if (stack > 9999) stack = 9999;
                         string dir = Path.Combine(pack.RootDir, "Defs", "ThingDefs");
-                        Directory.CreateDirectory(dir);
                         string path = Path.Combine(dir, "RimLua_Generated_" + defName + ".xml");
+                        if (!LuaSandbox.TryJailUnderRoot(pack.RootDir, path, out string fullPath, out string jailErr))
+                        {
+                            return Err(jailErr);
+                        }
+                        Directory.CreateDirectory(Path.GetDirectoryName(fullPath) ?? dir);
                         string xml =
                             "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n" +
                             "<Defs>\n" +
@@ -497,19 +709,17 @@ namespace RimLuaKit
                             "    </thingCategories>\n" +
                             "  </ThingDef>\n" +
                             "</Defs>\n";
-                        File.WriteAllText(path, xml);
-                        Log.Message("[RimLuaKit] Wrote ThingDef XML: " + path + " (restart to load)");
-                        return OkStr(path);
+                        File.WriteAllText(fullPath, xml);
+                        Log.Message("[RimKit] Wrote ThingDef XML: " + fullPath + " (restart to load)");
+                        return OkStr(fullPath);
                     }
 
-                    // ---- input ----
                     case "input.binding_just_pressed":
                     {
                         var def = DefDatabase<KeyBindingDef>.GetNamedSilentFail(Str(args, "def"));
                         return OkBool(def != null && def.JustPressed);
                     }
 
-                    // ---- harmony helpers ----
                     case "harmony.has_patch":
                     {
                         Type t = AccessTools.TypeByName(Str(args, "type"));
@@ -523,15 +733,33 @@ namespace RimLuaKit
                         return OkBool(t != null && AccessTools.Method(t, Str(args, "method")) != null);
                     }
 
-                    // ---- reflect (escape hatch for "everything") ----
-                    case "reflect.type": return OkStr(ObjectHandles.Get<object>(Int(args, "h"))?.GetType().FullName ?? "");
-                    case "reflect.get": return ReflectGet(Int(args, "h"), Str(args, "member"));
-                    case "reflect.set": return ReflectSet(Int(args, "h"), Str(args, "member"), Str(args, "value"));
-                    case "reflect.call": return ReflectCall(Int(args, "h"), Str(args, "method"), Str(args, "args"));
-                    case "reflect.static_get": return ReflectStaticGet(Str(args, "type"), Str(args, "member"));
-                    case "reflect.static_call": return ReflectStaticCall(Str(args, "type"), Str(args, "method"), Str(args, "args"));
-                    case "reflect.members": return OkStringList(ListMembers(Int(args, "h")));
-                    case "reflect.handle_of_static": return ReflectHandleOfStatic(Str(args, "type"), Str(args, "member"));
+                    // reflect (needs developer_reflect)
+                    case "reflect.type":
+                    case "reflect.get":
+                    case "reflect.set":
+                    case "reflect.call":
+                    case "reflect.static_get":
+                    case "reflect.static_call":
+                    case "reflect.members":
+                    case "reflect.handle_of_static":
+                    {
+                        if (!LuaSandbox.DeveloperReflectEnabled)
+                        {
+                            return Err("sandbox: reflect/cs disabled (enable RimKit setting developer_reflect)");
+                        }
+                        switch (op)
+                        {
+                            case "reflect.type": return OkStr(ObjectHandles.Get<object>(Int(args, "h"))?.GetType().FullName ?? "");
+                            case "reflect.get": return ReflectGet(Int(args, "h"), Str(args, "member"));
+                            case "reflect.set": return ReflectSet(Int(args, "h"), Str(args, "member"), Str(args, "value"));
+                            case "reflect.call": return ReflectCall(Int(args, "h"), Str(args, "method"), Str(args, "args"));
+                            case "reflect.static_get": return ReflectStaticGet(Str(args, "type"), Str(args, "member"));
+                            case "reflect.static_call": return ReflectStaticCall(Str(args, "type"), Str(args, "method"), Str(args, "args"));
+                            case "reflect.members": return OkStringList(ListMembers(Int(args, "h")));
+                            case "reflect.handle_of_static": return ReflectHandleOfStatic(Str(args, "type"), Str(args, "member"));
+                            default: return Err("unknown op: " + op);
+                        }
+                    }
 
                     default:
                         return Err("unknown op: " + op);
@@ -612,6 +840,8 @@ namespace RimLuaKit
         {
             object obj = ObjectHandles.Get<object>(h);
             if (obj == null) return Err("null");
+            string deny = LuaSandbox.DenyIfReflectBlocked(obj.GetType(), member, isCall: false);
+            if (deny != null) return Err(deny);
             MemberInfo mi = FindMember(obj.GetType(), member);
             if (mi is PropertyInfo pi) return EncodeValue(pi.GetValue(obj, null));
             if (mi is FieldInfo fi) return EncodeValue(fi.GetValue(obj));
@@ -622,6 +852,8 @@ namespace RimLuaKit
         {
             object obj = ObjectHandles.Get<object>(h);
             if (obj == null) return Err("null");
+            string deny = LuaSandbox.DenyIfReflectBlocked(obj.GetType(), member, isCall: false);
+            if (deny != null) return Err(deny);
             MemberInfo mi = FindMember(obj.GetType(), member);
             if (mi is PropertyInfo pi)
             {
@@ -640,13 +872,20 @@ namespace RimLuaKit
         {
             object obj = ObjectHandles.Get<object>(h);
             if (obj == null) return Err("null");
+            string deny = LuaSandbox.DenyIfReflectBlocked(obj.GetType(), method, isCall: true);
+            if (deny != null) return Err(deny);
             return InvokeMethod(obj.GetType(), obj, method, argsCsv);
         }
 
         private static string ReflectStaticGet(string typeName, string member)
         {
+            string denyName = LuaSandbox.DenyIfStaticTypeBlocked(typeName);
+            if (denyName != null) return Err(denyName);
             Type t = AccessTools.TypeByName(typeName);
             if (t == null) return Err("type not found");
+            if (!LuaSandbox.IsGameplayNamespace(t.Namespace)) return Err("sandbox: static get outside gameplay types");
+            string deny = LuaSandbox.DenyIfReflectBlocked(t, member, isCall: false);
+            if (deny != null) return Err(deny);
             MemberInfo mi = FindMember(t, member, staticOnly: true);
             if (mi is PropertyInfo pi) return EncodeValue(pi.GetValue(null, null));
             if (mi is FieldInfo fi) return EncodeValue(fi.GetValue(null));
@@ -655,15 +894,25 @@ namespace RimLuaKit
 
         private static string ReflectStaticCall(string typeName, string method, string argsCsv)
         {
+            string denyName = LuaSandbox.DenyIfStaticTypeBlocked(typeName);
+            if (denyName != null) return Err(denyName);
             Type t = AccessTools.TypeByName(typeName);
             if (t == null) return Err("type not found");
+            if (!LuaSandbox.IsGameplayNamespace(t.Namespace)) return Err("sandbox: static call outside gameplay types");
+            string deny = LuaSandbox.DenyIfReflectBlocked(t, method, isCall: true);
+            if (deny != null) return Err(deny);
             return InvokeMethod(t, null, method, argsCsv);
         }
 
         private static string ReflectHandleOfStatic(string typeName, string member)
         {
+            string denyName = LuaSandbox.DenyIfStaticTypeBlocked(typeName);
+            if (denyName != null) return Err(denyName);
             Type t = AccessTools.TypeByName(typeName);
             if (t == null) return Err("type not found");
+            if (!LuaSandbox.IsGameplayNamespace(t.Namespace)) return Err("sandbox: static handle outside gameplay types");
+            string deny = LuaSandbox.DenyIfReflectBlocked(t, member, isCall: false);
+            if (deny != null) return Err(deny);
             MemberInfo mi = FindMember(t, member, staticOnly: true);
             object val = null;
             if (mi is PropertyInfo pi) val = pi.GetValue(null, null);
@@ -674,6 +923,8 @@ namespace RimLuaKit
 
         private static string InvokeMethod(Type type, object target, string method, string argsCsv)
         {
+            string deny = LuaSandbox.DenyIfReflectBlocked(type, method, isCall: true);
+            if (deny != null) return Err(deny);
             string[] parts = string.IsNullOrEmpty(argsCsv) ? Array.Empty<string>() : argsCsv.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             object[] callArgs = new object[parts.Length];
             Type[] argTypes = new Type[parts.Length];
@@ -725,6 +976,7 @@ namespace RimLuaKit
             var list = new List<string>();
             object obj = ObjectHandles.Get<object>(h);
             if (obj == null) return list;
+            if (LuaSandbox.DenyIfReflectBlocked(obj.GetType(), null, isCall: false) != null) return list;
             Type t = obj.GetType();
             foreach (PropertyInfo pi in t.GetProperties(BindingFlags.Public | BindingFlags.Instance)) list.Add("P:" + pi.Name);
             foreach (FieldInfo fi in t.GetFields(BindingFlags.Public | BindingFlags.Instance)) list.Add("F:" + fi.Name);
@@ -771,6 +1023,30 @@ namespace RimLuaKit
         private static Map MapOf(Dictionary<string, string> args) => ObjectHandles.Get<Map>(Int(args, "h"));
         private static Thing ThingOf(Dictionary<string, string> args) => ObjectHandles.Get<Thing>(Int(args, "h"));
         private static Pawn PawnOf(Dictionary<string, string> args) => ObjectHandles.Get<Pawn>(Int(args, "h"));
+
+        private static ThingDef ResolveThingDef(string primary, params string[] fallbacks)
+        {
+            if (!string.IsNullOrEmpty(primary))
+            {
+                ThingDef d = DefDatabase<ThingDef>.GetNamedSilentFail(primary);
+                if (d != null) return d;
+                if (primary.Equals("Component", StringComparison.OrdinalIgnoreCase))
+                {
+                    d = DefDatabase<ThingDef>.GetNamedSilentFail("ComponentIndustrial");
+                    if (d != null) return d;
+                }
+            }
+            if (fallbacks != null)
+            {
+                foreach (string name in fallbacks)
+                {
+                    if (string.IsNullOrEmpty(name)) continue;
+                    ThingDef d = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                    if (d != null) return d;
+                }
+            }
+            return null;
+        }
 
         private static string Str(Dictionary<string, string> a, string k) => a.TryGetValue(k, out string v) ? v : "";
         private static int Int(Dictionary<string, string> a, string k) => int.TryParse(Str(a, k), NumberStyles.Integer, CultureInfo.InvariantCulture, out int v) ? v : 0;
@@ -881,8 +1157,19 @@ namespace RimLuaKit
                     if (s[i] == '\\' && i + 1 < s.Length)
                     {
                         i++;
-                        sb.Append(s[i]);
-                        i++;
+                        char esc = s[i++];
+                        switch (esc)
+                        {
+                            case 'n': sb.Append('\n'); break;
+                            case 'r': sb.Append('\r'); break;
+                            case 't': sb.Append('\t'); break;
+                            case '"': sb.Append('"'); break;
+                            case '\\': sb.Append('\\'); break;
+                            case '/': sb.Append('/'); break;
+                            case 'b': sb.Append('\b'); break;
+                            case 'f': sb.Append('\f'); break;
+                            default: sb.Append(esc); break;
+                        }
                     }
                     else sb.Append(s[i++]);
                 }

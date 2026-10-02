@@ -37,6 +37,8 @@ RIMLUA_API void rimlua_emit_event(const char* name, int handle);
 /* phase: "can_do" | "execute". out_result: 1=true/done, 0=false/continue. returns 0 on ok. */
 RIMLUA_API int rimlua_job_call(const char* name, const char* phase, int pawn_handle, int* out_result);
 RIMLUA_API void rimlua_ui_invoke(int callback_id);
+/* Returns pointer to static UTF-8 blob "label\\tid\\n..." from Lua ui.on_map_float_menu. Empty string if none. */
+RIMLUA_API const char* rimlua_collect_map_float_menu(int clicked_handle, int hauler_handle);
 
 #ifdef __cplusplus
 }

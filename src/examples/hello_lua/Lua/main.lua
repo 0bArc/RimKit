@@ -6,7 +6,6 @@ rim.on_load(function()
   player.send_message("[HelloLua] LOADED OK")
 end)
 
--- File-level sugar: auto-wired to events.pawn_spawned at on_load
 function on_pawn_spawned(pawn)
   if pawn.is_colonist then
     log.info("[HelloLua] colonist spawned: " .. tostring(pawn.name))
@@ -17,7 +16,6 @@ events.on("pawn_died", function(pawn)
   log.info("[HelloLua] died: " .. tostring(pawn.name))
 end)
 
--- Select type, then assign method. Callback gets RimPawn userdata.
 rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(pawn)
   local name = tostring(pawn.name or "?")
   local map = pawn.map

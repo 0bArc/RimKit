@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Defs>
+  <KeyBindingDef>
+    <defName>RimLua_BadProbeKeys</defName>
+    <label>Bad Probe test key (should never fire if gated)</label>
+    <category>Game</category>
+    <defaultKeyCodeA>F9</defaultKeyCodeA>
+  </KeyBindingDef>
+</Defs>

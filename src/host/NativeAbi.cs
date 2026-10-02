@@ -50,6 +50,9 @@ namespace RimLuaKit
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void rimlua_ui_invoke(int callbackId);
 
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern IntPtr rimlua_collect_map_float_menu(int clickedHandle, int haulerHandle);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void LogFn(IntPtr msg);
 

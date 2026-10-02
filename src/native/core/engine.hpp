@@ -62,6 +62,8 @@ public:
     void emit_event(const std::string& name, int handle);
     int job_call(const std::string& name, const std::string& phase, int pawn_handle, int* out_result);
     void ui_invoke(int callback_id);
+    /** UTF-8 "label\\tid\\n..." for map right-click options from Lua. Valid until next call. */
+    const char* collect_map_float_menu(int clicked_handle, int hauler_handle);
 
     const rimlua_callbacks& callbacks() const { return callbacks_; }
     bool ready() const { return ready_; }
@@ -83,7 +85,11 @@ private:
     void bind_events_and_timer();
     void bind_jobs_and_faction();
     void bind_ui_config_defs();
+    void bind_strong_api();
     void wire_global_handlers();
+    void apply_sandbox();
+    void allow_lua_root(const std::string& dir);
+    bool is_lua_path_allowed(const std::string& path) const;
     int register_ui_callback(sol::protected_function fn);
     int register_hook_lua(bool is_prefix, const std::string& type_name, const std::string& method_name,
                           sol::protected_function fn);
@@ -102,7 +108,10 @@ private:
     std::unordered_map<std::string, std::vector<sol::protected_function>> event_handlers_;
     std::unordered_map<std::string, LuaJobDef> lua_jobs_;
     std::unordered_map<int, sol::protected_function> ui_callbacks_;
+    std::vector<sol::protected_function> map_float_menu_handlers_;
+    std::string float_menu_blob_cache_;
     std::vector<TimerEntry> timers_;
+    std::vector<std::string> allowed_lua_roots_;
     int next_hook_id_ = 1;
     int next_ui_id_ = 1;
 };
