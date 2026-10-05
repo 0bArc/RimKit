@@ -6,16 +6,17 @@
 !bin/.gitkeep
 src/native/build/
 build/
+infrastructure/site/
 site/
 
 # Native / managed outputs (rebuild via rimkit build)
-Assemblies/*.dll
-Assemblies/*.pdb
-Assemblies/*.xml
-!Assemblies/.gitkeep
-Native/*.dll
-Native/*.pdb
-!Native/.gitkeep
+mod/Assemblies/*.dll
+mod/Assemblies/*.pdb
+mod/Assemblies/*.xml
+!mod/Assemblies/.gitkeep
+mod/Native/*.dll
+mod/Native/*.pdb
+!mod/Native/.gitkeep
 bin/*.exe
 bin/*.pdb
 
@@ -31,8 +32,9 @@ skills-lock.json
 Thumbs.db
 
 # Extension pack artifacts (keep sources)
-vscode-rimkit/node_modules/
-vscode-rimkit/*.vsix
+src/editor/node_modules/
+src/editor/*.vsix
+infrastructure/docs-site/node_modules/
 
 # Generated About can stay tracked; ignore accidental dumps
 *.log

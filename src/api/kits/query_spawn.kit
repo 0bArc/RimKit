@@ -1,0 +1,86 @@
+# game.query (P1-12) and spawning and generation (P1-11).
+
+@class RimArea | A rectangle of cells, both corners inclusive.
+x1: integer West edge, cell x
+z1: integer South edge, cell z
+x2: integer East edge, cell x
+z2: integer North edge, cell z
+
+@class RimThingQuery
+map: RimMap Required
+def?: string Only things of this def
+defs?: string[] Only things of one of these defs
+group?: string A ThingRequestGroup name such as HaulableEver, Weapon, Plant, Pawn
+faction?: RimFaction|string A faction, or "player"
+area?: RimArea Only things inside this rectangle
+spawned_only?: boolean Default true
+limit?: integer Return at most this many
+
+@class RimPawnQuery
+map?: RimMap All maps when omitted
+faction?: RimFaction|string A faction, or "player", "hostile" or "neutral"
+kind?: string Pawn kind def name
+humanlike?: boolean Only humanlike pawns, or only others when false
+animal?: boolean Only animals, or only others when false
+colonist?: boolean Only colonists, or only others when false
+prisoner?: boolean Only prisoners, or only others when false
+slave?: boolean Only slaves, or only others when false
+downed?: boolean Only downed pawns, or only others when false
+dead?: boolean Only dead pawns, or only others when false
+drafted?: boolean Only drafted pawns, or only others when false
+area?: RimArea Only pawns inside this rectangle
+include_unspawned?: boolean Also return pawns not spawned on a map
+limit?: integer Return at most this many
+
+@class RimRadiusQuery
+def?: string Only things of this def
+faction?: RimFaction|string Only things of this faction, or player
+limit?: integer Return at most this many
+
+@class RimNearestQuery
+def?: string Only things of this def
+group?: string Only things in this ThingRequestGroup
+faction?: RimFaction|string Only things of this faction, or player
+max_distance?: number Give up beyond this distance in cells
+
+@class RimGenerateOptions
+kind?: string Pawn kind def name, default Colonist
+faction?: RimFaction|string A faction, or "player"
+gender?: string Male or Female
+age?: number Years
+map?: RimMap Spawn on this map
+x?: integer Cell x to spawn at, with map and z
+z?: integer Cell z to spawn at, with map and x
+
+@class RimPawnKindInfo
+def: string Def name of the pawn kind
+label?: string Name shown to the player
+race?: string Race def name
+humanlike: boolean Whether it is humanlike
+animal: boolean Whether it is an animal
+
+@class RimThingSetOptions
+value_min?: number Lowest total market value
+value_max?: number Highest total market value
+count_min?: integer Fewest items
+count_max?: integer Most items
+
+@kit domain=query op=query subject=none title="Queries" page=query
+things(opts: RimThingQuery) -> RimThing[] | Things on a map matching the filters, in one host call.
+pawns(opts: RimPawnQuery) -> RimPawn[] | Pawns matching the filters, on one map or all maps.
+count_by_def(opts: RimThingQuery) -> table<string, integer> | Total count per thing def, stacks included.
+
+@kit domain=query op=query subject=map:RimMapRef title="Queries" page=query
+radius(x: integer, z: integer, radius: number, opts?: RimRadiusQuery) -> RimThing[] | Things within a radius of a cell.
+nearest(x: integer, z: integer, opts?: RimNearestQuery) -> RimThing? | The closest spawned thing to a cell.
+
+@kit domain=pawns op=pawn subject=none title="Pawns" page=pawns
+generate(opts?: RimGenerateOptions) -> RimPawn | Generates a pawn with the game's own generator, and spawns it when map, x and z are given.
+kinds() -> RimPawnKindInfo[] | Every pawn kind def.
+
+@kit domain=things op=thing subject=none title="Things" page=things
+thing_set(def: string, opts?: RimThingSetOptions) -> RimThing[] | Generates the items a thing set maker would (rewards, trade goods) without placing them.
+thing_set_defs() -> string[] | Every thing set maker def name.
+stuff_options(def: string) -> string[] | Materials a thing def can be made from.
+random_stuff(def: string) -> string? | A random material for a thing def.
+roll_quality(generator?: string) -> string | Rolls a quality the way the game does. Generator: Reward, BaseGen, Gift, OnMap or Trader.

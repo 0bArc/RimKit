@@ -1,0 +1,89 @@
+# game.maps (P1-02). Cells are integer x, z. Older functions (current, list, width, height, pawns, colonists, things, spawn) are in the alias table.
+
+@alias RimMapRef RimMap|integer
+
+@class RimCell | A map cell.
+x: integer Cell x coordinate
+z: integer Cell z coordinate
+
+@class RimMapInfo
+id: integer Map id
+tile: integer World tile the map is on
+width: integer Width in cells
+height: integer Height in cells
+cells: integer Number of cells
+biome: string Biome def name
+is_player_home: boolean Whether it is a player home map
+is_pocket: boolean Whether it is a pocket map
+outdoor_temperature: number Temperature outdoors now
+seasonal_temperature: number Average temperature for the season
+weather?: string Weather def name
+wealth: number Total wealth on the map
+faction?: RimFaction The faction that owns the map, when there is one
+
+@class RimRoomInfo
+id: integer Room id
+role?: string Room role def name, for example Bedroom
+cells: integer How many cells
+outdoors: boolean Whether it is outdoors
+temperature: number Room temperature
+proper: boolean Whether it counts as a proper room
+open_roof: integer Cells without a roof
+impressiveness?: number Impressiveness of the room
+cell_list?: RimCell[] Up to 400 cells, only when asked for
+
+@class RimZoneInfo
+id: integer Id of the zone, to pass back to the functions that take one
+label: string Name shown to the player
+type: string Zone_Stockpile, Zone_Growing and so on
+cells: integer How many cells
+
+@class RimAreaInfo
+id: integer Id of the area, to pass back to the functions that take one
+label: string Name shown to the player
+cells: integer How many cells
+
+@class RimDesignationInfo
+def: string Def name of the designation
+thing?: RimThing The thing it marks
+x?: integer Cell x coordinate
+z?: integer Cell z coordinate
+
+@class RimLordInfo
+job?: string Name of the lord job class
+toil?: string Name of the current toil
+pawns: integer How many pawns are in the group
+faction?: RimFaction The faction the group belongs to
+
+@kit domain=maps op=map subject=map:RimMapRef title="Maps" page=maps
+info() -> RimMapInfo | Size, biome, ownership, temperature, weather and wealth.
+terrain(x: integer, z: integer) -> string | Terrain def name at the cell.
+set_terrain(x: integer, z: integer, def: string) -> string | Sets the terrain. Returns the def name.
+roof(x: integer, z: integer) -> string? | Roof def name, nil when there is no roof.
+set_roof(x: integer, z: integer, def?: string) -> boolean | Sets a roof by def name, or removes it when def is nil.
+fogged(x: integer, z: integer) -> boolean | Whether the cell is still under fog of war.
+unfog(x: integer, z: integer) -> boolean | Reveals the cell and the area around it.
+temperature(x: integer, z: integer) -> number | Temperature at the cell in degrees Celsius.
+light(x: integer, z: integer) -> number | Light level from 0 to 1.
+snow(x: integer, z: integer) -> number | Snow depth from 0 to 1.
+set_snow(x: integer, z: integer, depth: number) -> number | Sets snow depth, clamped to 0 to 1.
+filth(x: integer, z: integer) -> string[] | Filth def names on the cell.
+clear_filth(x: integer, z: integer) -> integer | Removes all filth on the cell. Returns how many pieces.
+walkable(x: integer, z: integer) -> boolean | Whether a pawn can walk through the cell.
+standable(x: integer, z: integer) -> boolean | Whether a pawn can stand on the cell.
+in_bounds(x: integer, z: integer) -> boolean | Whether the cell is on the map.
+things_at(x: integer, z: integer) -> RimThing[] | Every thing on the cell.
+room(x: integer, z: integer, cells?: boolean) -> RimRoomInfo? | The room containing the cell, nil for none. Pass true to include the cells.
+rooms() -> RimRoomInfo[] | Every enclosed room with a roof.
+reachable(x: integer, z: integer, x2: integer, z2: integer) -> boolean | Whether a pawn can walk from the first cell to the second. Doors count as passable.
+zones() -> RimZoneInfo[] | Stockpiles, growing zones and other zones.
+zone_at(x: integer, z: integer) -> RimZoneInfo? | The zone on the cell.
+areas() -> RimAreaInfo[] | Allowed areas.
+designations(def?: string) -> RimDesignationInfo[] | Designations on the map, optionally only one def such as Mine or Hunt.
+add_designation(def: string, thing?: RimThing, x?: integer, z?: integer) -> boolean | Designates a thing, or a cell when no thing is given.
+remove_designations(def?: string) -> integer | Removes designations of one def, or all of them. Returns how many.
+lords() -> RimLordInfo[] | Groups of pawns under a lord job, such as raids and visitors.
+components() -> string[] | Class names of the map components.
+edge_cell() -> RimCell | A random cell on the map edge.
+drop_spot() -> RimCell | A cell suitable for dropping items or a drop pod.
+cell_near(x: integer, z: integer, radius: integer) -> RimCell? | A random standable cell within the radius.

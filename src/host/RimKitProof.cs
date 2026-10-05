@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Host/native SHA + short proof code.
     public static class RimKitProof

@@ -3,9 +3,9 @@ using RimWorld;
 using RimWorld.Planet;
 using Verse;
 using Verse.Sound;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class ApiWorld
     {

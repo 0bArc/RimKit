@@ -1,0 +1,222 @@
+# Combat, construction, power, bills, doors, economy, raids (P2-05, P2-06, P2-07).
+
+@class RimVerbInfo
+label?: string Verb label
+class?: string Name of the C# class that implements it
+range: number Range in cells
+burst: integer Shots per burst
+warmup: number Warmup in seconds
+cooldown: number Cooldown in seconds
+melee: boolean Whether it is a melee verb
+projectile?: string Projectile def name
+melee_damage?: number Melee damage
+damage?: integer Projectile damage
+
+@class RimArmor
+sharp: number Sharp armour rating
+blunt: number Blunt armour rating
+heat: number Heat armour rating
+
+@class RimExplosionOptions
+damage_def?: string Default Bomb
+damage?: integer Damage of the blast
+instigator?: RimThing Thing that caused it
+
+@class RimLaunchOptions
+launcher?: RimThing Thing that fired it
+
+@class RimDamageDefInfo
+def: string Def name of the damage def
+label?: string Name shown to the player
+harmful: boolean Whether it hurts
+explosive: boolean Whether it explodes
+
+@class RimProjectileInfo
+def: string Def name of the projectile
+label?: string Name shown to the player
+damage: integer Damage on hit
+speed: number Flight speed
+damage_def?: string Damage def name
+armor_penetration: number Armour penetration
+
+@class RimTurretInfo
+has_target: boolean Whether it has a target
+mode: string Targeting mode name
+target?: RimThing Current target
+
+@class RimBuildOptions
+stuff?: string Material def name, defaults to the def's default
+rotation?: integer 0 north, 1 east, 2 south, 3 west
+faction?: RimFaction Defaults to the player faction
+
+@class RimPlacement
+ok: boolean Whether it can be placed
+reason?: string Why not, when it cannot
+
+@class RimBuildSite
+thing: RimThing The blueprint or frame
+def: string Def of what is being built
+label: string Name shown to the player
+x: integer Cell x coordinate
+z: integer Cell z coordinate
+work_done?: number Work done so far
+work_total?: number Work needed in all
+
+@class RimBuildableInfo
+def: string Def name of the buildable
+label?: string Name shown to the player
+category?: string Category it is listed under
+stuff: boolean Whether it is built from a stuff
+size_x: integer Width in cells
+size_z: integer Height in cells
+work: number Work needed to build
+
+@class RimPowerInfo
+connected: boolean Whether it is on a power net
+powered_on?: boolean Whether it is switched on
+consumption?: number Watts it uses
+gain?: number Net watts per tick of the whole power net
+stored?: number Watt-days stored in the net
+batteries?: integer How many batteries the net has
+devices?: integer How many devices the net has
+
+@class RimBillInfo
+index: integer Position of the bill, 0 first
+recipe: string Recipe def name
+label: string Name shown to the player
+suspended: boolean Whether the bill is suspended
+mode?: string Forever, RepeatCount or TargetCount
+repeat_count?: integer How many times it repeats
+target_count?: integer Stock level it works toward
+paused?: boolean Whether the stock bill is paused
+
+@class RimBillOptions
+mode?: string Forever, RepeatCount or TargetCount
+count?: integer For RepeatCount
+target?: integer For TargetCount
+
+@class RimRecipeInfo
+def: string Def name of the recipe
+label: string Name shown to the player
+available: boolean Whether it can be used now
+work: number Work needed
+products: { def: string, count: integer }[]
+
+@class RimDoorInfo
+open: boolean Whether the door is open now
+hold_open: boolean Whether it is held open
+blocked: boolean Whether something blocks it
+forbidden: boolean Whether the door is forbidden
+
+@class RimWealth
+total: number Total wealth
+items: number Wealth in items
+buildings: number Wealth in buildings
+pawns: number Wealth in pawns
+floors: number Wealth in floors
+
+@class RimPrice
+market: number Market value
+sell: number Rough price when selling to a trader
+buy: number Rough price when buying from a trader
+
+@class RimTraderKind
+def: string Def name of the trader kind
+label?: string Name shown to the player
+orbital: boolean Whether it trades from orbit
+visitor: boolean Whether it arrives on foot or by caravan
+commonality: number How often it is chosen
+
+@class RimShipInfo
+name?: string Name of the ship
+class: string Name of the C# class
+kind?: string Trader kind def name
+goods?: integer How many goods it carries
+ticks_left?: integer Ticks until it leaves
+
+@class RimStockItem
+def: string Def name of the stock item
+label: string Name shown to the player
+count: integer How many are in stock
+value: number Market value of one
+
+@class RimRaidStrategy
+def: string Def name of the raid strategy
+label?: string Name shown to the player
+selection_weight: number How often it is chosen
+
+@class RimArrivalMode
+def: string Def name of the arrival mode
+label?: string Name shown to the player
+walks_in: boolean Whether the raid walks in from the edge
+
+@class RimRaidOptions
+faction?: RimFaction A faction friendly to the player sends a friendly raid
+points?: number Threat points to spend
+strategy?: string RaidStrategyDef name
+arrival?: string PawnsArrivalModeDef name
+
+@kit domain=combat op=combat subject=thing:RimThingRef title="Combat" page=combat
+verbs() -> RimVerbInfo[] | Attacks a pawn or weapon can make: range, burst, damage, melee or ranged.
+attack(target: RimThing) -> boolean | Orders a pawn to attack a target with its best verb.
+armor() -> RimArmor | Armor rating against sharp, blunt and heat damage.
+turret_info() -> RimTurretInfo | Target and state of a turret.
+turret_target(target?: RimThing) -> boolean | Orders a gun turret to attack a target, or clears the order when nil.
+
+@kit domain=combat op=combat subject=map:RimMapRef title="Combat" page=combat
+explode(x: integer, z: integer, radius: number, opts?: RimExplosionOptions) -> boolean | Causes an explosion.
+start_fire(x: integer, z: integer, size?: number) -> boolean | Starts a fire on a cell.
+extinguish(x: integer, z: integer) -> integer | Puts out the fires on a cell. Returns how many.
+fires() -> RimThing[] | Every fire on the map.
+launch(x: integer, z: integer, x2: integer, z2: integer, projectile: string, opts?: RimLaunchOptions) -> RimThing | Launches a projectile def from one cell to another.
+
+@kit domain=combat op=combat subject=none title="Combat" page=combat
+damage_defs() -> RimDamageDefInfo[] | Every damage def.
+projectile_defs() -> RimProjectileInfo[] | Every projectile def with damage and speed.
+
+@kit domain=build op=build subject=map:RimMapRef title="Construction" page=build
+can_place(def: string, x: integer, z: integer, opts?: RimBuildOptions) -> RimPlacement | Whether a building can be planned there, and why not.
+blueprint(def: string, x: integer, z: integer, opts?: RimBuildOptions) -> RimThing | Plans a building. Colonists build it.
+blueprints() -> RimBuildSite[] | Planned buildings.
+frames() -> RimBuildSite[] | Buildings under construction with their progress.
+instant(def: string, x: integer, z: integer, opts?: RimBuildOptions) -> RimThing | Builds a finished building at once.
+
+@kit domain=build op=build subject=thing:RimThingRef title="Construction" page=build
+cancel() -> boolean | Cancels a blueprint or frame.
+
+@kit domain=build op=build subject=none title="Construction" page=build
+defs(category?: string) -> RimBuildableInfo[] | Buildings a player can build, optionally one architect category.
+
+@kit domain=power op=power subject=thing:RimThingRef title="Power" page=build
+net() -> RimPowerInfo | Power state of a building and its whole power net.
+set_battery(pct: number) -> number | Sets a battery's charge from 0 to 1.
+
+@kit domain=bills op=bill subject=thing:RimThingRef title="Bills" page=build
+list() -> RimBillInfo[] | The bills on a workbench.
+add(recipe: string, opts?: RimBillOptions) -> integer | Adds a bill. Returns its index.
+remove(index: integer) -> boolean | Deletes a bill by index.
+suspend(index: integer, suspended: boolean) -> boolean | Suspends or resumes a bill.
+recipes() -> RimRecipeInfo[] | What a workbench can make.
+
+@kit domain=doors op=door subject=thing:RimThingRef title="Doors and traps" page=build
+info() -> RimDoorInfo | State of a door.
+hold_open(hold: boolean) -> boolean | Holds a door open.
+
+@kit domain=traps op=trap subject=thing:RimThingRef title="Doors and traps" page=build
+info() -> { armed: boolean, class: string } | Whether a trap is armed.
+
+@kit domain=economy op=economy subject=none title="Economy" page=economy
+silver(h?: RimMapRef) -> integer | Silver the colony holds on a map, the current map by default.
+wealth(h?: RimMapRef) -> RimWealth | Colony wealth split into items, buildings, pawns and floors.
+price(def?: string, stuff?: string, thing?: RimThing) -> RimPrice | Market value of a def (with a material) or a thing, with rough trade prices.
+give_silver(amount: integer, h?: RimMapRef) -> integer | Drops silver by pod next to the colony.
+trader_kinds() -> RimTraderKind[] | Every trader kind def.
+ships(h?: RimMapRef) -> RimShipInfo[] | Passing ships and orbital traders.
+stock(settlement?: RimObject, ship?: integer, h?: RimMapRef) -> RimStockItem[] | Goods of a settlement, or of an orbital trader by index.
+call_trader(h?: RimMapRef) -> boolean | Calls an orbital trader.
+
+@kit domain=raids op=raid subject=none title="Raids" page=economy
+strategies() -> RimRaidStrategy[] | Every raid strategy def.
+arrival_modes() -> RimArrivalMode[] | Every way a raid can arrive.
+can_fire(opts?: RimRaidOptions, h?: RimMapRef) -> boolean | Whether a raid with these options could fire now.
+fire(opts?: RimRaidOptions, h?: RimMapRef) -> boolean | Sends a raid at a map.

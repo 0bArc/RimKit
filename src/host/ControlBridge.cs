@@ -5,7 +5,7 @@ using UnityEngine;
 using Verse;
 using Verse.AI;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Debug: right-click walks the controlled pawn.
     internal static class ControlBridge
@@ -88,7 +88,7 @@ namespace RimLuaKit
                     return;
                 }
                 Event.current.Use();
-                Messages.Message("[RimLua] " + p.LabelShort + " go " + cell, MessageTypeDefOf.SilentInput, false);
+                Messages.Message("[RimKit] " + p.LabelShort + " go " + cell, MessageTypeDefOf.SilentInput, false);
             }
             catch (Exception e)
             {

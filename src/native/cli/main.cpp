@@ -3,8 +3,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
+#include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
+
+#include "aliases.hpp"
+#include "tools.hpp"
 
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
@@ -14,12 +20,21 @@ namespace fs = std::filesystem;
 static void usage() {
     std::cout
         << "rimkit - RimKit CLI\n\n"
+        << "  rimkit migrate [path] [--write] Rewrite deprecated API names to UNC names (dry run unless --write)\n"
+        << "  rimkit migrate --check [path]   Exit 1 when deprecated names remain\n"
         << "  rimkit init [name]              Init Lua mod in cwd (or ./name)\n"
         << "  rimkit build                    Build native core + C# host\n"
         << "  rimkit mod create <name> [dir]  Create Lua mod folder\n"
-        << "  rimkit mod sync [path]          meta.lua -> About/About.xml\n"
+        << "  rimkit mod sync [path]          meta.lua -> About/About.xml, Defs/*.lua and Languages/**/*.lua -> XML\n"
+        << "  rimkit mod defs [dir]           Only the Lua to XML step, for a folder with no meta.lua\n"
         << "  rimkit mod ship [path] [mods]   Sync + copy mod into RimWorld Mods/\n"
-        << "  rimkit mod check [path]         Validate meta + Lua\n"
+        << "  rimkit mod check [path]         Validate meta, Lua, Defs, patches, textures and translation keys\n"
+        << "  rimkit mod test [path]          Run Tests/*.lua against a mock host (no game needed)\n"
+        << "  rimkit mod assets [path] [--fix]  Check the Workshop preview and mod icon, make placeholders\n"
+        << "  rimkit mod i18n <cmd> [path]    extract | missing <lang> | export <lang> | import <lang> <csv>\n"
+        << "  rimkit mod release-check [path] Checklist before publishing: version, changelog, licence, credits, assets\n"
+        << "  rimkit publish [path]           Upload to the Steam Workshop (--note, --user, --steamcmd, --dry-run)\n"
+        << "  rimkit diag [--fresh]           Zip the log, mod list and profiler numbers for a bug report (no network)\n"
         << "  rimkit help\n";
 }
 
@@ -45,21 +60,6 @@ static std::string xml_escape(const std::string& s) {
         }
     }
     return out;
-}
-
-static std::string to_package_id(const std::string& name) {
-    std::string out;
-    for (char c : name) {
-        if (std::isalnum(static_cast<unsigned char>(c))) {
-            out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
-        } else if (c == '_' || c == '-' || c == '.') {
-            out.push_back('.');
-        }
-    }
-    if (out.empty()) {
-        out = "mymod";
-    }
-    return "stratware." + out;
 }
 
 static std::string default_author() {
@@ -216,6 +216,17 @@ static int write_about_xml(const fs::path& modDir, const sol::table& meta) {
     std::string description = field_str(meta, "description", "Description");
     std::vector<std::string> versions = field_string_list(meta, "supported_versions", "supportedVersions");
     if (versions.empty()) {
+        sol::object vf = meta["version_folders"];
+        if (vf.get_type() == sol::type::table) {
+            for (const auto& kv : vf.as<sol::table>()) {
+                if (kv.first.is<std::string>()) {
+                    versions.push_back(kv.first.as<std::string>());
+                }
+            }
+            std::sort(versions.begin(), versions.end());
+        }
+    }
+    if (versions.empty()) {
         std::string ver = field_str(meta, "version", "Version");
         if (!ver.empty()) {
             versions.push_back(ver);
@@ -266,6 +277,16 @@ static int write_about_xml(const fs::path& modDir, const sol::table& meta) {
     }
     f << "  </supportedVersions>\n";
     f << "  <packageId>" << xml_escape(packageId) << "</packageId>\n";
+    {
+        const std::string modVersion = field_str(meta, "mod_version", "modVersion");
+        if (!modVersion.empty()) {
+            f << "  <modVersion>" << xml_escape(modVersion) << "</modVersion>\n";
+        }
+        const std::string url = field_str(meta, "url");
+        if (!url.empty()) {
+            f << "  <url>" << xml_escape(url) << "</url>\n";
+        }
+    }
     f << "  <description>" << xml_escape(description) << "</description>\n";
     if (!deps.empty()) {
         f << "  <modDependencies>\n";
@@ -289,6 +310,24 @@ static int write_about_xml(const fs::path& modDir, const sol::table& meta) {
             f << "    <li>" << xml_escape(id) << "</li>\n";
         }
         f << "  </loadAfter>\n";
+    }
+    {
+        auto before = field_string_list(meta, "load_before", "loadBefore");
+        if (!before.empty()) {
+            f << "  <loadBefore>\n";
+            for (const auto& id : before) {
+                f << "    <li>" << xml_escape(id) << "</li>\n";
+            }
+            f << "  </loadBefore>\n";
+        }
+        auto incompatible = field_string_list(meta, "incompatible_with", "incompatibleWith");
+        if (!incompatible.empty()) {
+            f << "  <incompatibleWith>\n";
+            for (const auto& id : incompatible) {
+                f << "    <li>" << xml_escape(id) << "</li>\n";
+            }
+            f << "  </incompatibleWith>\n";
+        }
     }
     f << "</ModMetaData>\n";
     std::cout << "Wrote " << outPath << "\n";
@@ -400,6 +439,272 @@ static int write_defs_from_lua(const fs::path& modDir) {
     return 0;
 }
 
+// ---------------------------------------------------------------- Defs written in Lua
+// Any Defs/*.lua file is a script that calls def(kind, defName, fields, opts). rimkit mod sync turns it into Defs/<name>.xml, so a mod
+// can be written entirely in Lua and the game still reads ordinary Def XML. Fields are plain tables: a key _class sets the Class
+// attribute, a list becomes <li> items, nested tables become nested elements. opts: parent, name, abstract.
+//
+//   def("ThingDef", "MyChair", { label = "my chair", statBases = { Comfort = 0.8 } }, { parent = "FurnitureBase" })
+//
+// Helpers inside the script: vec(x, z) gives "(x,z)", rgb(r, g, b) gives "(r,g,b)".
+
+static const char* kLuaDefsMarker = "<!-- Generated by rimkit mod sync from ";
+
+static void lua_value_to_xml(std::ostringstream& out, const std::string& name, const sol::object& v, int depth, bool is_li = false) {
+    const std::string pad(static_cast<size_t>(depth) * 2, ' ');
+    auto open_tag = [&](const std::string& extra) { out << pad << "<" << name << extra << ">"; };
+    if (v.get_type() == sol::type::table) {
+        sol::table t = v.as<sol::table>();
+        std::string class_attr;
+        sol::object cls = t["_class"];
+        if (cls.get_type() == sol::type::string) {
+            class_attr = " Class=\"" + xml_escape(cls.as<std::string>()) + "\"";
+        }
+        std::string attrs;
+        sol::object attr_obj = t["_attrs"];
+        if (attr_obj.get_type() == sol::type::table) {
+            std::vector<std::pair<std::string, std::string>> list;
+            for (const auto& kv : attr_obj.as<sol::table>()) {
+                if (kv.first.is<std::string>()) {
+                    list.emplace_back(kv.first.as<std::string>(), kv.second.is<std::string>() ? kv.second.as<std::string>() : std::to_string(kv.second.as<double>()));
+                }
+            }
+            std::sort(list.begin(), list.end());
+            for (const auto& a : list) {
+                attrs += " " + a.first + "=\"" + xml_escape(a.second) + "\"";
+            }
+        }
+        const size_t n = t.size();
+        bool has_string_key = false;
+        for (const auto& kv : t) {
+            if (kv.first.is<std::string>()) {
+                has_string_key = true;
+            }
+        }
+        open_tag(class_attr + attrs);
+        if (n > 0 && !has_string_key) {
+            out << "\n";
+            for (size_t i = 1; i <= n; ++i) {
+                sol::object item = t[i];
+                lua_value_to_xml(out, "li", item, depth + 1, true);
+            }
+            out << pad;
+        } else {
+            std::vector<std::string> keys;
+            for (const auto& kv : t) {
+                if (kv.first.is<std::string>()) {
+                    const std::string k = kv.first.as<std::string>();
+                    if (k != "_class" && k != "_attrs") {
+                        keys.push_back(k);
+                    }
+                }
+            }
+            std::sort(keys.begin(), keys.end());
+            if (!keys.empty()) {
+                out << "\n";
+            }
+            for (const std::string& k : keys) {
+                sol::object child = t[k];
+                lua_value_to_xml(out, k, child, depth + 1);
+            }
+            if (!keys.empty()) {
+                out << pad;
+            }
+        }
+        out << "</" << name << ">\n";
+        return;
+    }
+    open_tag("");
+    if (v.get_type() == sol::type::boolean) {
+        out << (v.as<bool>() ? "true" : "false");
+    } else if (v.get_type() == sol::type::number) {
+        const double d = v.as<double>();
+        if (d == static_cast<double>(static_cast<long long>(d))) {
+            out << static_cast<long long>(d);
+        } else {
+            std::ostringstream num;
+            num.precision(9);
+            num << d;
+            out << num.str();
+        }
+    } else if (v.get_type() == sol::type::string) {
+        out << xml_escape(v.as<std::string>());
+    }
+    out << "</" << name << ">\n";
+    (void)is_li;
+}
+
+static int write_lua_defs_files(const fs::path& modDir) {
+    const fs::path defsDir = modDir / "Defs";
+    if (!fs::exists(defsDir)) {
+        return 0;
+    }
+    std::vector<fs::path> scripts;
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(defsDir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file(ec) && it->path().extension() == ".lua") {
+            scripts.push_back(it->path());
+        }
+    }
+    std::sort(scripts.begin(), scripts.end());
+    for (const fs::path& script : scripts) {
+        fs::path out_path = script;
+        out_path.replace_extension(".xml");
+        if (fs::exists(out_path)) {
+            std::ifstream existing(out_path);
+            std::string first_lines, line;
+            for (int i = 0; i < 3 && std::getline(existing, line); ++i) {
+                first_lines += line + "\n";
+            }
+            if (first_lines.find(kLuaDefsMarker) == std::string::npos) {
+                std::cerr << out_path.string() << " exists and was not generated from Lua. Delete it or rename the .lua file.\n";
+                return 1;
+            }
+        }
+        sol::state lua;
+        lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table, sol::lib::math);
+        std::ostringstream body;
+        int count = 0;
+        std::string failure;
+        lua["vec"] = [](double x, double z) {
+            std::ostringstream s;
+            s << "(" << x << "," << z << ")";
+            return s.str();
+        };
+        lua["rgb"] = [](double r, double g, double b) {
+            std::ostringstream s;
+            s << "(" << r << "," << g << "," << b << ")";
+            return s.str();
+        };
+        lua["def"] = [&](const std::string& kind, const std::string& def_name, sol::optional<sol::table> fields, sol::optional<sol::table> opts) {
+            if (kind.empty() || def_name.empty()) {
+                failure = "def needs a kind and a defName";
+                return;
+            }
+            std::string attrs;
+            if (opts) {
+                sol::table o = *opts;
+                sol::object parent = o["parent"], name = o["name"], abstract_obj = o["abstract"];
+                if (parent.get_type() == sol::type::string) attrs += " ParentName=\"" + xml_escape(parent.as<std::string>()) + "\"";
+                if (name.get_type() == sol::type::string) attrs += " Name=\"" + xml_escape(name.as<std::string>()) + "\"";
+                if (abstract_obj.get_type() == sol::type::boolean && abstract_obj.as<bool>()) attrs += " Abstract=\"True\"";
+            }
+            body << "  <" << kind << attrs << ">\n    <defName>" << xml_escape(def_name) << "</defName>\n";
+            if (fields) {
+                std::vector<std::string> keys;
+                for (const auto& kv : *fields) {
+                    if (kv.first.is<std::string>()) keys.push_back(kv.first.as<std::string>());
+                }
+                std::sort(keys.begin(), keys.end());
+                for (const std::string& k : keys) {
+                    sol::object child = (*fields)[k];
+                    lua_value_to_xml(body, k, child, 2);
+                }
+            }
+            body << "  </" << kind << ">\n\n";
+            ++count;
+        };
+        sol::protected_function_result r = lua.safe_script_file(script.string(), sol::script_pass_on_error);
+        if (!r.valid()) {
+            sol::error e = r;
+            std::cerr << script.string() << ": " << e.what() << "\n";
+            return 1;
+        }
+        if (!failure.empty()) {
+            std::cerr << script.string() << ": " << failure << "\n";
+            return 1;
+        }
+        std::ofstream f(out_path);
+        if (!f) {
+            std::cerr << "Cannot write " << out_path.string() << "\n";
+            return 1;
+        }
+        f << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+          << kLuaDefsMarker << script.filename().string() << ". Edit the .lua file, not this one. -->\n<Defs>\n\n"
+          << body.str() << "</Defs>\n";
+        std::cout << "Wrote " << out_path.string() << " (" << count << " def(s) from " << script.filename().string() << ")\n";
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------- Strings written in Lua
+// Languages/<Language>/Keyed/*.lua returns a table of key = text. rimkit mod sync writes the LanguageData XML next to it, so the
+// translation files can be Lua too:   return { MyMod_Hello = "Hello {0}", MyMod_Bye = "Goodbye" }
+
+static int write_lua_language_files(const fs::path& modDir) {
+    const fs::path langDir = modDir / "Languages";
+    if (!fs::exists(langDir)) {
+        return 0;
+    }
+    std::vector<fs::path> scripts;
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(langDir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (it->is_regular_file(ec) && it->path().extension() == ".lua") {
+            scripts.push_back(it->path());
+        }
+    }
+    std::sort(scripts.begin(), scripts.end());
+    for (const fs::path& script : scripts) {
+        fs::path out_path = script;
+        out_path.replace_extension(".xml");
+        if (fs::exists(out_path)) {
+            std::ifstream existing(out_path);
+            std::string first_lines, line;
+            for (int i = 0; i < 3 && std::getline(existing, line); ++i) {
+                first_lines += line + "\n";
+            }
+            if (first_lines.find(kLuaDefsMarker) == std::string::npos) {
+                std::cerr << out_path.string() << " exists and was not generated from Lua. Delete it or rename the .lua file.\n";
+                return 1;
+            }
+        }
+        sol::state lua;
+        lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table, sol::lib::math);
+        sol::protected_function_result r = lua.safe_script_file(script.string(), sol::script_pass_on_error);
+        if (!r.valid()) {
+            sol::error e = r;
+            std::cerr << script.string() << ": " << e.what() << "\n";
+            return 1;
+        }
+        if (r.return_count() == 0 || r.get_type(0) != sol::type::table) {
+            std::cerr << script.string() << " must return a table of key = text\n";
+            return 1;
+        }
+        sol::table t = r.get<sol::table>(0);
+        std::vector<std::pair<std::string, std::string>> rows;
+        for (const auto& kv : t) {
+            if (!kv.first.is<std::string>()) {
+                continue;
+            }
+            const std::string key = kv.first.as<std::string>();
+            const std::regex valid_key("^[A-Za-z_][A-Za-z0-9_.\\-]*$");
+            if (!std::regex_match(key, valid_key)) {
+                std::cerr << script.string() << ": \"" << key << "\" is not a valid key (letters, digits, underscore, dot)\n";
+                return 1;
+            }
+            if (!kv.second.is<std::string>()) {
+                std::cerr << script.string() << ": " << key << " must be a string\n";
+                return 1;
+            }
+            rows.emplace_back(key, kv.second.as<std::string>());
+        }
+        std::sort(rows.begin(), rows.end());
+        std::ofstream f(out_path);
+        if (!f) {
+            std::cerr << "Cannot write " << out_path.string() << "\n";
+            return 1;
+        }
+        f << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+          << kLuaDefsMarker << script.filename().string() << ". Edit the .lua file, not this one. -->\n<LanguageData>\n";
+        for (const auto& row : rows) {
+            f << "  <" << row.first << ">" << xml_escape(row.second) << "</" << row.first << ">\n";
+        }
+        f << "</LanguageData>\n";
+        std::cout << "Wrote " << out_path.string() << " (" << rows.size() << " string(s) from " << script.filename().string() << ")\n";
+    }
+    return 0;
+}
+
 static int sync_mod(const fs::path& modDir) {
     fs::path metaPath = find_meta_lua(modDir);
     if (metaPath.empty()) {
@@ -431,45 +736,102 @@ static int sync_mod(const fs::path& modDir) {
     if (rc != 0) {
         return rc;
     }
-    return write_defs_from_lua(modDir);
+    rc = rkcli::write_extras(modDir);
+    if (rc != 0) {
+        return rc;
+    }
+    rc = write_defs_from_lua(modDir);
+    if (rc != 0) {
+        return rc;
+    }
+    rc = write_lua_defs_files(modDir);
+    if (rc != 0) {
+        return rc;
+    }
+    return write_lua_language_files(modDir);
 }
 
+// Lowercase letters and digits only, for package ids.
+static std::string id_slug(const std::string& s, const char* fallback) {
+    std::string out;
+    for (char c : s) {
+        if (std::isalnum(static_cast<unsigned char>(c))) {
+            out.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        }
+    }
+    return out.empty() ? std::string(fallback) : out;
+}
+
+// A new mod written the way RimKit mods are written today: game.* names, a translated message, dependencies with download links so the
+// game does not warn, an author based package id, and a first test that checks the template's own behaviour.
 static int create_mod_at(const fs::path& out, const std::string& name) {
     if (fs::exists(out / "meta.lua")) {
         std::cerr << "Already exists: " << (out / "meta.lua") << "\n";
         return 1;
     }
+    const char* author_env = std::getenv("RIMKIT_AUTHOR");
+    const std::string author = author_env && *author_env ? author_env : "Your Name";
+    const std::string slug = id_slug(name, "mymod");
+    const std::string package_id = id_slug(author, "yourname") + "." + slug;
     fs::create_directories(out / "Lua");
     fs::create_directories(out / "Languages" / "English" / "Keyed");
-    const std::string package_id = to_package_id(name);
     {
         std::ofstream f(out / "meta.lua");
         f << "local meta = require(\"host.metadata\")\n"
           << "meta.name = \"" << name << "\"\n"
-          << "meta.author = \"Team Stratware.win\"\n"
+          << "meta.author = \"" << author << "\"\n"
           << "meta.package_id = \"" << package_id << "\"\n"
-          << "meta.version = \"1.6\"\n"
-          << "meta.description = \"Lua mod powered by RimKit.\"\n"
-          << "meta.depends = { \"brrainz.harmony\", \"stratware.rimkit\" }\n"
-          << "meta.load_after = { \"brrainz.harmony\", \"stratware.rimkit\" }\n"
+          << "meta.version = \"1.6\"                -- the RimWorld version the mod is for\n"
+          << "meta.mod_version = \"0.1.0\"          -- the mod's own version, bump it for every release\n"
+          << "meta.description = \"Replace this with one clear sentence about what the mod does for the player.\"\n"
+          << "meta.api_level = 1                 -- strict mode: errors raise, old API names are refused, only declared capabilities work\n"
+          << "-- What the Lua may do. hooks: game.hooks and game.tweaks. reflect: game.reflect. files: write Defs and patches. dev: evaluate code.\n"
+          << "meta.capabilities = {}\n"
+          << "meta.depends = {\n"
+          << "  {\n"
+          << "    id = \"brrainz.harmony\",\n"
+          << "    name = \"Harmony\",\n"
+          << "    steam = \"steam://url/CommunityFilePage/2009463077\",\n"
+          << "    download = \"https://github.com/pardeike/HarmonyRimWorld\",\n"
+          << "  },\n"
+          << "  {\n"
+          << "    id = \"stratware.rimkit\",\n"
+          << "    name = \"RimKit\",\n"
+          << "    steam = \"steam://url/CommunityFilePage/3811629229\",\n"
+          << "    download = \"https://steamcommunity.com/sharedfiles/filedetails/?id=3811629229\",\n"
+          << "  },\n"
+          << "}\n"
+          << "meta.load_after = { \"ludeon.rimworld\", \"brrainz.harmony\", \"stratware.rimkit\" }\n"
           << "return meta\n";
     }
+    rkcli::scaffold_extras(out, name, package_id);
     {
         std::ofstream f(out / "Lua" / "main.lua");
-        f << "rim.on_load(function()\n"
-          << "  rim.log(\"[" << name << "] loaded\")\n"
-          << "  rim.message(\"[" << name << "] loaded\")\n"
+        f << "-- " << name << "\n"
+          << "-- Starts here. The game runs this file when a game is loaded.\n"
+          << "-- Read the docs for every game.* function: infrastructure/docs/api, or hover over it in VS Code with the RimKit extension.\n\n"
+          << "game.events.on_load(function()\n"
+          << "  game.log.info(\"[" << name << "] loaded\")\n"
+          << "  game.ui.message(game.ui.translate(\"" << slug << "_Loaded\"))\n"
           << "end)\n";
     }
     {
-        // RimWorld ignores Lua/; Keyed file marks mod as having content.
-        std::ofstream f(out / "Languages" / "English" / "Keyed" / "RimLua.xml");
-        f << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-          << "<LanguageData>\n"
-          << "  <RimLuaModMarker>" << name << "</RimLuaModMarker>\n"
-          << "</LanguageData>\n";
+        // Text lives in Keyed files so the mod can be translated. game.ui.translate reads it.
+        // Written in Lua like the rest of the mod: rimkit mod sync turns it into the LanguageData XML the game reads.
+        std::ofstream f(out / "Languages" / "English" / "Keyed" / (name + ".lua"));
+        std::string quoted;
+        for (char c : name) {
+            if (c == '"' || c == '\\') quoted += '\\';
+            quoted += c;
+        }
+        f << "-- Strings for the English language. rimkit mod sync turns this file into " << name << ".xml, which the game reads.\n"
+          << "-- Edit this file, not the XML. {0}, {1} are filled in by game.ui.translate(key, a, b).\n"
+          << "return {\n"
+          << "  " << slug << "_Loaded = \"" << quoted << " is loaded.\",\n"
+          << "}\n";
     }
     std::cout << "Created " << out << "\n";
+    std::cout << "Next: set RIMKIT_AUTHOR (or edit meta.lua) so the package id carries your name, then rimkit mod test and rimkit mod ship.\n";
     return sync_mod(out);
 }
 
@@ -489,7 +851,8 @@ static void copy_tree(const fs::path& from, const fs::path& to) {
 
 static bool is_ship_root_name(const std::string& name) {
     static const char* keep[] = {"About", "Assemblies", "Native", "Lua", "Defs", "Patches", "Textures",
-                                 "Sounds", "Languages", "News", "Auth", "LoadFolders.xml", "meta.lua"};
+                                 "Sounds", "Languages", "News", "Auth", "LoadFolders.xml", "meta.lua",
+                                 "LICENSE", "LICENSE.md", "LICENSE.txt", "CREDITS.md", "CHANGELOG.md"};
     for (const char* k : keep) {
         if (name == k) {
             return true;
@@ -544,16 +907,41 @@ static fs::path default_mods_dir() {
 
 static fs::path kit_root_from_exe() {
     fs::path cur = fs::current_path();
+    // Repo root: src/native + mod/meta.lua (shippable package lives under mod/).
+    if (fs::exists(cur / "mod" / "meta.lua") && fs::exists(cur / "src" / "native")) {
+        return cur;
+    }
+    if (fs::exists(cur / ".." / "mod" / "meta.lua") && fs::exists(cur / ".." / "src" / "native")) {
+        return (cur / "..").lexically_normal();
+    }
+    if (fs::exists(cur / ".." / ".." / ".." / "mod" / "meta.lua")) {
+        return (cur / ".." / ".." / "..").lexically_normal();
+    }
+    // Legacy: package files still at repo root.
     if (fs::exists(cur / "meta.lua") && fs::exists(cur / "src" / "native")) {
         return cur;
     }
-    if (fs::exists(cur / ".." / "meta.lua") && fs::exists(cur / ".." / "src" / "native")) {
-        return (cur / "..").lexically_normal();
-    }
-    if (fs::exists(cur / ".." / ".." / ".." / "meta.lua")) {
-        return (cur / ".." / ".." / "..").lexically_normal();
-    }
     return cur;
+}
+
+static fs::path kit_package_dir(const fs::path& root) {
+    fs::path nested = root / "mod";
+    if (fs::exists(nested / "meta.lua")) {
+        return nested;
+    }
+    return root;
+}
+
+// When shipping the kit repo itself (`.` or the repo root), use mod/ as the package.
+static fs::path resolve_ship_dir(fs::path dir) {
+    fs::path abs = fs::absolute(dir).lexically_normal();
+    if (fs::exists(abs / "mod" / "meta.lua") && fs::exists(abs / "src" / "native")) {
+        return abs / "mod";
+    }
+    if (fs::exists(abs / "meta.lua") && fs::exists(abs / "src" / "native") && !fs::exists(abs / "mod" / "meta.lua")) {
+        return abs;
+    }
+    return dir;
 }
 
 static bool looks_like_lua(const std::string& text) {
@@ -596,6 +984,7 @@ static int cmd_mod_check(const fs::path& target) {
         std::cerr << "No meta.lua\n";
         failures++;
     }
+    failures += rkcli::content_check(target, false) == 0 ? 0 : 1;
     fs::path lua_root = target / "Lua";
     if (!fs::exists(lua_root)) {
         lua_root = target;
@@ -651,11 +1040,12 @@ static fs::path find_harmony_dll() {
 }
 
 static int regenerate_allowlist(const fs::path& root) {
-    fs::path host = root / "Assemblies" / "RimLuaHost.dll";
-    fs::path native = root / "Native" / "rimlua_core.dll";
+    fs::path pkg = kit_package_dir(root);
+    fs::path host = pkg / "Assemblies" / "RimLuaHost.dll";
+    fs::path native = pkg / "Native" / "rimlua_core.dll";
     fs::path harmony = find_harmony_dll();
     if (!fs::exists(host) || !fs::exists(native)) {
-        std::cerr << "allowlist: missing host or native DLL under " << root << "\n";
+        std::cerr << "allowlist: missing host or native DLL under " << pkg << "\n";
         return 1;
     }
     if (harmony.empty()) {
@@ -669,7 +1059,7 @@ static int regenerate_allowlist(const fs::path& root) {
         std::cerr << "allowlist: hash failed\n";
         return 1;
     }
-    fs::path authDir = root / "Auth";
+    fs::path authDir = pkg / "Auth";
     fs::create_directories(authDir);
     fs::path out = authDir / "allowlist.json";
     std::ofstream f(out);
@@ -700,9 +1090,16 @@ static int cmd_mod_ship(fs::path modDir, fs::path modsDir) {
     std::string folderName = modDir.filename().string();
     if (folderName.empty() || folderName == "." || folderName == "..") {
         folderName = fs::absolute(modDir).filename().string();
+    }
+    // Kit package lives in repo/mod/; ship as the repo folder name (or RimKit), not "mod".
+    if (folderName == "mod" && fs::exists(modDir / ".." / "src" / "native")) {
+        folderName = fs::absolute(modDir / "..").filename().string();
         if (folderName.empty() || folderName == "." || folderName == "..") {
-            folderName = "LuaMod";
+            folderName = "RimKit";
         }
+    }
+    if (folderName.empty() || folderName == "." || folderName == "..") {
+        folderName = "LuaMod";
     }
     fs::path dest = modsDir / folderName;
     // Overwrite payload in place. Avoid remove_all: RimWorld locks Native/*.dll while running.
@@ -757,6 +1154,157 @@ static int cmd_init(int argc, char** argv) {
     return create_mod_at(out, name);
 }
 
+// ---------------------------------------------------------------- migrate (UNC)
+
+static bool is_ident_char(char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+}
+
+// Replaces whole-token occurrences of `from` with `to`. A match must not continue an identifier or a field
+// path on either side, so "rim.pawn.hunger" does not match inside "rim.pawn.hunger_pct" or "x.rim.pawn.hunger".
+static int replace_token(std::string& text, const std::string& from, const std::string& to, char required_prefix) {
+    int count = 0;
+    size_t pos = 0;
+    while ((pos = text.find(from, pos)) != std::string::npos) {
+        const size_t end = pos + from.size();
+        const char before = pos == 0 ? '\0' : text[pos - 1];
+        const char after = end >= text.size() ? '\0' : text[end];
+        bool ok = !is_ident_char(after);
+        if (required_prefix != '\0') {
+            ok = ok && before == required_prefix;
+        } else {
+            // A name inside a string literal ("config.get" in t.mock) is an op name, not a Lua call, so it is left alone.
+            ok = ok && !is_ident_char(before) && before != '.' && before != ':' && before != '"' && before != '\'';
+        }
+        if (ok) {
+            text.replace(pos, from.size(), to);
+            pos += to.size();
+            ++count;
+        } else {
+            pos = end;
+        }
+    }
+    return count;
+}
+
+struct MigrateResult {
+    int replacements = 0;
+    std::vector<std::string> notes;
+};
+
+static MigrateResult migrate_text(std::string& text) {
+    MigrateResult result;
+    const rimlua::aliases::Table& table = rimlua::aliases::table();
+
+    std::vector<const rimlua::aliases::PathAlias*> rules;
+    for (const auto& a : table.paths) {
+        if (a.deprecate) {
+            rules.push_back(&a);
+        }
+    }
+    std::sort(rules.begin(), rules.end(),
+              [](const auto* a, const auto* b) { return a->old_path.size() > b->old_path.size(); });
+    for (const auto* rule : rules) {
+        result.replacements += replace_token(text, rule->old_path, rule->new_path, '\0');
+    }
+    for (const auto& m : table.methods) {
+        result.replacements += replace_token(text, m.from, m.to, ':');
+    }
+
+    // Events change the handler signature (a payload table instead of a pawn), so only report them.
+    for (const auto& e : table.events) {
+        for (const char quote : {'"', '\''}) {
+            const std::string literal = std::string(1, quote) + e.from + std::string(1, quote);
+            if (text.find(literal) != std::string::npos) {
+                result.notes.push_back("event " + literal + ": use \"" + e.to + "\" and read e." + e.payload_key +
+                                       " (the old name still works with the old handler signature)");
+            }
+        }
+    }
+    for (const auto& g : table.globals) {
+        if (text.find(g.from) != std::string::npos) {
+            result.notes.push_back(g.from + ": use events.on(\"" + g.event + "\", fn)");
+        }
+    }
+    for (const auto& m : table.manual) {
+        if (text.find(m.from) != std::string::npos) {
+            result.notes.push_back(m.from + " -> " + m.to + ": " + m.note);
+        }
+    }
+    return result;
+}
+
+static int cmd_migrate(int argc, char** argv) {
+    bool write = false;
+    bool check = false;
+    fs::path target;
+    for (int i = 2; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "--write") {
+            write = true;
+        } else if (a == "--check") {
+            check = true;
+        } else {
+            target = a;
+        }
+    }
+    if (target.empty()) {
+        target = fs::current_path();
+    }
+    if (!fs::exists(target)) {
+        std::cerr << "Path not found: " << target << "\n";
+        return 1;
+    }
+
+    std::vector<fs::path> files;
+    if (fs::is_regular_file(target)) {
+        files.push_back(target);
+    } else {
+        for (auto it = fs::recursive_directory_iterator(target); it != fs::recursive_directory_iterator(); ++it) {
+            const std::string name = it->path().filename().string();
+            if (it->is_directory() && (name == ".git" || name == "node_modules" || name == "third_party" ||
+                                       name == "build" || name == "bin")) {
+                it.disable_recursion_pending();
+                continue;
+            }
+            if (it->is_regular_file() && it->path().extension() == ".lua") {
+                files.push_back(it->path());
+            }
+        }
+    }
+
+    int changed_files = 0;
+    int total = 0;
+    for (const fs::path& file : files) {
+        std::ifstream in(file, std::ios::binary);
+        std::string original((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        in.close();
+        std::string text = original;
+        const MigrateResult r = migrate_text(text);
+        if (r.replacements == 0 && r.notes.empty()) {
+            continue;
+        }
+        std::cout << file.string() << ": " << r.replacements << " name(s)\n";
+        for (const std::string& note : r.notes) {
+            std::cout << "  note: " << note << "\n";
+        }
+        if (r.replacements > 0) {
+            ++changed_files;
+            total += r.replacements;
+            if (write) {
+                std::ofstream out(file, std::ios::binary | std::ios::trunc);
+                out << text;
+            }
+        }
+    }
+    std::cout << (write ? "Rewrote " : "Would rewrite ") << total << " name(s) in " << changed_files << " file(s) ("
+              << files.size() << " scanned).\n";
+    if (!write && changed_files > 0) {
+        std::cout << "Run again with --write to apply.\n";
+    }
+    return check && changed_files > 0 ? 1 : 0;
+}
+
 static int cmd_mod(int argc, char** argv) {
     if (argc < 3) {
         usage();
@@ -772,24 +1320,65 @@ static int cmd_mod(int argc, char** argv) {
         fs::path out = argc >= 5 ? fs::path(argv[4]) / name : fs::path(name);
         return create_mod_at(out, name);
     }
+    if (sub == "defs") {
+        // Only the Lua to XML step (Defs/*.lua and Languages/**/*.lua) for any folder, with no meta.lua needed.
+        const fs::path dir = argc >= 4 ? fs::path(argv[3]) : fs::current_path();
+        int rc = write_lua_defs_files(dir);
+        return rc != 0 ? rc : write_lua_language_files(dir);
+    }
     if (sub == "sync") {
         fs::path dir = argc >= 4 ? fs::path(argv[3]) : fs::current_path();
-        return sync_mod(dir);
+        return sync_mod(resolve_ship_dir(dir));
     }
     if (sub == "ship") {
         fs::path dir = argc >= 4 ? fs::path(argv[3]) : fs::current_path();
         fs::path mods = argc >= 5 ? fs::path(argv[4]) : fs::path();
-        return cmd_mod_ship(dir, mods);
+        return cmd_mod_ship(resolve_ship_dir(dir), mods);
     }
     if (sub == "check") {
         fs::path dir = argc >= 4 ? fs::path(argv[3]) : fs::current_path();
-        return cmd_mod_check(dir);
+        return cmd_mod_check(resolve_ship_dir(dir));
+    }
+    // Commands that take an optional mod folder first, then their own options.
+    auto split = [&](int first, fs::path& dir, std::vector<std::string>& rest) {
+        dir = fs::current_path();
+        for (int i = first; i < argc; ++i) {
+            std::string a = argv[i];
+            if (i == first && !a.empty() && a[0] != '-' && fs::exists(a) && fs::is_directory(a)) {
+                dir = a;
+            } else {
+                rest.push_back(a);
+            }
+        }
+        dir = resolve_ship_dir(dir);
+    };
+    if (sub == "test" || sub == "assets" || sub == "release-check" || sub == "publish") {
+        fs::path dir;
+        std::vector<std::string> rest;
+        split(3, dir, rest);
+        if (sub == "test") return rkcli::cmd_test(dir, rest);
+        if (sub == "assets") return rkcli::cmd_assets(dir, rest);
+        if (sub == "release-check") return rkcli::cmd_release_check(dir);
+        if (sync_mod(dir) != 0) return 1;
+        return rkcli::cmd_publish(dir, rest);
+    }
+    if (sub == "i18n") {
+        fs::path dir = fs::current_path();
+        std::vector<std::string> rest;
+        for (int i = 3; i < argc; ++i) rest.push_back(argv[i]);
+        return rkcli::cmd_i18n(resolve_ship_dir(dir), rest);
+    }
+    if (sub == "diag") {
+        std::vector<std::string> rest;
+        for (int i = 3; i < argc; ++i) rest.push_back(argv[i]);
+        return rkcli::cmd_diag(rest);
     }
     usage();
     return 1;
 }
 
 int main(int argc, char** argv) {
+    rkcli::copy_payload = [](const fs::path& from, const fs::path& to) { copy_mod_payload(from, to); };
     if (argc < 2) {
         usage();
         return 1;
@@ -807,6 +1396,14 @@ int main(int argc, char** argv) {
     }
     if (cmd == "mod") {
         return cmd_mod(argc, argv);
+    }
+    if (cmd == "publish" || cmd == "test" || cmd == "diag") {
+        std::vector<char*> fake = {argv[0], const_cast<char*>("mod"), argv[1]};
+        for (int i = 2; i < argc; ++i) fake.push_back(argv[i]);
+        return cmd_mod(static_cast<int>(fake.size()), fake.data());
+    }
+    if (cmd == "migrate") {
+        return cmd_migrate(argc, argv);
     }
     // aliases
     if (cmd == "create" || cmd == "new-mod") {

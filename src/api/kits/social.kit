@@ -1,0 +1,49 @@
+# game.pawns social, animals, prisoners and slaves (P1-08).
+
+@class RimOpinionReason
+def?: string Thought def name
+label?: string Reason shown to the player
+offset: number How much it adds or takes away
+
+@class RimOpinion
+opinion: integer Total opinion from -100 to 100
+reasons: RimOpinionReason[] Each reason and its offset
+
+@class RimTrainable
+def: string Def name of the trainable
+learned: boolean Whether the animal has learned it
+can_learn: boolean Whether the animal can learn it now
+
+@class RimAnimalInfo
+trainability?: string Trainability name
+wildness: number Wildness, 0 to 1
+tame: boolean Whether it is tamed
+master?: RimPawn The animal's master
+bonded?: RimPawn The pawn it is bonded with
+trainables: RimTrainable[] What it can be trained in
+
+@class RimGuestInfo
+status: string Guest, Prisoner or Slave
+mode?: string Prisoner interaction mode def name
+resistance: number Recruit resistance
+will: number Will, for enslaved or convert interactions
+recruitable: boolean Whether it can be recruited now
+is_prisoner: boolean Whether it is a prisoner
+is_slave: boolean Whether it is a slave
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+interact(other: RimPawn, def: string) -> boolean | Makes the pawn start a social interaction such as Chitchat or Insult. False when it could not.
+interaction_defs!() -> string[] | Every interaction def name.
+opinion_reasons(other: RimPawn) -> RimOpinion | The pawn's opinion of another pawn with each reason and its offset.
+partner() -> RimPawn? | Spouse, fiance or lover.
+marry(other: RimPawn) -> boolean | Makes the two pawns spouses, removing lover and fiance relations.
+break_up(other: RimPawn) -> boolean | Ends a romantic relation and records an ex-lover. False when there was none.
+animal_info() -> RimAnimalInfo | Trainability, wildness, master, bond and training state. Raises RK3003 for a non-animal.
+set_master(master?: RimPawn) -> boolean | Sets the animal's master, or clears it when nil.
+train(def: string, trainer?: RimPawn) -> boolean | Teaches a trainable such as Obedience or Release. False when it cannot learn it.
+tame(tamer?: RimPawn) -> boolean | Makes a wild animal join the player.
+guest_info() -> RimGuestInfo | Guest, prisoner or slave data.
+set_guest_status(status: string) -> string | Sets Guest, Prisoner or Slave for the player.
+set_interaction_mode(mode: string) -> string | Sets the prisoner interaction mode, for example ReduceResistance or Convert.
+interaction_modes!() -> string[] | Every prisoner interaction mode def name.
+recruit(recruiter?: RimPawn) -> boolean | Recruits a prisoner or guest into the colony.

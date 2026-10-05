@@ -8,7 +8,7 @@ using System.Text;
 using HarmonyLib;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Binary allowlist for RimKit + Harmony. Dirty Lua packs get quarantined separately.
     public static class AuthGate
@@ -112,8 +112,7 @@ namespace RimLuaKit
             hostSha = "missing";
             nativeSha = "missing";
             proof = "RLK-ERROR";
-            ModContentPack pack = LoadedModManager.RunningModsListForReading
-                .FirstOrDefault(m => string.Equals(m.PackageId, "stratware.rimkit", StringComparison.OrdinalIgnoreCase));
+            ModContentPack pack = FindRimKitPack();
             if (pack == null)
             {
                 lines.Add("FAIL: RimKit mod (stratware.rimkit) not enabled");
@@ -128,6 +127,7 @@ namespace RimLuaKit
                 lines.Add("FAIL: RimKit binaries missing or unreadable");
                 return false;
             }
+            lines.Add("OK: RimKit pack=" + (pack.PackageId ?? "?") + " root=" + (pack.RootDir ?? "?"));
             lines.Add("OK: RimKit proof=" + proof);
             lines.Add("OK: host sha=" + Short(hostSha));
             lines.Add("OK: native sha=" + Short(nativeSha));
@@ -146,19 +146,48 @@ namespace RimLuaKit
             bool harmMatch = JsonContainsSha(json, "harmony", harmonySha);
             bool hostMatch = JsonContainsSha(json, "rimkit_host", hostSha);
             bool nativeMatch = JsonContainsSha(json, "rimkit_native", nativeSha);
-            if (!harmMatch) lines.Add("FAIL: Harmony sha not in allowlist");
+            // Harmony is not ours and updates on its own schedule. An unknown build is noted and allowed, so a Harmony update does not switch
+            // every Lua mod off. RimKit's own host and native hashes below stay strict.
+            if (!harmMatch) lines.Add("WARN: Harmony sha not in allowlist (allowed, it is a different Harmony build)");
             else lines.Add("OK: Harmony sha allowlisted");
             if (!hostMatch) lines.Add("FAIL: RimKit host sha not in allowlist");
             else lines.Add("OK: RimKit host sha allowlisted");
             if (!nativeMatch) lines.Add("FAIL: RimKit native sha not in allowlist");
             else lines.Add("OK: RimKit native sha allowlisted");
-            return harmMatch && hostMatch && nativeMatch;
+            return hostMatch && nativeMatch;
+        }
+
+        // Workshop builds often run as stratware.rimkit_steam. Also match PackageIdPlayerFacing
+        // and fall back to the mod folder that contains this RimLuaHost.dll.
+        private static ModContentPack FindRimKitPack()
+        {
+            const string id = "stratware.rimkit";
+            foreach (ModContentPack m in LoadedModManager.RunningModsListForReading)
+            {
+                if (m == null) continue;
+                if (string.Equals(m.PackageId, id, StringComparison.OrdinalIgnoreCase)) return m;
+                if (string.Equals(m.PackageIdPlayerFacing, id, StringComparison.OrdinalIgnoreCase)) return m;
+                string pid = m.PackageId ?? "";
+                if (pid.StartsWith(id + "_", StringComparison.OrdinalIgnoreCase)) return m;
+            }
+
+            string assembliesDir = NativeAbi.ResolveDllDirectory();
+            string modRoot = Directory.GetParent(assembliesDir ?? "")?.FullName;
+            if (string.IsNullOrEmpty(modRoot)) return null;
+            foreach (ModContentPack m in LoadedModManager.RunningModsListForReading)
+            {
+                if (m?.RootDir == null) continue;
+                if (string.Equals(Path.GetFullPath(m.RootDir), Path.GetFullPath(modRoot), StringComparison.OrdinalIgnoreCase))
+                {
+                    return m;
+                }
+            }
+            return null;
         }
 
         private static string FindAllowlistPath()
         {
-            ModContentPack pack = LoadedModManager.RunningModsListForReading
-                .FirstOrDefault(m => string.Equals(m.PackageId, "stratware.rimkit", StringComparison.OrdinalIgnoreCase));
+            ModContentPack pack = FindRimKitPack();
             if (pack?.RootDir == null) return null;
             return Path.Combine(pack.RootDir, "Auth", "allowlist.json");
         }

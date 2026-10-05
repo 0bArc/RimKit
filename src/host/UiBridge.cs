@@ -4,13 +4,13 @@ using System.Linq;
 using UnityEngine;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class LuaUiBridge
     {
         public static void OpenWindow(string title, string body, List<(string label, int id)> buttons)
         {
-            Find.WindowStack?.Add(new RimLuaDebugWindow(title ?? "RimLua", body ?? "", buttons ?? new List<(string, int)>()));
+            Find.WindowStack?.Add(new RimLuaDebugWindow(title ?? "RimKit", body ?? "", buttons ?? new List<(string, int)>()));
         }
 
         public static void OpenFloatMenu(List<(string label, int id)> options)

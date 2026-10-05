@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Verse;
 using Verse.AI;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Job handle -> Lua job name.
     internal static class LuaJobBridge

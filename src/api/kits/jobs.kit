@@ -1,0 +1,43 @@
+# game.jobs (P1-06). The pawn is the first argument. Older: game.jobs.make, start, register.
+
+@class RimJobOptions
+target?: RimThing First target thing
+x?: integer First target cell
+z?: integer Target cell z coordinate
+target2?: RimThing Second target thing
+x2?: integer Second target cell
+z2?: integer Second target cell z coordinate
+count?: integer How many to work on
+queue?: boolean Add to the end of the queue instead of replacing the current job
+
+@class RimJobInfo
+def: string Def name of the job
+forced: boolean Whether the player ordered it
+count: integer Count the job works on
+driver?: string Name of the job driver class
+target?: RimThing First target
+target2?: RimThing Second target
+x?: integer Target cell x coordinate
+z?: integer Target cell z coordinate
+
+@class RimJobDefInfo
+def: string Def name of the job def
+report?: string Text shown while it runs
+casual_interruptible: boolean Whether a casual job may interrupt it
+
+@kit domain=jobs op=job subject=pawn:RimPawnRef title="Jobs" page=jobs
+give(def: string, opts?: RimJobOptions) -> boolean | Orders the pawn to do any vanilla job, as if the player forced it. False when the pawn cannot take it.
+current() -> RimJobInfo? | The job the pawn is doing, nil when idle.
+queue_list() -> RimJobInfo[] | Jobs waiting in the queue.
+interrupt() -> boolean | Ends the current job.
+clear_queue() -> boolean | Empties the job queue.
+can_reserve(thing: RimThing) -> boolean | Whether the pawn could reserve the thing right now.
+release_reservations() -> boolean | Releases everything this pawn has reserved.
+haul(thing: RimThing, queue?: boolean) -> boolean | Hauls the thing to a stockpile. False when nothing accepts it.
+tend(patient: RimPawn, queue?: boolean) -> boolean | Tends the patient.
+rescue(patient: RimPawn, queue?: boolean) -> boolean | Rescues a downed pawn to a bed.
+repair(building: RimThing, queue?: boolean) -> boolean | Repairs a damaged building.
+clean(filth: RimThing, queue?: boolean) -> boolean | Cleans a piece of filth.
+wait(ticks: integer, queue?: boolean) -> boolean | Makes the pawn wait in place.
+go_to(x: integer, z: integer, queue?: boolean) -> boolean | Walks to a cell.
+defs!() -> RimJobDefInfo[] | Every job def in the game.

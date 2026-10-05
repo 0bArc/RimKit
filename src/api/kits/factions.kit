@@ -1,0 +1,38 @@
+# game.factions (P1-04). player, list, name and of_def come from the alias table.
+
+@class RimFactionInfo
+name: string Name of the faction
+def: string Faction def name
+label: string Name shown to the player
+is_player: boolean Whether it is the player's faction
+hidden: boolean Whether it is hidden from the player
+defeated: boolean Whether it is defeated
+temporary: boolean Whether it was made at runtime and may be removed
+permanent_enemy: boolean Whether it is always hostile
+tech_level: string Tech level name, for example Industrial
+goodwill?: integer Toward the player faction. Absent for the player faction.
+relation?: string Hostile, Neutral or Ally toward the player faction
+leader?: RimPawn The faction's leader
+
+@class RimFactionDefInfo
+def: string Def name of the faction def
+label: string Name shown to the player
+hidden: boolean Whether it is hidden from the player
+permanent_enemy: boolean Whether it is always hostile
+tech_level: string Tech level name, for example Industrial
+
+@kit domain=factions op=faction subject=faction:RimFactionRef title="Factions" page=factions
+info() -> RimFactionInfo | Name, definition, relation to the player, leader.
+goodwill(other?: RimFactionRef) -> integer | Goodwill from -100 to 100. other defaults to the player faction.
+set_goodwill(other: RimFactionRef, value: integer) -> integer | Exact value on both sides, clamped to -100 to 100. Does not change the relation kind, use set_relation for that.
+adjust_goodwill(other: RimFactionRef, delta: integer) -> integer | Relative change, scaled by the game's goodwill difficulty setting like any in-game goodwill change.
+relation(other?: RimFactionRef) -> string | Hostile, Neutral or Ally.
+set_relation(other: RimFactionRef, kind: string) -> any | Forces the relation to Hostile, Neutral or Ally, ignoring goodwill.
+is_hostile(other: RimFactionRef) -> boolean | Whether the two factions are hostile.
+leader() -> RimPawn? | The faction leader.
+members() -> RimPawn[] | Living pawns of the faction, on maps and in the world.
+hostiles() -> RimFaction[] | Factions hostile to this one.
+allies() -> RimFaction[] | Allied factions.
+
+@kit domain=factions op=faction subject=none title="Factions" page=factions
+defs() -> RimFactionDefInfo[] | Every faction definition in the loaded game.

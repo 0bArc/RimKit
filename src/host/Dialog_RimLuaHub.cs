@@ -1,11 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using HarmonyLib;
 using RimWorld;
 using UnityEngine;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal sealed class Dialog_RimLuaHub : Window
     {
@@ -14,12 +15,13 @@ namespace RimLuaKit
             About,
             Authenticity,
             Settings,
+            Mods,
             Credits
         }
 
         private Tab tab = Tab.About;
         private Vector2 scroll;
-        private static readonly Tab[] Tabs = { Tab.About, Tab.Authenticity, Tab.Settings, Tab.Credits };
+        private static readonly Tab[] Tabs = { Tab.About, Tab.Authenticity, Tab.Settings, Tab.Mods, Tab.Credits };
 
         public Dialog_RimLuaHub()
         {
@@ -73,10 +75,51 @@ namespace RimLuaKit
                 case Tab.Settings:
                     DrawSettingsTab(inner);
                     break;
+                case Tab.Mods:
+                    DrawMods(inner);
+                    break;
                 case Tab.Credits:
                     DrawCredits(inner);
                     break;
             }
+        }
+
+        // Lua mods and the permissions they declared in meta.capabilities (written to About/RimKit.json by rimkit mod sync).
+        private void DrawMods(Rect rect)
+        {
+            var rows = new List<string[]>();
+            foreach (ModContentPack pack in LoadedModManager.RunningModsListForReading)
+            {
+                if (pack?.RootDir == null || !System.IO.Directory.Exists(System.IO.Path.Combine(pack.RootDir, "Lua"))) continue;
+                string perms = "not declared: everything is allowed";
+                string version = "";
+                string manifest = System.IO.Path.Combine(pack.RootDir, "About", "RimKit.json");
+                if (System.IO.File.Exists(manifest) && Json.TryParse(System.IO.File.ReadAllText(manifest), out object parsed) && parsed is Dictionary<string, object> d)
+                {
+                    version = Json.GetString(d, "version", "");
+                    List<string> caps = Json.GetStringList(d, "capabilities");
+                    if (d.ContainsKey("capabilities")) perms = caps.Count == 0 ? "none (no reflection, hooks or file access)" : string.Join(", ", caps);
+                }
+
+                rows.Add(new[] { pack.Name + (version.Length > 0 ? "  " + version : ""), perms });
+            }
+
+            var view = new Rect(0f, 0f, rect.width - 16f, rows.Count * 44f + 30f);
+            Widgets.BeginScrollView(rect, ref scroll, view);
+            Text.Font = GameFont.Tiny;
+            Widgets.Label(new Rect(0f, 0f, view.width, 24f), "Permissions each Lua mod declared. Reflection, hooks and file writing need a declared permission.");
+            Text.Font = GameFont.Small;
+            float y = 28f;
+            foreach (string[] r in rows)
+            {
+                Widgets.Label(new Rect(0f, y, view.width, 22f), r[0]);
+                GUI.color = r[1].StartsWith("not declared") ? new Color(0.85f, 0.7f, 0.35f) : Color.gray;
+                Widgets.Label(new Rect(14f, y + 20f, view.width - 14f, 22f), r[1]);
+                GUI.color = Color.white;
+                y += 44f;
+            }
+
+            Widgets.EndScrollView();
         }
 
         private void DrawAbout(Rect rect)

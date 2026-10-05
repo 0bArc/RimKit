@@ -1,0 +1,335 @@
+# Phase 5: DLC kits. Every function checks that its DLC is active and raises RK3003 otherwise (src/host/api/ApiDlc.cs).
+
+@class RimDlcStatus
+Royalty: boolean Whether the Royalty expansion is active
+Ideology: boolean Whether the Ideology expansion is active
+Biotech: boolean Whether the Biotech expansion is active
+Anomaly: boolean Whether the Anomaly expansion is active
+Odyssey: boolean Whether the Odyssey expansion is active
+
+@class RimIdeoBrief
+id: integer Id of the ideo brief, to pass back to the functions that take one
+name: string Name of the ideo brief
+culture?: string Culture def name
+memes: string[] Meme def names
+pawns: integer How many pawns follow it
+precepts: integer How many precepts it has
+certainty?: number The pawn's certainty in it, 0 to 1, when asked for one pawn
+
+@class RimIdeoPrecept
+def: string Def name of the ideo precept
+label: string Name shown to the player
+issue?: string Issue the precept answers, such as Meat eating
+class: string Name of the C# class that implements it
+
+@class RimIdeoRole
+def: string Def name of the ideo role
+label: string Name shown to the player
+assigned: boolean Whether a pawn holds the role
+pawn?: RimPawn The pawn who holds the role
+
+@class RimIdeoInfo : RimIdeoBrief
+precept_list: RimIdeoPrecept[] Precepts of the ideoligion
+roles: RimIdeoRole[] Roles of the ideoligion and who holds them
+
+@class RimMemeInfo
+def: string Def name of the meme
+label?: string Name shown to the player
+category: string Meme category, such as Structure or Normal
+
+@class RimStyleCategory
+def: string Style category def name
+label?: string Name shown to the player
+
+@class RimIdeoStyle
+def: string Def name of the ideo style
+label?: string Name shown to the player
+priority: number Priority of the style, higher is used first
+
+@class RimPreceptDefInfo
+def: string Def name of the precept def
+label?: string Name shown to the player
+issue?: string Issue the precept answers
+
+@class RimRitualInfo
+def: string Def name of the ritual
+label: string Name shown to the player
+outcome?: string Name of the ritual outcome
+
+@class RimRoyalTitleInfo
+def: string Def name of the royal title
+label: string Name shown to the player
+seniority: integer Rank of the title, higher is more senior
+favor_cost?: integer Honor needed to be granted the title
+awardable?: boolean Whether the title can be granted by honor
+
+@class RimPermitInfo
+def: string Def name of the permit
+label: string Name shown to the player
+faction?: RimFaction Faction that grants the permit
+last_used_tick?: integer Tick the permit was last used
+title?: string Title the permit needs
+cooldown_days?: integer Days before it can be used again
+
+@class RimAbilityInfo
+def: string Def name of the ability
+label?: string Name shown to the player
+level: integer Level the ability needs
+can_cast: boolean Whether the pawn can cast it now
+cooldown_ticks: integer Ticks until it can be cast again
+
+@class RimEntropyInfo
+entropy: number Current neural heat
+max: number Neural heat limit
+psyfocus: number Current psyfocus from 0 to 1
+limited: boolean Whether heat is capped
+
+@class RimEmpireInfo
+faction: RimFaction The Empire faction
+name: string Name of the empire
+hidden: boolean Whether it is hidden from the player
+goodwill?: integer How much the Empire likes the player
+relation?: string Relation with the player: Ally, Neutral or Hostile
+
+@class RimThroneRoom
+id: integer Room id
+cells: integer Size of the room in cells
+impressiveness: number Impressiveness of the room
+x: integer Cell x coordinate of the room's centre
+z: integer Cell z coordinate of the room's centre
+
+@class RimXenotypeInfo
+def: string Def name of the xenotype
+label?: string Name shown to the player
+genes: integer How many genes it has
+inheritable: boolean Whether children inherit it
+
+@class RimGeneDefInfo
+def: string Def name of the gene def
+label?: string Name shown to the player
+complexity: integer Complexity cost
+metabolism: integer Metabolism cost or gain
+archite: integer Archite capsules needed
+category?: string Category it is listed under
+
+@class RimMechanitorInfo
+bandwidth: integer Total bandwidth
+used_bandwidth: integer Bandwidth in use
+controlled: integer How many mechs are controlled
+control_groups: integer How many control groups
+
+@class RimPregnancy
+progress: number Progress of the pregnancy from 0 to 1
+father?: RimPawn The father, when known
+
+@class RimGrowthInfo
+age: number Biological age in years
+life_stage?: string Life stage name
+growth_points: number Growth points gathered
+growing: boolean Whether the pawn is still growing
+growth: number Growth from 0 to 1
+
+@class RimHemogen
+value: number Current hemogen amount
+max: number Most hemogen the pawn can hold
+hungry: boolean Whether the pawn needs hemogen
+
+@class RimGenepack
+genes: string[] Gene def names in the pack
+complexity: integer Total complexity
+metabolism: integer Total metabolism
+archite: integer Total archite capsules needed
+
+@class RimMonolith
+level: integer Current monolith level
+highest_level: integer Highest level the monolith has reached
+level_def?: string Def name of the current level
+next_level_def?: string Def name of the next level
+spawned: boolean Whether the monolith is on the map
+study_completed: boolean Whether the study of the monolith is done
+questline_ended: boolean Whether the Anomaly questline is over
+
+@class RimStudyInfo
+enabled: boolean Whether study is switched on
+progress: number Study progress from 0 to 1
+completed: boolean Whether study is finished
+category?: string Knowledge category it gives
+needs_platform: boolean Whether it must be on a containment platform
+needs_prisoner: boolean Whether a pawn must be held for it
+knowledge_gained: number Knowledge gained so far
+
+@class RimStudyOptions
+enabled?: boolean Switch study on or off
+progress?: number 0 to 1
+
+@class RimContainment
+mode: string Containment mode name
+held: boolean Whether the entity is held
+can_be_captured: boolean Whether the entity can be captured
+can_study: boolean Whether the entity can be studied
+extract_bioferrite: boolean Whether bioferrite is being extracted
+platform?: RimThing The platform holding it
+
+@class RimPlatformInfo
+platform: RimThing The containment platform
+occupied: boolean Whether something is held on it
+held?: RimPawn The pawn held on it
+
+@class RimCodexEntry
+def: string Def name of the codex entry
+label?: string Name shown to the player
+category?: string Category it is listed under
+discovered: boolean Whether the player has discovered the entry
+
+@class RimEngagement
+enabled: boolean Whether it is switched on
+range: number How far controlled entities look for fights
+interval: integer Ticks between checks
+auto_draft: boolean Whether entities are drafted by themselves
+melee_range: number Range counted as melee
+disabled_pawns: integer How many pawns are switched out
+
+@class RimEngagementOptions
+enabled?: boolean Switch automatic engagement on or off
+range?: number Cells to look for hostiles, 5 to 150
+interval?: integer Ticks between checks, 5 to 600
+auto_draft?: boolean Draft entities automatically
+melee_range?: number Range counted as melee
+
+@class RimLayerInfo
+def: string Planet layer def name
+label?: string Name shown to the player
+
+@class RimSpaceMapInfo
+map: RimMap The map it is on
+name: string Name of the orbital site
+layer?: string Planet layer def name
+precious_resource?: string Def name of the resource found there
+gravship_can_land: boolean Whether a gravship can land
+
+@class RimEngineDetail
+name: string Name of the gravship
+fuel: number Fuel now
+max_fuel: number Fuel capacity
+fuel_per_tile: number Fuel used per world tile
+fuel_savings_percent: number Fuel saved by facilities, in percent
+max_launch_distance: integer Farthest launch, in tiles
+cooldown_ticks: integer Ticks until the engine can launch again
+substructure_cells: integer Cells of valid substructure
+connected_cells: integer Cells of substructure connected to the engine
+components: integer How many facilities are linked
+missing_components: string[] Component defs a launch still needs
+signal_jammer: boolean Whether a signal jammer is linked
+
+@class RimGravComponent
+thing: RimThing The linked facility
+def: string Facility def name
+active: boolean Whether the facility works now
+
+@class RimEngineInfo
+engine: RimThing The gravship engine
+def: string Engine def name
+x: integer Cell x coordinate
+z: integer Cell z coordinate
+
+@kit domain=dlc op=dlc subject=none title="DLC" page=dlc
+status() -> RimDlcStatus | Which expansions are active.
+active(dlc: string) -> boolean | Whether one expansion (Royalty, Ideology, Biotech, Anomaly or Odyssey) is active.
+
+@kit domain=ideology op=ideology subject=none title="Ideology" page=dlc
+list() -> RimIdeoBrief[] | Every ideoligion with its memes and believers.
+info(id: integer) -> RimIdeoInfo | One ideoligion with its precepts and roles.
+memes() -> RimMemeInfo[] | Every meme def.
+precept_defs(issue?: string) -> RimPreceptDefInfo[] | Every precept def, optionally one issue.
+rituals(id: integer) -> RimRitualInfo[] | The rituals of an ideoligion.
+add_precept(id: integer, def: string) -> boolean | Adds a precept to an ideoligion.
+remove_precept(id: integer, def: string) -> boolean | Removes a precept from an ideoligion.
+add_meme(id: integer, def: string) -> boolean | Adds a meme. Raises RK1001 when it conflicts with a meme the ideoligion has, or a second structure meme.
+remove_meme(id: integer, def: string) -> boolean | Removes a meme.
+style_defs() -> RimStyleCategory[] | Every style category def.
+styles(id: integer) -> RimIdeoStyle[] | The style categories of an ideoligion with their priority.
+set_style(id: integer, def: string, priority?: number) -> boolean | Adds a style category or changes its priority (default 1).
+remove_style(id: integer, def: string) -> boolean | Removes a style category.
+rename(id: integer, name: string, adjective?: string) -> boolean | Renames an ideoligion.
+
+@kit domain=ideology op=ideology subject=pawn:RimPawnRef title="Ideology" page=dlc
+of_pawn() -> RimIdeoBrief? | The pawn's ideoligion with its certainty.
+set_pawn_ideo(id: integer) -> boolean | Converts the pawn to an ideoligion.
+certainty() -> number | The pawn's certainty in its ideoligion, 0 to 1.
+set_certainty(value: number) -> number | Sets certainty.
+assign_role(role: string) -> boolean | Gives the pawn a role of its ideoligion, such as Moral guide.
+unassign_role() -> boolean | Takes the pawn's role away.
+
+@kit domain=royalty op=royalty subject=none title="Royalty" page=dlc
+titles() -> RimRoyalTitleInfo[] | Every royal title, junior first.
+permit_defs() -> RimPermitInfo[] | Every permit def.
+empire() -> RimEmpireInfo | The Empire faction and how it regards the player.
+
+@kit domain=royalty op=royalty subject=pawn:RimPawnRef title="Royalty" page=dlc
+title(faction?: RimFactionRef) -> RimRoyalTitleInfo? | The pawn's title with a faction, the Empire by default.
+set_title(def?: string, faction?: RimFactionRef, rewards?: boolean, letter?: boolean) -> boolean | Grants a title, or removes it when def is nil.
+favor(faction?: RimFactionRef) -> integer | Honor with a faction.
+set_favor(value: integer, faction?: RimFactionRef) -> integer | Sets honor.
+permits() -> RimPermitInfo[] | Permits the pawn has.
+add_permit(def: string, faction?: RimFactionRef) -> boolean | Grants a permit.
+psylink_level() -> integer | The pawn's psylink level.
+set_psylink_level(level: integer) -> integer | Changes the psylink level, 0 to 6. The pawn needs a psylink.
+abilities() -> RimAbilityInfo[] | The pawn's abilities, psycasts included.
+gain_ability(def: string) -> boolean | Gives the pawn an ability.
+entropy() -> RimEntropyInfo | Neural heat and psyfocus.
+
+@kit domain=royalty op=royalty subject=map:RimMapRef title="Royalty" page=dlc
+throne_rooms() -> RimThroneRoom[] | Rooms counted as throne rooms, with the impressiveness a title requires.
+
+@kit domain=biotech op=biotech subject=none title="Biotech" page=dlc
+xenotypes() -> RimXenotypeInfo[] | Every xenotype def.
+gene_defs() -> RimGeneDefInfo[] | Every gene def with its complexity, metabolism and archite cost.
+
+@kit domain=biotech op=biotech subject=pawn:RimPawnRef title="Biotech" page=dlc
+set_xenotype(def: string) -> boolean | Changes the pawn's xenotype.
+mechanitor() -> RimMechanitorInfo? | Bandwidth and mechs of a mechanitor, nil for other pawns.
+mechs() -> RimPawn[] | The mechs a mechanitor controls.
+control_mech(mech: RimPawn) -> boolean | Makes a mech obey the mechanitor.
+pregnancy() -> RimPregnancy? | The pawn's pregnancy.
+start_pregnancy(father?: RimPawn) -> boolean | Starts a pregnancy.
+end_pregnancy() -> boolean | Ends a pregnancy.
+growth() -> RimGrowthInfo | Age, life stage and growth points of a child.
+set_growth_points(value: number) -> number | Sets growth points.
+hemogen() -> RimHemogen? | A sanguophage's hemogen.
+set_hemogen(value: number) -> number | Sets hemogen.
+
+@kit domain=biotech op=biotech subject=thing:RimThingRef title="Biotech" page=dlc
+genepack() -> RimGenepack | The genes and cost of a gene pack.
+
+@kit domain=anomaly op=anomaly subject=none title="Anomaly" page=dlc
+monolith() -> RimMonolith | The monolith's level and state.
+set_monolith_level(level: integer) -> integer | Sets the monolith level, 0 to 6.
+codex() -> RimCodexEntry[] | Entity codex entries and whether each is discovered.
+engagement() -> RimEngagement | How controlled pawns pick fights.
+set_engagement(opts: RimEngagementOptions) -> RimEngagement | Tunes controlled pawn engagement: range, check interval, auto draft, melee range.
+
+@kit domain=anomaly op=anomaly subject=thing:RimThingRef title="Anomaly" page=dlc
+study() -> RimStudyInfo | Study state of an anomaly entity or object.
+set_study(opts: RimStudyOptions) -> number | Enables or disables study, or sets its progress. Returns progress.
+containment() -> RimContainment | Containment state of an entity.
+
+@kit domain=anomaly op=anomaly subject=map:RimMapRef title="Anomaly" page=dlc
+platforms() -> RimPlatformInfo[] | Holding platforms and what they hold.
+creepjoiners() -> RimPawn[] | Creepjoiners on the map.
+
+@kit domain=anomaly op=anomaly subject=pawn:RimPawnRef title="Anomaly" page=dlc
+set_pawn_engagement(enabled: boolean) -> boolean | Turns auto engagement on or off for one controlled pawn.
+
+@kit domain=odyssey op=odyssey subject=none title="Odyssey" page=dlc
+layers() -> RimLayerInfo[] | Planet layer defs, the surface and orbit.
+gravship() -> table? | The gravship in flight, nil when none.
+
+space_maps() -> RimSpaceMapInfo[] | Maps that are in orbit, with their layer and precious resource.
+
+@kit domain=odyssey op=odyssey subject=map:RimMapRef title="Odyssey" page=dlc
+engines() -> RimEngineInfo[] | Gravship engines on a map.
+has_engine() -> boolean | Whether the player has a gravship engine on the map.
+
+@kit domain=odyssey op=odyssey subject=thing:RimThing title="Odyssey" page=dlc
+engine_info() -> RimEngineDetail | Fuel, launch range, cooldown, substructure size and the components a launch still needs.
+components() -> RimGravComponent[] | The facilities linked to a gravship engine and whether each is active.

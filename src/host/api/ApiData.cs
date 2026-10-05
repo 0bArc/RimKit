@@ -1,7 +1,8 @@
+using RimLuaKit;
 using System.Collections.Generic;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class ApiData
     {

@@ -1,0 +1,176 @@
+# Phase 4: Lua-backed classes, stat modifiers, def changes, def authoring, XML patches, mod lookups, per-object data.
+
+@class RimNeedOptions
+lua_class?: string The Lua class (game.classes.define("need", name, ...)), the def name by default
+label?: string Name shown on the need bar
+description?: string Tooltip text
+who?: string colonists (default), colonists_and_prisoners, humanlike or everyone
+intelligence?: string Animal, ToolUser or Humanlike
+base_level?: number Start level, 0 to 1
+fall_per_day?: number Level lost per day, handled by the game
+major?: boolean Shown in the main need column
+show?: boolean Shown on the needs tab
+list_priority?: integer Position in the needs list
+freeze_while_sleeping?: boolean Stop the level changing while the pawn sleeps
+freeze_in_mental_state?: boolean Stop the level changing in a mental break
+scale_bar?: boolean Draw the bar to scale
+show_for_caravan?: boolean Show it for caravan members
+
+@class RimNeedDefined
+def: string Def name of the need defined
+lua_class: string Lua class that runs the need
+created: boolean False when an earlier call already made the def and this one updated it
+pawns: integer How many pawns have the need now
+
+@class RimNeedDefInfo
+def: string Def name of the need def
+label?: string Name shown to the player
+lua_class?: string Lua class that runs the need
+major: boolean Whether it is in the main need column
+base_level: number Start level, 0 to 1
+fall_per_day: number Level lost per day
+
+@class RimClassInfo
+family: string Family, such as comp or incident
+name: string Name of the Lua class
+functions: string[] Names of the functions it defines
+
+@class RimReplaceable
+family: string Family whose defs can be swapped
+def_type: string Def type that holds the class
+field: string Field of the def that names the class
+proxy: string Name of the Lua proxy class
+
+@class RimStatModifierOptions
+target?: string any, pawn, building or item
+defs?: string[] Only things of these defs
+
+@class RimStatModifierArgs
+thing?: RimThing nil when the stat is read for a def
+def: string Def name of the thing being measured
+value: number Value so far, return the new one
+stat: string Stat def name
+
+@class RimStatModifierInfo
+id: integer Id to pass to remove_modifier
+stat: string Stat def name
+kind: string fn, offset or factor
+value: number Offset or factor
+target: string What it applies to, such as item or apparel
+
+@class RimDefChange
+kind: string Def type
+def: string Def name
+path: string Field path that was changed
+old: string Value before
+new: string Value after
+tick: integer Tick of the change
+
+@class RimDefField
+name: string Field name
+type: string Field type name
+declared_in: string Class that declares it
+public: boolean Whether it is public
+
+@class RimDefInfo
+exists: boolean Whether the def is loaded
+kind?: string Def type
+def?: string Def name of the def
+label?: string Name shown to the player
+package_id?: string The mod that defines it
+mod?: string Name of the mod that defines it
+
+@class RimDataRow
+def: string Def name of the data row
+label?: string Name shown to the player
+values: table<string, string>
+list: string[] The row's list of strings
+
+@class RimDefXmlOptions
+parent?: string ParentName attribute
+name?: string Name attribute, for an abstract parent
+abstract?: boolean Write Abstract=True so other defs can use it as a parent
+
+@class RimXmlCheck
+ok: boolean True when the XML is valid
+errors: string[] Problems found, as text
+warnings: string[] Things to look at that do not stop it working
+
+@class RimPatchOp | One XML patch operation. op is add, replace, remove, insert, set_attribute, add_attribute, remove_attribute, test, conditional, sequence, if_mod or add_mod_extension.
+op: string Operation name, such as add or replace
+xpath?: string XPath of the nodes it changes
+value?: string|table XML text or a table
+attribute?: string Attribute name for attribute operations
+order?: string Append or Prepend
+mods?: string[] if_mod
+match?: RimPatchOp[] Operations to run when the condition matches
+nomatch?: RimPatchOp[] Operations to run when it does not
+ops?: RimPatchOp[] sequence
+success?: string Always, Invert or Normal
+
+@class RimPatchBuild
+xml: string The patch XML
+errors: string[] Problems found while building it
+
+@class RimModInfo
+package_id: string Package id of the mod
+name: string Display name of the mod
+path: string Folder of the mod
+assemblies: string[] Names of its loaded assemblies
+
+@kit domain=classes op=classes subject=none title="Lua classes" page=classes
+register_fn(family: string, name: string, fn: string, callback: function) -> boolean | One function of a Lua class. Prefer game.classes.define, which registers every function of a table.
+list() -> RimClassInfo[] | Registered Lua classes and the functions each defines.
+families() -> string[] | The families a Lua class can belong to.
+replaceable() -> RimReplaceable[] | Families whose def class can be swapped for the Lua proxy, with the def type and field.
+replace(family: string, def: string, lua_class: string) -> boolean | Swaps one def's class (worker, giver, comp class) for the family's Lua proxy and names the Lua class. Lasts until restart.
+
+@kit domain=classes op=classes subject=thing:RimThingRef title="Lua classes" page=classes
+data_get(key: string, class?: string) -> string? | A value saved in the Lua comp of a thing.
+data_set(key: string, value?: string, class?: string) -> boolean | Saves a value in the Lua comp of a thing. Nil removes it.
+
+@kit domain=needs op=need subject=none title="Needs" page=classes
+define(def: string, opts?: RimNeedOptions) -> RimNeedDefined | Creates a need from Lua with no XML, or updates one this mod made. Run it when the mod loads, before any save. The game draws its bar, saves its level and adds it to pawns. Behavior comes from a need class: game.classes.define("need", def, { interval = function(pawn, level) end }).
+defs() -> RimNeedDefInfo[] | The needs Lua has defined.
+remove(def: string) -> boolean | Takes a Lua need away from every pawn. The def stays hidden until the game restarts.
+
+@kit domain=stats op=stat subject=none title="Stats" page=research
+modify(stat: string, fn: fun(args: RimStatModifierArgs): number, opts?: RimStatModifierOptions) -> integer | Changes a stat wherever it is read. fn returns the new value. It runs on every read of the stat, so keep it small. Returns a modifier id.
+add_offset(stat: string, value: number, opts?: RimStatModifierOptions) -> integer | Adds a fixed amount to a stat.
+add_factor(stat: string, value: number, opts?: RimStatModifierOptions) -> integer | Multiplies a stat.
+remove_modifier(id: integer) -> boolean | Removes a modifier.
+modifiers() -> RimStatModifierInfo[] | Active modifiers.
+
+@kit domain=defs op=defs subject=none title="Defs" page=defs
+set(kind: string, def: string, path: string, value: table|any) -> string | Changes one field of a def, by path such as stackLimit, plant.growDays or statBases[0].value. The change is recorded. Returns the new value.
+value(kind: string, def: string, path: string) -> any | Reads a field of a def.
+fields(kind: string) -> RimDefField[] | The fields of a def type.
+kinds() -> string[] | Every def type name.
+restore(kind?: string, def?: string, path?: string) -> integer | Puts back recorded changes, newest first. Returns how many.
+changes() -> RimDefChange[] | Every recorded def change.
+of(kind: string, def: string, package_id?: string) -> RimDefInfo | A def and the mod it comes from, even from another mod. exists is false when it is not loaded.
+of_mod(package_id: string, kind: string) -> RimDefInfo[] | The defs of one type that a mod defines.
+data_rows(table: string) -> RimDataRow[] | The rows of a custom data def table, defined in XML as RimKit.LuaDataDef.
+to_xml(kind: string, def: string, fields: table, opts?: RimDefXmlOptions) -> string | Def XML for a table. A key _class sets the Class attribute, lists become li items.
+validate_xml(xml: string) -> RimXmlCheck | Checks Def XML against the game's own types: fields, values, enums and def references.
+write_xml(package_id: string, kind: string, def: string, fields: table, opts?: RimDefXmlOptions) -> string | Validates a def and writes it to the mod's Defs folder, loaded at the next start. Returns the file path.
+
+@kit domain=patch op=patch subject=none title="XML patches" page=patch
+build(ops: RimPatchOp[]) -> RimPatchBuild | The patch XML for a list of operations, with any errors found.
+write(package_id: string, name: string, ops: RimPatchOp[]) -> string | Validates a patch and writes it to the mod's Patches folder, applied at the next start. Returns the file path.
+
+@kit domain=mods op=mods subject=none title="Mods" page=patch
+list() -> RimModInfo[] | Active mods with their assemblies.
+active(package_id: string) -> boolean | Whether a mod is active.
+info(package_id: string) -> RimModInfo? | One active mod.
+type_exists(package_id: string, type: string) -> boolean | Whether an active mod has a type with this full name.
+order() -> string[] | Package ids of the active mods in load order.
+deactivate(package_id: string) -> boolean | Turns a mod off in the mod list, effective after a restart.
+
+@kit domain=dev op=dev subject=none title="Developer tools" page=dev
+mode() -> boolean | Whether Development mode is on.
+export_defs(path?: string) -> string | Writes every def name by def type to a JSON file for the editor's name completion. Returns the path.
+bundle(profile?: string, path?: string) -> string | Writes a diagnostics folder (log, mod list, versions, profiler numbers). Nothing is sent anywhere. Returns the folder.
+
+@kit domain=save op=save subject=thing:RimThingRef title="Saving" page=save
+forget_thing(package_id: string) -> integer | Removes everything a mod stored for this thing with scope thing.

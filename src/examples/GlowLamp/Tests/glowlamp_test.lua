@@ -1,0 +1,45 @@
+-- Run with: rimkit mod test src/examples/GlowLamp
+local t = game.test
+
+t.describe("GlowLamp", function()
+  t.it("starts a new lamp at zero pulses", function()
+    t.mock("classes.data_set", true)
+    t.class("comp", "glow_pulse").spawn(rim.wrap_thing(3), false)
+    local set = t.calls("classes.data_set")[1].args
+    t.expect(set.key).to_be("pulses")
+    t.expect(set.value).to_be("0")
+  end)
+
+  t.it("does not reset a lamp that is loaded from a save", function()
+    t.mock("classes.data_set", true)
+    t.class("comp", "glow_pulse").spawn(rim.wrap_thing(3), true)
+    t.expect(#t.calls("classes.data_set")).to_be(0)
+  end)
+
+  t.it("counts a pulse and sparkles on every fourth", function()
+    local comp = t.class("comp", "glow_pulse")
+    t.mock("classes.data_get", "3")
+    t.mock("classes.data_set", true)
+    t.mock("thing.info", { x = 10, z = 12, map = 1 })
+    t.mock("effects.text", true)
+    t.mock("ui.translate", function(a) return a.key end)
+    comp.tick_rare(rim.wrap_thing(3))
+    t.expect(t.calls("classes.data_set")[1].args.value).to_be("4")
+    t.expect(#t.calls("effects.text")).to_be(1)
+  end)
+
+  t.it("stays quiet on the other pulses", function()
+    t.mock("classes.data_get", "1")
+    t.mock("classes.data_set", true)
+    t.mock("effects.text", true)
+    t.class("comp", "glow_pulse").tick_rare(rim.wrap_thing(3))
+    t.expect(#t.calls("effects.text")).to_be(0)
+  end)
+
+  t.it("shows the pulse count in the inspect pane", function()
+    t.mock("classes.data_get", "7")
+    t.mock("ui.translate", function(a) return a.key .. ":" .. tostring(a.arg0) end)
+    local text = t.class("comp", "glow_pulse").inspect_string(rim.wrap_thing(3))
+    t.expect(text).to_contain("glowlamp_Pulses")
+  end)
+end)

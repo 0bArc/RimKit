@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<Defs>
-  <KeyBindingDef>
-    <defName>RimLua_LogicPanelOpen</defName>
-    <label>Open Logic Panel demo</label>
-    <category>Game</category>
-    <defaultKeyCodeA>F8</defaultKeyCodeA>
-  </KeyBindingDef>
-</Defs>

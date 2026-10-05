@@ -1,0 +1,23 @@
+# More of game.things and game.factions (P1-01, P1-04).
+
+@kit domain=things op=thing subject=thing:RimThingRef title="Things" page=things
+minify() -> RimThing | Turns a minifiable building into a minified item in place. Returns the minified thing.
+inner() -> RimThing? | The thing inside a minified item.
+style() -> string? | The style def name of the thing.
+set_style(style?: string) -> boolean | Sets the style by def name, or clears it when nil.
+owners() -> RimPawn[] | Pawns assigned to this thing, for beds and similar. Raises RK3003 when it cannot be assigned.
+assign_owner(pawn: RimPawn) -> boolean | Assigns a pawn to a bed or other assignable thing.
+unassign_owner(pawn: RimPawn) -> boolean | Removes an assignment.
+storage_allows(def: string) -> boolean | Whether a storage building or stockpile accepts a thing def.
+storage_set_allowed(def: string, allowed: boolean) -> boolean | Changes what a storage building accepts.
+storage_priority() -> string | Unstored, Low, Normal, Preferred, Important or Critical.
+set_storage_priority(priority: string) -> string | Sets the storage priority.
+
+@kit domain=factions op=faction subject=faction:RimFactionRef title="Factions" page=factions
+remove() -> boolean | Removes a temporary faction. Raises RK1001 for any other faction.
+make_peace() -> string | Sets the relation with the player to Neutral, with the game's letter. Returns the relation.
+declare_war() -> string | Sets the relation with the player to Hostile.
+send_gift(things: RimThing[]) -> integer | Consumes the items and raises goodwill by market value / 40, at most 40. Returns the new goodwill.
+
+@kit domain=factions op=faction subject=none title="Factions" page=factions
+make_temporary(def: string, name?: string) -> RimFaction | Generates a temporary faction from a faction def, for quests and events.

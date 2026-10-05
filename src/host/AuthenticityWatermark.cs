@@ -7,7 +7,7 @@ using RimWorld;
 using UnityEngine;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // On-screen kit version + hashes (compare to a published release).
     internal static class AuthenticityWatermark

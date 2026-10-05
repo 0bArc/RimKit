@@ -10,7 +10,7 @@ using RimWorld;
 using Verse;
 using Verse.AI;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Lua host ops (op name + json args).
     internal static class GameApi
@@ -26,8 +26,8 @@ namespace RimLuaKit
                 }
                 switch (op)
                 {
-                    case "find.tick": return OkInt(Find.TickManager?.TicksGame ?? 0);
-                    case "find.current_map": return OkHandle(Find.CurrentMap);
+                    case "find.tick": return OkInt(Current.Game == null ? 0 : Find.TickManager?.TicksGame ?? 0);
+                    case "find.current_map": return OkHandle(Current.Game == null ? null : Find.CurrentMap);
                     case "find.world": return OkHandle(Find.World);
                     case "find.camera_driver": return OkHandle(Find.CameraDriver);
                     case "find.selector_first":
@@ -734,14 +734,14 @@ namespace RimLuaKit
                     }
 
                     // reflect (needs developer_reflect)
-                    case "reflect.type":
-                    case "reflect.get":
-                    case "reflect.set":
-                    case "reflect.call":
-                    case "reflect.static_get":
-                    case "reflect.static_call":
-                    case "reflect.members":
-                    case "reflect.handle_of_static":
+                    case "reflect_v1.type":
+                    case "reflect_v1.get":
+                    case "reflect_v1.set":
+                    case "reflect_v1.call":
+                    case "reflect_v1.static_get":
+                    case "reflect_v1.static_call":
+                    case "reflect_v1.members":
+                    case "reflect_v1.handle_of_static":
                     {
                         if (!LuaSandbox.DeveloperReflectEnabled)
                         {
@@ -749,14 +749,14 @@ namespace RimLuaKit
                         }
                         switch (op)
                         {
-                            case "reflect.type": return OkStr(ObjectHandles.Get<object>(Int(args, "h"))?.GetType().FullName ?? "");
-                            case "reflect.get": return ReflectGet(Int(args, "h"), Str(args, "member"));
-                            case "reflect.set": return ReflectSet(Int(args, "h"), Str(args, "member"), Str(args, "value"));
-                            case "reflect.call": return ReflectCall(Int(args, "h"), Str(args, "method"), Str(args, "args"));
-                            case "reflect.static_get": return ReflectStaticGet(Str(args, "type"), Str(args, "member"));
-                            case "reflect.static_call": return ReflectStaticCall(Str(args, "type"), Str(args, "method"), Str(args, "args"));
-                            case "reflect.members": return OkStringList(ListMembers(Int(args, "h")));
-                            case "reflect.handle_of_static": return ReflectHandleOfStatic(Str(args, "type"), Str(args, "member"));
+                            case "reflect_v1.type": return OkStr(ObjectHandles.Get<object>(Int(args, "h"))?.GetType().FullName ?? "");
+                            case "reflect_v1.get": return ReflectGet(Int(args, "h"), Str(args, "member"));
+                            case "reflect_v1.set": return ReflectSet(Int(args, "h"), Str(args, "member"), Str(args, "value"));
+                            case "reflect_v1.call": return ReflectCall(Int(args, "h"), Str(args, "method"), Str(args, "args"));
+                            case "reflect_v1.static_get": return ReflectStaticGet(Str(args, "type"), Str(args, "member"));
+                            case "reflect_v1.static_call": return ReflectStaticCall(Str(args, "type"), Str(args, "method"), Str(args, "args"));
+                            case "reflect_v1.members": return OkStringList(ListMembers(Int(args, "h")));
+                            case "reflect_v1.handle_of_static": return ReflectHandleOfStatic(Str(args, "type"), Str(args, "member"));
                             default: return Err("unknown op: " + op);
                         }
                     }
@@ -767,7 +767,9 @@ namespace RimLuaKit
             }
             catch (Exception e)
             {
-                return Err(e.GetType().Name + ": " + e.Message);
+                // The Lua error only has the message. The log gets the stack so the failing line can be found.
+                try { Verse.Log.Warning("[RimKit] op " + op + " failed: " + e); } catch (Exception) { }
+                return Err(e.GetType().Name + ": " + e.Message + " (op " + op + ")");
             }
         }
 
@@ -1098,95 +1100,5 @@ namespace RimLuaKit
         }
 
         private static string Err(string msg) => "{\"ok\":false,\"e\":" + JsonLite.Quote(msg) + "}";
-    }
-
-    internal static class JsonLite
-    {
-        public static Dictionary<string, string> ParseObject(string json)
-        {
-            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (string.IsNullOrWhiteSpace(json)) return dict;
-            json = json.Trim();
-            if (json.Length < 2 || json[0] != '{') return dict;
-            int i = 1;
-            while (i < json.Length)
-            {
-                SkipWs(json, ref i);
-                if (i >= json.Length || json[i] == '}') break;
-                string key = ReadString(json, ref i);
-                SkipWs(json, ref i);
-                if (i < json.Length && json[i] == ':') i++;
-                SkipWs(json, ref i);
-                string val = ReadValue(json, ref i);
-                dict[key] = val;
-                SkipWs(json, ref i);
-                if (i < json.Length && json[i] == ',') i++;
-            }
-            return dict;
-        }
-
-        public static string Quote(string s)
-        {
-            if (s == null) s = "";
-            var sb = new StringBuilder("\"");
-            foreach (char c in s)
-            {
-                if (c == '"' || c == '\\') sb.Append('\\').Append(c);
-                else if (c == '\n') sb.Append("\\n");
-                else if (c == '\r') sb.Append("\\r");
-                else if (c == '\t') sb.Append("\\t");
-                else sb.Append(c);
-            }
-            sb.Append('"');
-            return sb.ToString();
-        }
-
-        private static void SkipWs(string s, ref int i)
-        {
-            while (i < s.Length && char.IsWhiteSpace(s[i])) i++;
-        }
-
-        private static string ReadString(string s, ref int i)
-        {
-            if (i < s.Length && s[i] == '"')
-            {
-                i++;
-                var sb = new StringBuilder();
-                while (i < s.Length && s[i] != '"')
-                {
-                    if (s[i] == '\\' && i + 1 < s.Length)
-                    {
-                        i++;
-                        char esc = s[i++];
-                        switch (esc)
-                        {
-                            case 'n': sb.Append('\n'); break;
-                            case 'r': sb.Append('\r'); break;
-                            case 't': sb.Append('\t'); break;
-                            case '"': sb.Append('"'); break;
-                            case '\\': sb.Append('\\'); break;
-                            case '/': sb.Append('/'); break;
-                            case 'b': sb.Append('\b'); break;
-                            case 'f': sb.Append('\f'); break;
-                            default: sb.Append(esc); break;
-                        }
-                    }
-                    else sb.Append(s[i++]);
-                }
-                if (i < s.Length && s[i] == '"') i++;
-                return sb.ToString();
-            }
-            return ReadValue(s, ref i);
-        }
-
-        private static string ReadValue(string s, ref int i)
-        {
-            SkipWs(s, ref i);
-            if (i >= s.Length) return "";
-            if (s[i] == '"') return ReadString(s, ref i);
-            int start = i;
-            while (i < s.Length && s[i] != ',' && s[i] != '}' && s[i] != ']') i++;
-            return s.Substring(start, i - start).Trim();
-        }
     }
 }

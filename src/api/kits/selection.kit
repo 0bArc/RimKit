@@ -1,0 +1,33 @@
+# game.selection and game.camera (P1-10). Older: game.selection.first, game.selection.things.
+
+@class RimInspected
+kind: string thing, zone, or the class name of the object
+thing?: RimThing The thing, when the selected object is one
+id?: integer Id of the object, for zones
+label?: string Name shown to the player
+
+@class RimCameraPosition
+x: integer Cell x the camera looks at
+z: integer Cell z the camera looks at
+map: RimMap The map the camera is on
+zoom: string Zoom level name
+
+@class RimMouseCell
+x: integer Map cell x under the mouse
+z: integer Map cell z under the mouse
+in_bounds: boolean Whether the cell is inside the map
+
+@kit domain=selection op=selection subject=none title="Selection" page=selection
+pawns() -> RimPawn[] | The selected pawns.
+zones() -> RimZoneInfo[] | The selected zones.
+count() -> integer | How many objects are selected.
+select(thing: RimThing) -> boolean | Selects only this thing.
+add(thing: RimThing) -> boolean | Adds a thing to the selection.
+clear() -> boolean | Clears the selection.
+inspected() -> RimInspected? | The single selected object, nil when nothing or several are selected.
+
+@kit domain=camera op=camera subject=none title="Camera" page=selection
+jump_cell(map: RimMapRef, x: integer, z: integer) -> boolean | Moves the camera to a cell.
+jump_thing(thing: RimThing) -> boolean | Moves the camera to a thing, switching maps when needed.
+position() -> RimCameraPosition | Where the camera looks and how far it is zoomed.
+mouse_cell() -> RimMouseCell | The cell under the mouse pointer.

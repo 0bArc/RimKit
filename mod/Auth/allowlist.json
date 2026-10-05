@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "note": "Accepted SHA256 digests for a Stratware release. Rebuild/ship updates this file.",
+  "harmony": [
+    "353daafec180bb8e7bbe4da78f2a7cdc78067392e3a4e79dc8e7af295f2371e6"
+  ],
+  "rimkit_host": [
+    "026225d9db5cbcbd8042c254bba18ce0c7fa94544eb7001bf8e05b39c68e98a9"
+  ],
+  "rimkit_native": [
+    "f595b74ea92326dc6cf2e4d044ae9f658044dcc74e29099b3cfdd74bc084af4f"
+  ]
+}

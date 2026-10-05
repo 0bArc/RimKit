@@ -1,0 +1,108 @@
+# Storyteller, incidents, quests, research, stats (P2-02, P2-03, P2-14).
+
+@class RimStorytellerInfo
+def: string Def name of the storyteller
+label?: string Name shown to the player
+difficulty?: string Difficulty name
+threat_points?: number Points the storyteller would use for a threat on the current map right now
+wealth?: number Colony wealth the storyteller sees
+colonists?: integer Colonists the storyteller counts
+
+@class RimStorytellerDef
+def: string Def name of the storyteller
+label?: string Name shown to the player
+visible: boolean Whether the player can pick it
+
+@class RimIncidentDef
+def: string Def name of the incident
+label?: string Name shown to the player
+category?: string Category it is listed under
+base_chance: number Base chance of being picked
+min_threat_points: number Fewest threat points it needs
+pointless: boolean Whether threat points do not matter
+
+@class RimIncidentOptions
+points?: number Threat points
+faction?: RimFaction Faction that sends it
+forced?: boolean Fire even when the game says it cannot
+
+@class RimQuestInfo
+id: integer Id of the quest, to pass back to the functions that take one
+name?: string Quest name
+state: string NotYetAccepted, Ongoing, EndedSuccess, EndedFailed, EndedOfferExpired, EndedUnknownOutcome or EndedInvalid
+root?: string Quest script def name
+challenge: number Challenge rating
+age_ticks: integer How many ticks old it is
+accepted: boolean Whether the player accepted it
+hidden: boolean Whether it is hidden
+parts: integer How many parts it has
+
+@class RimResearchInfo
+def: string Def name of the research
+label?: string Name shown to the player
+cost: number Research points needed
+progress: number Research points done
+progress_pct: number 0 to 1
+finished: boolean Whether it is finished
+can_start: boolean Whether it can be researched now
+tab?: string Research tab def name
+tech_level: string Tech level name, for example Industrial
+prerequisites: string[] Project defs needed first
+techprints: integer Techprints needed
+techprints_applied: integer Techprints applied
+
+@class RimKnowledge
+project?: string Current project def name
+progress: number Progress on it
+
+@class RimStatExplanation
+value: number The stat value
+text: string Line by line breakdown, as the game shows it
+final: string The value formatted as the game shows it
+
+@class RimStatDef
+def: string Def name of the stat
+label?: string Name shown to the player
+category?: string Category it is listed under
+show: boolean Whether the stat is shown to the player
+
+@kit domain=storyteller op=storyteller subject=none title="Storyteller" page=storyteller
+info() -> RimStorytellerInfo | The storyteller, difficulty, threat points, wealth and colonists.
+defs() -> RimStorytellerDef[] | Every storyteller def.
+set(def: string) -> string | Switches the storyteller. Returns the def name.
+threat_points(map?: RimMapRef) -> number | Threat points for a map, the current map by default.
+difficulty() -> table<string, number|boolean> | Every numeric and boolean difficulty setting.
+set_difficulty(name: string, value: number|boolean) -> string | Changes one difficulty setting, for example threatScale.
+
+@kit domain=incidents op=incident subject=none title="Incidents" page=storyteller
+defs() -> RimIncidentDef[] | Every incident def with category and chance.
+can_fire(def: string, opts?: RimIncidentOptions, h?: RimMapRef) -> boolean | Whether the game would let the incident fire now.
+fire(def: string, opts?: RimIncidentOptions, h?: RimMapRef) -> boolean | Fires an incident with options on a map (the current map by default).
+queue(def: string, ticks: integer, opts?: RimIncidentOptions, h?: RimMapRef) -> boolean | Queues an incident to fire after some ticks.
+
+@kit domain=quests op=quest subject=none title="Quests" page=storyteller
+list(state?: string) -> RimQuestInfo[] | Every quest, optionally only those in one state.
+defs() -> string[] | Every quest script def name.
+generate(root: string, points?: number) -> RimQuestInfo | Generates a quest from a script and makes it available.
+accept(id: integer, pawn?: RimPawn) -> boolean | Accepts a quest offer.
+finish(id: integer, outcome?: string) -> string | Ends a quest with Success, Fail, InvalidPreAcceptance or Unknown. Returns the new state.
+signal(tag: string) -> boolean | Sends a quest signal that quest parts listen for.
+slate_get(name: string) -> any | A value of the quest slate while a Lua quest node runs, such as points, map, asker or any value an earlier node stored. nil when it is not set.
+slate_set(name: string, value: any, kind?: string) -> boolean | Stores a number, string or boolean in the quest slate for later nodes. kind forces int, float, string or bool, because slate values are typed.
+slate_set_object(name: string, target: RimObject) -> boolean | Stores a game object (a pawn, thing, map or faction) in the quest slate.
+
+@kit domain=research op=research subject=none title="Research" page=research
+list(filter?: string) -> RimResearchInfo[] | All projects, or only finished, available or locked ones.
+info(def: string) -> RimResearchInfo | One project.
+current() -> RimResearchInfo? | The project being researched.
+set_current(def: string) -> boolean | Starts researching a project.
+finish(def: string) -> boolean | Completes a project at once, with the game's letter.
+set_progress(def: string, progress: number) -> number | Sets the progress of a project, clamped to its cost.
+knowledge(category: string, add?: number) -> RimKnowledge | Anomaly knowledge. Adds points to a category (Basic or Advanced) when asked.
+
+@kit domain=stats op=stat subject=thing:RimThingRef title="Stats" page=research
+value(stat: string) -> number? | The final value of a stat for a thing, nil when the stat is disabled for it.
+explain(stat: string) -> RimStatExplanation | The value with the game's own explanation of where it comes from.
+
+@kit domain=stats op=stat subject=none title="Stats" page=research
+defs(category?: string) -> RimStatDef[] | Every stat def, optionally one category.

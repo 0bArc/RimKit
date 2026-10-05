@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using Verse;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class ApiUiPlus
     {

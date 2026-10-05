@@ -1,0 +1,44 @@
+# game.pawns gear and policy (P1-07). Older: game.pawns.equipment, apparel, inventory, carry, strip, give_thing.
+
+@class RimGearItem
+thing: RimThing The item
+def: string Def name of the gear item
+label: string Name shown to the player
+count: integer Stack size
+hp: integer Current hit points
+max_hp: integer Maximum hit points
+quality?: string Quality category name, for example Normal or Masterwork
+
+@class RimGear
+weapon?: RimGearItem The weapon in hand
+apparel: RimGearItem[] Worn apparel
+inventory: RimGearItem[] Items carried
+
+@class RimWorkPriority
+def: string Work type def name
+label: string Work type name shown to the player
+priority: integer 0 means off, 1 is highest
+disabled: boolean Incapable of the work
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+gear() -> RimGear | Weapon, worn apparel and carried inventory in one call.
+equip(thing: RimThing) -> boolean | Equips a weapon or tool, replacing the current one.
+unequip() -> boolean | Drops the primary weapon.
+wear(thing: RimThing) -> boolean | Puts on apparel. Raises RK1001 when the pawn cannot wear it.
+remove_apparel(thing: RimThing) -> boolean | Takes off a piece of apparel and drops it.
+add_to_inventory(thing: RimThing) -> boolean | Moves a thing into the pawn's inventory.
+drop(thing: RimThing) -> boolean | Drops an inventory item next to the pawn.
+outfit() -> string | Name of the current outfit.
+set_outfit(name: string) -> string | Switches outfit by name. Raises RK3001 for an unknown name.
+outfits!() -> string[] | Names of all outfits.
+drug_policy() -> string | Name of the current drug policy.
+set_drug_policy(name: string) -> string | Switches drug policy by name.
+drug_policies!() -> string[] | Names of all drug policies.
+food_policy() -> string | Name of the current food policy.
+set_food_policy(name: string) -> string | Switches food policy by name.
+food_policies!() -> string[] | Names of all food policies.
+work_priorities() -> RimWorkPriority[] | Every work type with the pawn's priority.
+bed() -> RimThing? | The bed the pawn owns.
+assign_bed(bed: RimThing) -> boolean | Claims a bed for the pawn.
+unassign_bed() -> boolean | Releases the pawn's bed.
+set_assignments!(pawns: RimPawn[], hour: integer, def: string) -> integer | Sets one timetable hour (0 to 23) to Anything, Work, Joy, Sleep or Meditate for a group. Returns how many pawns changed.

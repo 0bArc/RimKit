@@ -1,6 +1,10 @@
 #include "engine.hpp"
+#include "handle_util.hpp"
+#include "aliases.hpp"
+#include "version_data.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace rimlua {
 
@@ -119,12 +123,74 @@ void Engine::bind_oo_types() {
             return host_call_hv("pawn.set_name", p.h, "v", sol::make_object(*lua_, name));
         },
         "add_trait",
-        [this](RimPawn& p, const std::string& trait) {
-            return host_call_hv("pawn.add_trait", p.h, "def", sol::make_object(*lua_, trait));
+        [this](RimPawn& p, const std::string& trait, sol::optional<int> degree) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["def"] = trait;
+            a["degree"] = degree.value_or(0);
+            return host_call("pawn.add_trait", a);
         },
         "remove_trait",
         [this](RimPawn& p, const std::string& trait) {
             return host_call_hv("pawn.remove_trait", p.h, "def", sol::make_object(*lua_, trait));
+        },
+        // game.pawns kit (docs/api/pawns.md). Properties return nil when the pawn lacks the tracker.
+        "skills", sol::property([this](RimPawn& p) { return host_call_h("pawn.skills", p.h); }),
+        "needs", sol::property([this](RimPawn& p) { return host_call_h("pawn.needs", p.h); }),
+        "traits", sol::property([this](RimPawn& p) { return host_call_h("pawn.traits", p.h); }),
+        "thoughts", sol::property([this](RimPawn& p) { return host_call_h("pawn.thoughts", p.h); }),
+        "relations", sol::property([this](RimPawn& p) { return host_call_h("pawn.relations", p.h); }),
+        "capacities", sol::property([this](RimPawn& p) { return host_call_h("pawn.capacities", p.h); }),
+        "skill_info",
+        [this](RimPawn& p, const std::string& skill) {
+            return host_call_hv("pawn.skill_info", p.h, "skill", sol::make_object(*lua_, skill));
+        },
+        "set_passion",
+        [this](RimPawn& p, const std::string& skill, const std::string& passion) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["skill"] = skill;
+            a["passion"] = passion;
+            return host_call("pawn.set_passion", a);
+        },
+        "add_xp",
+        [this](RimPawn& p, const std::string& skill, double amount) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["skill"] = skill;
+            a["amount"] = amount;
+            return host_call("pawn.add_skill_xp", a);
+        },
+        "has_trait",
+        [this](RimPawn& p, const std::string& trait, sol::optional<int> degree) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["def"] = trait;
+            if (degree) {
+                a["degree"] = *degree;
+            }
+            return host_call("pawn.has_trait", a);
+        },
+        "add_thought",
+        [this](RimPawn& p, const std::string& def, sol::optional<RimPawn> other) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["def"] = def;
+            if (other) {
+                a["other"] = other->h;
+            }
+            return host_call("pawn.add_thought", a);
+        },
+        "remove_thought",
+        [this](RimPawn& p, const std::string& def) {
+            return host_call_hv("pawn.remove_thought", p.h, "def", sol::make_object(*lua_, def));
+        },
+        "opinion_of",
+        [this](RimPawn& p, RimPawn& other) {
+            sol::table a = lua_->create_table();
+            a["h"] = p.h;
+            a["other"] = other.h;
+            return host_call("pawn.opinion_of", a);
         },
         "give_hediff",
         [this](RimPawn& p, const std::string& def, sol::optional<double> sev) {
@@ -144,7 +210,12 @@ void Engine::bind_oo_types() {
             a["v"] = v.value_or(true);
             return host_call("pawn.set_drafted", a);
         },
-        "seek_medical_help", [this](RimPawn& p) { return host_call_h("pawn.seek_medical", p.h); },
+        "seek_medical", [this](RimPawn& p) { return host_call_h("pawn.seek_medical", p.h); },
+        "seek_medical_help",
+        [this](RimPawn& p) {
+            warn_deprecated("RimPawn:seek_medical_help", "RimPawn:seek_medical");
+            return host_call_h("pawn.seek_medical", p.h);
+        },
         "position",
         sol::property([this](RimPawn& p) -> sol::object {
             sol::object o = host_call_h("pawn.pos", p.h);
@@ -234,6 +305,20 @@ void Engine::bind_oo_types() {
             return level >= 0;
         });
 
+    auto spawn_on_map = [this](RimMap& m, const std::string& def, int x, int z, sol::optional<int> stack) {
+        sol::table a = lua_->create_table();
+        a["h"] = m.h;
+        a["def"] = def;
+        a["x"] = x;
+        a["z"] = z;
+        if (stack) {
+            a["stack"] = *stack;
+        }
+        sol::object o = host_call("map.spawn", a);
+        int th = o.is<int>() ? o.as<int>() : 0;
+        return th == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_thing(th));
+    };
+
     lua_->new_usertype<RimMap>(
         "RimMap", sol::no_constructor, "handle", &RimMap::h, "nutrition",
         sol::property([this](RimMap& m) -> double {
@@ -250,19 +335,11 @@ void Engine::bind_oo_types() {
             sol::object o = host_call_h("map.height", m.h);
             return o.is<int>() ? o.as<int>() : 0;
         }),
+        "spawn", spawn_on_map,
         "spawn_thing",
-        [this](RimMap& m, const std::string& def, int x, int z, sol::optional<int> stack) {
-            sol::table a = lua_->create_table();
-            a["h"] = m.h;
-            a["def"] = def;
-            a["x"] = x;
-            a["z"] = z;
-            if (stack) {
-                a["stack"] = *stack;
-            }
-            sol::object o = host_call("map.spawn", a);
-            int th = o.is<int>() ? o.as<int>() : 0;
-            return th == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_thing(th));
+        [this, spawn_on_map](RimMap& m, const std::string& def, int x, int z, sol::optional<int> stack) {
+            warn_deprecated("RimMap:spawn_thing", "RimMap:spawn");
+            return spawn_on_map(m, def, x, z, stack);
         },
         "spawn_pawn",
         [this](RimMap& m, const std::string& kind, sol::optional<std::string> faction, sol::optional<int> x,
@@ -346,18 +423,74 @@ void Engine::bind_oo_types() {
                                 }),
                                 "destroy", [this](RimThing& t) { return host_call_h("thing.destroy", t.h); });
 
+    lua_->new_usertype<RimEntity>(
+        "RimEntity", sol::no_constructor, "handle", &RimEntity::h, "name",
+        sol::property([this](RimEntity& e) -> std::string {
+            sol::object o = host_call_h("pawn.name", e.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "kind",
+        sol::property([this](RimEntity& e) -> std::string {
+            sol::object o = host_call_h("pawn.kind", e.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "is_entity",
+        [this](RimEntity& e) {
+            sol::object o = host_call_h("anomaly.is_entity", e.h);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "recruit",
+        [this](RimEntity& e) {
+            sol::object o = host_call_h("anomaly.recruit", e.h);
+            return o.is<bool>() && o.as<bool>();
+        },
+        "knock_out",
+        [this](RimEntity& e, sol::optional<double> severity) {
+            sol::table a = lua_->create_table();
+            a["h"] = e.h;
+            a["severity"] = severity.value_or(1.0);
+            return host_call("anomaly.knock_out", a);
+        },
+        "release",
+        [this](RimEntity& e) {
+            sol::object o = host_call_h("anomaly.release_to_hostile", e.h);
+            return o.is<bool>() && o.as<bool>();
+        });
+
+    lua_->new_usertype<RimObject>(
+        "RimObject", sol::no_constructor, "handle", &RimObject::h, "type_name", &RimObject::type_name, "def", &RimObject::def,
+        sol::meta_function::to_string, [](RimObject& o) { return "RimObject<" + o.type_name + "#" + std::to_string(o.h) + ">"; });
+
     (*lua_)["rim"]["wrap"] = [this](int h) { return wrap_pawn(h); };
     (*lua_)["rim"]["wrap_map"] = [this](int h) { return wrap_map(h); };
     (*lua_)["rim"]["wrap_thing"] = [this](int h) { return wrap_thing(h); };
     (*lua_)["rim"]["wrap_faction"] = [this](int h) { return wrap_faction(h); };
+    (*lua_)["rim"]["wrap_entity"] = [this](int h) { return wrap_entity(h); };
 }
 
 void Engine::bind_events_and_timer() {
     sol::table events = lua_->create_named_table("events");
+    // Canonical event names contain a dot (pawn.died). The host installs the Harmony patch on first subscription.
     events["on"] = [this](const std::string& name, sol::protected_function fn) {
-        event_handlers_[name].push_back(std::move(fn));
+        add_event_handler(name, std::move(fn));
     };
-    events["off"] = [this](const std::string& name) { event_handlers_.erase(name); };
+    events["off"] = [this](const std::string& requested) {
+        const std::string name = canonical_event_name(requested);
+        auto it = event_handlers_.find(name);
+        if (it == event_handlers_.end()) {
+            return;
+        }
+        const size_t count = it->second.size();
+        event_handlers_.erase(it);
+        for (size_t i = 0; i < count; ++i) {
+            unsubscribe_named_event(name);
+        }
+    };
+    events["list"] = [this]() {
+        sol::table out = lua_->create_table();
+        sol::object o = host_call("events.list", lua_->create_table());
+        return o.is<sol::table>() ? o.as<sol::table>() : out;
+    };
 
     sol::table logt = lua_->create_named_table("log");
     logt["info"] = [this](const std::string& msg) {
@@ -402,6 +535,7 @@ void Engine::bind_events_and_timer() {
     sol::table timer = lua_->create_named_table("timer");
     timer["after"] = [this](int ticks, sol::protected_function fn) {
         TimerEntry e;
+        e.mod = current_mod_;
         e.fire_tick = current_tick() + std::max(0, ticks);
         e.fn = std::move(fn);
         timers_.push_back(std::move(e));
@@ -508,6 +642,7 @@ void Engine::bind_jobs_and_faction() {
 int Engine::register_ui_callback(sol::protected_function fn) {
     int id = next_ui_id_++;
     ui_callbacks_[id] = std::move(fn);
+    ui_callback_mod_[id] = current_mod_;
     return id;
 }
 
@@ -516,10 +651,40 @@ void Engine::ui_invoke(int callback_id) {
     if (it == ui_callbacks_.end() || !ready_) {
         return;
     }
+    ModScope scope(*this, ui_callback_mod_[callback_id], PROF_UI);
     sol::protected_function_result r = it->second();
     if (!r.valid()) {
-        log_lua_error("[RimLuaKit] ui callback " + std::to_string(callback_id), r);
+        log_lua_error("[RimKit] ui callback " + std::to_string(callback_id), r);
     }
+}
+
+const char* Engine::ui_call(int callback_id, const char* arg_json) {
+    ui_call_cache_.clear();
+    auto it = ui_callbacks_.find(callback_id);
+    if (it == ui_callbacks_.end() || !ready_ || !lua_) {
+        return ui_call_cache_.c_str();
+    }
+    sol::object arg = sol::make_object(*lua_, sol::lua_nil);
+    if (arg_json && *arg_json) {
+        rimlua::json::Value v;
+        if (rimlua::json::parse(arg_json, v)) {
+            arg = json_to_lua(v);
+        }
+    }
+    ModScope scope(*this, ui_callback_mod_[callback_id], PROF_UI);
+    sol::protected_function_result r = it->second(arg);
+    if (!r.valid()) {
+        // A widget view fails every frame. Log the first few, then stay quiet for that callback.
+        if (++ui_error_counts_[callback_id] <= 3) {
+            log_lua_error("[RimKit] ui callback " + std::to_string(callback_id), r);
+        }
+        return ui_call_cache_.c_str();
+    }
+    sol::object ret = r;
+    if (ret.get_type() != sol::type::lua_nil) {
+        ui_call_cache_ = lua_value_json(ret);
+    }
+    return ui_call_cache_.c_str();
 }
 
 const char* Engine::collect_map_float_menu(int clicked_handle, int hauler_handle) {
@@ -534,7 +699,7 @@ const char* Engine::collect_map_float_menu(int clicked_handle, int hauler_handle
         ctx["hauler"] = hauler_handle;
         sol::protected_function_result r = fn(ctx);
         if (!r.valid()) {
-            log_lua_error("[RimLuaKit] on_map_float_menu", r);
+            log_lua_error("[RimKit] on_map_float_menu", r);
             continue;
         }
         sol::object obj = r;
@@ -642,6 +807,7 @@ void Engine::bind_ui_config_defs() {
     // Right-click map thing: fn(ctx) -> { {label=, on_click=, disabled?}, ... }
     ui["on_map_float_menu"] = [this](sol::protected_function fn) {
         map_float_menu_handlers_.push_back(std::move(fn));
+        map_float_menu_mods_.push_back(current_mod_);
     };
 
     sol::table config = lua_->create_named_table("config");
@@ -720,7 +886,7 @@ void Engine::bind_ui_config_defs() {
         }
         sol::object o = host_call("defs.write_thing", a);
         if (callbacks_.log) {
-            callbacks_.log("[RimLuaKit] defs.register_thing wrote XML (restart RimWorld to load Def)");
+            callbacks_.log("[RimKit] defs.register_thing wrote XML (restart RimWorld to load Def)");
         }
         return o;
     };
@@ -775,36 +941,36 @@ void Engine::bind_strong_api() {
     };
 
     sol::table health = lua_->create_named_table("health");
-    health["has_hediff"] = [this](int h, const std::string& def) {
+    health["has_hediff"] = [this](HandleArg h, const std::string& def) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["def"] = def;
         return host_call("health.has_hediff", a);
     };
-    health["hediff_severity"] = [this](int h, const std::string& def) {
+    health["hediff_severity"] = [this](HandleArg h, const std::string& def) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["def"] = def;
         return host_call("health.hediff_severity", a);
     };
-    health["set_hediff_severity"] = [this](int h, const std::string& def, double sev) {
+    health["set_hediff_severity"] = [this](HandleArg h, const std::string& def, double sev) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["def"] = def;
         a["severity"] = sev;
         return host_call("health.set_hediff_severity", a);
     };
-    health["tend"] = [this](int h, sol::optional<double> quality) {
+    health["tend"] = [this](HandleArg h, sol::optional<double> quality) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["quality"] = quality.value_or(0.5);
         return host_call("health.tend", a);
     };
 
     sol::table surgery = lua_->create_named_table("surgery");
-    surgery["queue_operation"] = [this](int h, const std::string& recipe) {
+    surgery["queue_operation"] = [this](HandleArg h, const std::string& recipe) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["recipe"] = recipe;
         return host_call("surgery.queue_operation", a);
     };
@@ -813,19 +979,19 @@ void Engine::bind_strong_api() {
     sol::table rim_tbl = (*lua_)["rim"];
     sol::table pawn_tbl = rim_tbl.get<sol::table>("pawn");
     if (pawn_tbl.valid()) {
-        pawn_tbl["make_controllable"] = [this](int h) {
+        pawn_tbl["make_controllable"] = [this](HandleArg h) {
             sol::table a = lua_->create_table();
-            a["h"] = h;
+            a["h"] = h.v;
             return host_call("pawn.make_controllable", a);
         };
-        pawn_tbl["release_control"] = [this](int h) {
+        pawn_tbl["release_control"] = [this](HandleArg h) {
             sol::table a = lua_->create_table();
-            a["h"] = h;
+            a["h"] = h.v;
             return host_call("pawn.release_control", a);
         };
-        pawn_tbl["is_controllable"] = [this](int h) {
+        pawn_tbl["is_controllable"] = [this](HandleArg h) {
             sol::table a = lua_->create_table();
-            a["h"] = h;
+            a["h"] = h.v;
             return host_call("pawn.is_controllable", a);
         };
         (*lua_)["pawn"] = pawn_tbl;
@@ -833,48 +999,54 @@ void Engine::bind_strong_api() {
 
     sol::table anomaly = lua_->create_named_table("anomaly");
     anomaly["dlc_active"] = [this]() { return host_call("anomaly.dlc_active", lua_->create_table()); };
-    anomaly["is_entity"] = [this](int h) {
+    anomaly["is_entity"] = [this](HandleArg h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         return host_call("anomaly.is_entity", a);
     };
-    anomaly["try_set_faction_player"] = [this](int h) {
+    anomaly["try_set_faction_player"] = [this](HandleArg h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         return host_call("anomaly.try_set_faction_player", a);
     };
-    anomaly["release_to_hostile"] = [this](int h) {
+    anomaly["release_to_hostile"] = [this](HandleArg h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         return host_call("anomaly.release_to_hostile", a);
     };
-    anomaly["list_on_map"] = [this](sol::optional<int> map_h) {
+    anomaly["list_on_map"] = [this](sol::optional<HandleArg> map_h) {
         sol::table a = lua_->create_table();
-        if (map_h) a["h"] = *map_h;
+        if (map_h && map_h->v > 0) a["h"] = map_h->v;
         return host_call("anomaly.list_on_map", a);
     };
-    anomaly["knock_out"] = [this](int h, sol::optional<double> severity) {
+    anomaly["get_on_map"] = [this](const std::string& name, sol::optional<HandleArg> map_h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["name"] = name;
+        if (map_h && map_h->v > 0) a["h"] = map_h->v;
+        return host_call("anomaly.get_on_map", a);
+    };
+    anomaly["knock_out"] = [this](HandleArg h, sol::optional<double> severity) {
+        sol::table a = lua_->create_table();
+        a["h"] = h.v;
         a["severity"] = severity.value_or(1.0);
         return host_call("anomaly.knock_out", a);
     };
-    anomaly["find_platform"] = [this](int hauler_h, sol::optional<int> entity_h) {
+    anomaly["find_platform"] = [this](HandleArg hauler_h, sol::optional<HandleArg> entity_h) {
         sol::table a = lua_->create_table();
-        a["h"] = hauler_h;
-        if (entity_h) a["entity"] = *entity_h;
+        a["h"] = hauler_h.v;
+        if (entity_h && entity_h->v > 0) a["entity"] = entity_h->v;
         return host_call("anomaly.find_platform", a);
     };
-    anomaly["start_capture"] = [this](int hauler_h, int entity_h, sol::optional<int> platform_h) {
+    anomaly["start_capture"] = [this](HandleArg hauler_h, HandleArg entity_h, sol::optional<HandleArg> platform_h) {
         sol::table a = lua_->create_table();
-        a["h"] = hauler_h;
-        a["entity"] = entity_h;
-        if (platform_h) a["platform"] = *platform_h;
+        a["h"] = hauler_h.v;
+        a["entity"] = entity_h.v;
+        if (platform_h && platform_h->v > 0) a["platform"] = platform_h->v;
         return host_call("anomaly.start_capture", a);
     };
-    anomaly["recruit"] = [this](int h) {
+    anomaly["recruit"] = [this](HandleArg h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         return host_call("anomaly.recruit", a);
     };
 
@@ -894,34 +1066,34 @@ void Engine::bind_strong_api() {
     };
 
     sol::table building = lua_->create_named_table("building");
-    building["power_on"] = [this](int h) {
+    building["power_on"] = [this](HandleArg h) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         return host_call("building.power_on", a);
     };
-    building["set_power"] = [this](int h, bool v) {
+    building["set_power"] = [this](HandleArg h, bool v) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["v"] = v ? "true" : "false";
         return host_call("building.set_power", a);
     };
-    building["flick"] = [this](int h, bool v) {
+    building["flick"] = [this](HandleArg h, bool v) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["v"] = v ? "true" : "false";
         return host_call("building.flick", a);
     };
 
     sol::table work = lua_->create_named_table("work");
-    work["get_priority"] = [this](int h, const std::string& wt) {
+    work["get_priority"] = [this](HandleArg h, const std::string& wt) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["work"] = wt;
         return host_call("work.get_priority", a);
     };
-    work["set_priority"] = [this](int h, const std::string& wt, int pri) {
+    work["set_priority"] = [this](HandleArg h, const std::string& wt, int pri) {
         sol::table a = lua_->create_table();
-        a["h"] = h;
+        a["h"] = h.v;
         a["work"] = wt;
         a["priority"] = pri;
         return host_call("work.set_priority", a);
@@ -929,24 +1101,24 @@ void Engine::bind_strong_api() {
     work["list_types"] = [this]() { return host_call("work.list_types", lua_->create_table()); };
 
     sol::table world = lua_->create_named_table("world_api");
-    world["weather"] = [this](sol::optional<int> map_h) {
+    world["weather"] = [this](sol::optional<HandleArg> map_h) {
         sol::table a = lua_->create_table();
-        if (map_h) a["h"] = *map_h;
+        if (map_h && map_h->v > 0) a["h"] = map_h->v;
         return host_call("world.weather", a);
     };
-    world["set_weather"] = [this](const std::string& def, sol::optional<int> map_h) {
+    world["set_weather"] = [this](const std::string& def, sol::optional<HandleArg> map_h) {
         sol::table a = lua_->create_table();
         a["def"] = def;
-        if (map_h) a["h"] = *map_h;
+        if (map_h && map_h->v > 0) a["h"] = map_h->v;
         return host_call("world.set_weather", a);
     };
     (*lua_)["world_api"] = world;
 
     sol::table incident = lua_->create_named_table("incident");
-    incident["try_fire"] = [this](const std::string& def, sol::optional<int> map_h) {
+    incident["try_fire"] = [this](const std::string& def, sol::optional<HandleArg> map_h) {
         sol::table a = lua_->create_table();
         a["def"] = def;
-        if (map_h) a["h"] = *map_h;
+        if (map_h && map_h->v > 0) a["h"] = map_h->v;
         return host_call("incident.try_fire", a);
     };
     incident["list"] = [this]() { return host_call("incident.list", lua_->create_table()); };
@@ -994,8 +1166,163 @@ void Engine::bind_strong_api() {
         };
     }
 
+    sol::table game = (*lua_)["game"];
+    if (game.valid()) {
+        sol::table anomalies = lua_->create_table();
+        anomalies["get"] = [this](sol::table /*self*/, const std::string& name, sol::optional<RimMap> map) -> sol::object {
+            sol::table a = lua_->create_table();
+            a["name"] = name;
+            if (map) {
+                a["h"] = map->h;
+            }
+            sol::object o = host_call("anomaly.get_on_map", a);
+            int h = o.is<int>() ? o.as<int>() : 0;
+            if (h <= 0) {
+                return sol::make_object(*lua_, sol::lua_nil);
+            }
+            return sol::make_object(*lua_, wrap_entity(h));
+        };
+        anomalies["list"] = [this](sol::table /*self*/, sol::optional<RimMap> map) -> sol::object {
+            sol::table a = lua_->create_table();
+            if (map) {
+                a["h"] = map->h;
+            }
+            sol::object o = host_call("anomaly.list_on_map", a);
+            sol::table out = lua_->create_table();
+            if (o.is<sol::table>()) {
+                sol::table src = o.as<sol::table>();
+                int i = 1;
+                for (const auto& kv : src) {
+                    if (kv.second.is<int>()) {
+                        int h = kv.second.as<int>();
+                        if (h > 0) {
+                            out[i++] = wrap_entity(h);
+                        }
+                    }
+                }
+            }
+            return sol::make_object(*lua_, out);
+        };
+        anomalies["find"] = [this](sol::table /*self*/, sol::protected_function predicate,
+                                   sol::optional<RimMap> map) -> sol::object {
+            sol::table a = lua_->create_table();
+            if (map) {
+                a["h"] = map->h;
+            }
+            sol::object o = host_call("anomaly.list_on_map", a);
+            if (!o.is<sol::table>()) {
+                return sol::make_object(*lua_, sol::lua_nil);
+            }
+            sol::table src = o.as<sol::table>();
+            for (const auto& kv : src) {
+                if (!kv.second.is<int>()) {
+                    continue;
+                }
+                int h = kv.second.as<int>();
+                if (h <= 0) {
+                    continue;
+                }
+                RimEntity ent = wrap_entity(h);
+                sol::protected_function_result r = predicate(ent);
+                if (!r.valid()) {
+                    log_lua_error("[RimKit] game.anomalies:find", r);
+                    continue;
+                }
+                bool ok = false;
+                if (r.return_count() > 0) {
+                    if (r.get_type(0) == sol::type::boolean) {
+                        ok = r.get<bool>(0);
+                    } else if (r.get_type(0) != sol::type::nil) {
+                        ok = true;
+                    }
+                }
+                if (ok) {
+                    return sol::make_object(*lua_, ent);
+                }
+            }
+            return sol::make_object(*lua_, sol::lua_nil);
+        };
+        game["anomalies"] = anomalies;
+    }
+
     if (callbacks_.log) {
-        callbacks_.log("[RimLuaKit] strong API domains bound (data/health/anomaly/util/building/work/...)");
+        callbacks_.log("[RimKit] strong API domains bound (data/health/anomaly/util/building/work/...)");
+    }
+}
+
+void Engine::bind_rimkit_module() {
+    if (!lua_) {
+        return;
+    }
+    sol::table mod = lua_->create_table();
+    mod["version"] = RIMKIT_VERSION;
+    mod["api_level"] = RIMKIT_API_LEVEL;
+
+    sol::table stable = lua_->create_table();
+    stable["rim_pawn"] = (*lua_)["rim"]["pawn"];
+    stable["rim_map"] = (*lua_)["rim"]["map"];
+    stable["rim_find"] = (*lua_)["rim"]["find"];
+    stable["rim_thing"] = (*lua_)["rim"]["thing"];
+    stable["rim_faction"] = (*lua_)["rim"]["faction"];
+    stable["events"] = (*lua_)["events"];
+    stable["data"] = (*lua_)["data"];
+    stable["ui"] = (*lua_)["ui"];
+    stable["log"] = (*lua_)["log"];
+    stable["game"] = (*lua_)["game"];
+    stable["timer"] = (*lua_)["timer"];
+    mod["stable"] = stable;
+
+    sol::table experimental = lua_->create_table();
+    experimental["anomaly"] = (*lua_)["anomaly"];
+    experimental["game_anomalies"] = (*lua_)["game"]["anomalies"];
+    experimental["rim_prefix"] = (*lua_)["rim"]["prefix"];
+    experimental["rim_postfix"] = (*lua_)["rim"]["postfix"];
+    experimental["rim_harmony"] = (*lua_)["rim"]["harmony"];
+    experimental["jobs"] = (*lua_)["jobs"];
+    experimental["path"] = (*lua_)["path"];
+    experimental["config"] = (*lua_)["config"];
+    experimental["health"] = (*lua_)["health"];
+    experimental["surgery"] = (*lua_)["surgery"];
+    experimental["building"] = (*lua_)["building"];
+    experimental["work"] = (*lua_)["work"];
+    experimental["world_api"] = (*lua_)["world_api"];
+    experimental["incident"] = (*lua_)["incident"];
+    experimental["audio"] = (*lua_)["audio"];
+    experimental["control"] = (*lua_)["control"];
+    mod["experimental"] = experimental;
+
+    // rk.strict_errors(true): every function raises a Lua error on failure (starting with its RK code) instead of
+    // logging and returning nil. Off by default for older mods. The newer kits always raise.
+    mod["strict_errors"] = [this](sol::optional<bool> on) {
+        if (on) {
+            strict_errors_ = *on;
+        }
+        return strict_errors_;
+    };
+    mod["assert_api"] = [this](int min_level) {
+        const int level = RIMKIT_API_LEVEL;
+        if (min_level > level) {
+            std::string msg = "RimKit api_level " + std::to_string(level) + " < required " + std::to_string(min_level);
+            if (callbacks_.log) {
+                callbacks_.log(("[error] " + msg).c_str());
+            }
+            throw std::runtime_error(msg);
+        }
+        return true;
+    };
+
+    sol::table package = (*lua_)["package"];
+    sol::table preload = package["preload"];
+    if (!preload.valid()) {
+        preload = lua_->create_table();
+        package["preload"] = preload;
+    }
+    preload["rimkit"] = [mod]() { return mod; };
+
+    if (callbacks_.log) {
+        const std::string msg = std::string("[RimKit] require(\"rimkit\") ready (version ") + RIMKIT_VERSION +
+                                ", api_level " + std::to_string(RIMKIT_API_LEVEL) + ")";
+        callbacks_.log(msg.c_str());
     }
 }
 
@@ -1020,7 +1347,7 @@ int Engine::job_call(const std::string& name, const std::string& phase, int pawn
         }
         sol::protected_function_result r = it->second.can_do(pawn);
         if (!r.valid()) {
-            log_lua_error("[RimLuaKit] job can_do " + name, r);
+            log_lua_error("[RimKit] job can_do " + name, r);
             return 2;
         }
         bool ok = true;
@@ -1041,7 +1368,7 @@ int Engine::job_call(const std::string& name, const std::string& phase, int pawn
         }
         sol::protected_function_result r = it->second.execute(pawn);
         if (!r.valid()) {
-            log_lua_error("[RimLuaKit] job execute " + name, r);
+            log_lua_error("[RimKit] job execute " + name, r);
             return 2;
         }
         bool done = false;
@@ -1060,14 +1387,40 @@ void Engine::wire_global_handlers() {
     if (!lua_) {
         return;
     }
-    auto wire = [this](const char* global_name, const char* event_name) {
-        sol::object o = (*lua_)[global_name];
-        if (o.is<sol::protected_function>()) {
-            event_handlers_[event_name].push_back(o.as<sol::protected_function>());
+    // Legacy file level handlers (on_pawn_died) are served through the canonical event with the old signature.
+    for (const aliases::GlobalAlias& g : aliases::table().globals) {
+        sol::object o = (*lua_)[g.from];
+        if (!o.is<sol::protected_function>()) {
+            continue;
         }
-    };
-    wire("on_pawn_spawned", "pawn_spawned");
-    wire("on_pawn_died", "pawn_died");
+        warn_deprecated(g.from, "events.on(\"" + g.event + "\", fn)");
+        add_event_handler(g.event, o.as<sol::protected_function>(), /*legacy_signature=*/true);
+    }
+}
+
+void Engine::emit_event_ex(const std::string& name, const std::string& payload_json) {
+    auto it = event_handlers_.find(name);
+    if (it == event_handlers_.end() || !ready_) {
+        return;
+    }
+    rimlua::json::Value root;
+    sol::object payload = sol::make_object(*lua_, sol::lua_nil);
+    if (rimlua::json::parse(payload_json, root)) {
+        payload = json_to_lua(root);
+    }
+    // Copy: a handler may call events.off while running.
+    const std::vector<ModFn> handlers = it->second;
+    for (const auto& cb : handlers) {
+        if (!mod_enabled(cb.mod)) {
+            continue;
+        }
+        ModScope scope(*this, cb.mod, PROF_EVENT);
+        sol::protected_function_result r = cb.fn(payload);
+        if (!r.valid()) {
+            log_lua_error("[RimKit] event " + name, r);
+            record_mod_error(cb.mod, "event " + name);
+        }
+    }
 }
 
 void Engine::emit_event(const std::string& name, int handle) {
@@ -1076,10 +1429,16 @@ void Engine::emit_event(const std::string& name, int handle) {
         return;
     }
     RimPawn pawn = wrap_pawn(handle);
-    for (auto& fn : it->second) {
-        sol::protected_function_result r = fn(pawn);
+    const std::vector<ModFn> handlers = it->second;
+    for (const auto& cb : handlers) {
+        if (!mod_enabled(cb.mod)) {
+            continue;
+        }
+        ModScope scope(*this, cb.mod, PROF_EVENT);
+        sol::protected_function_result r = cb.fn(pawn);
         if (!r.valid()) {
-            log_lua_error("[RimLuaKit] event " + name, r);
+            log_lua_error("[RimKit] event " + name, r);
+            record_mod_error(cb.mod, "event " + name);
         }
     }
 }

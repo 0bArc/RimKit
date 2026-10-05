@@ -4,9 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Verse;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Def writers under the owning mod.
     internal static class ApiDefsPlus

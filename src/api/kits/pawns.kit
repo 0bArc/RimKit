@@ -1,0 +1,90 @@
+# game.pawns core kit: skills, needs, traits, thoughts, relations, backstory, capacities, timetable, genes (docs/api/pawns.md).
+# Health, gear, social, mind and spawning live in the other pawn_*.kit files.
+
+@alias RimPawnRef RimPawn|RimEntity|integer
+
+@class RimSkill
+def: string SkillDef name, for example "Shooting"
+label: string Skill name shown to the player
+level: integer Skill level, 0 to 20
+passion: string None, Minor or Major
+xp: number XP gained since the last level
+xp_required: number XP needed for the next level
+disabled: boolean Whether the pawn cannot do the work
+
+@class RimNeed
+def: string Need def name
+label: string Need name shown to the player
+level: number 0 to 1
+
+@class RimTrait
+def: string Def name of the trait
+degree: integer Degree of the trait
+label: string Name shown to the player
+
+@class RimThought
+def: string Def name of the thought
+label: string Name shown to the player
+mood_offset: number Mood it adds or takes away
+
+@class RimMemory : RimThought
+age: integer Ticks
+other?: RimPawn The other pawn it is about
+
+@class RimRelation
+def: string PawnRelationDef name
+other: RimPawn The other pawn in the relation
+
+@class RimCapacity
+def: string Def name of the capacity
+level: number Capacity level, 1 is normal
+capable: boolean Whether the pawn is capable at all
+
+@class RimBackstory
+childhood?: string Childhood backstory def name
+childhood_title?: string Childhood backstory title
+adulthood?: string Adulthood backstory def name
+adulthood_title?: string Adulthood backstory title
+
+@class RimGene
+def: string Def name of the gene
+label: string Name shown to the player
+active: boolean Whether the gene is active
+xenogene: boolean Whether it is a xenogene, not a germline gene
+
+@class RimXenotype
+def?: string Xenotype def name
+label: string Xenotype name shown to the player
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+skills() -> RimSkill[] | Every skill with level, passion and experience.
+skill_info(skill: string) -> RimSkill | One skill by def name.
+set_passion(skill: string, passion: string) -> boolean | Sets None, Minor or Major passion.
+add_skill_xp(skill: string, amount: number, direct?: boolean) -> integer | Adds experience. Returns the level afterwards.
+needs() -> RimNeed[] | Every need with its level.
+need(def: string) -> number | One need level from 0 to 1.
+set_need(def: string, level: number) -> boolean | Sets a need level from 0 to 1.
+traits() -> RimTrait[] | The pawn's traits.
+has_trait(def: string, degree?: integer) -> boolean | Whether the pawn has a trait, optionally at a degree.
+add_trait(def: string, degree?: integer) -> boolean | Adds a trait. Default degree 0. An invalid degree raises RK1001.
+remove_trait(def: string) -> boolean | Removes a trait.
+thoughts() -> RimThought[] | Current mood thoughts with their offsets.
+memories() -> RimMemory[] | Memory thoughts with age and the other pawn.
+add_thought(def: string, other?: RimPawnRef) -> boolean | Gives the pawn a memory thought.
+remove_thought(def: string) -> boolean | Removes memories of a thought def.
+opinion_of(other: RimPawnRef) -> integer | The pawn's opinion of another pawn.
+relations() -> RimRelation[] | Direct relations such as Spouse and Bond.
+has_relation(def: string, other: RimPawnRef) -> boolean | Whether a direct relation exists.
+add_relation(def: string, other: RimPawnRef) -> boolean | Adds a direct relation.
+remove_relation(def: string, other: RimPawnRef) -> boolean | Removes a direct relation.
+backstory() -> RimBackstory | Childhood and adulthood backstories.
+set_backstory(slot: string, def: string) -> boolean | Sets the childhood or adulthood backstory.
+capacities() -> RimCapacity[] | Every capacity (Moving, Sight, ...) with its level.
+capacity(def: string) -> number | One capacity level.
+timetable() -> string[] | 24 assignment names, hour 0 first.
+set_assignment(hour: integer, def: string) -> boolean | Sets one timetable hour to Anything, Work, Joy, Sleep or Meditate.
+genes() -> RimGene[] | Biotech only. Raises RK3003 when the DLC is inactive.
+has_gene(def: string) -> boolean | Whether the pawn has a gene.
+add_gene(def: string, xenogene?: boolean) -> boolean | Adds a gene, as a xenogene when asked.
+remove_gene(def: string) -> boolean | Removes a gene.
+xenotype() -> RimXenotype | The pawn's xenotype.

@@ -1,0 +1,40 @@
+# Older ops that had no Lua function. They now have a documented surface. Optional map arguments default to the current map.
+
+@kit domain=buildings op=building subject=building:RimThingRef title="Buildings" page=things
+is_building() -> boolean | Whether the thing is a building.
+flickable() -> boolean | Whether the building has a power switch.
+room_role() -> string | Role of the room the building is in, empty when none.
+
+@kit domain=defs op=defs subject=none title="Defs" page=defs
+write_hediff(package_id: string, defName: string, label?: string, initialSeverity?: number) -> string | Writes a simple hediff def XML into the mod's Defs folder. Returns the file path.
+write_recipe(package_id: string, defName: string, label?: string, product?: string, count?: integer) -> string | Writes a simple recipe def XML into the mod's Defs folder. Returns the file path.
+mod_root(package_id: string) -> string | The root folder of a loaded mod.
+
+@kit domain=events op=events subject=none title="Events" page=events
+stats() -> { pending: integer, dropped: integer } | Events waiting for Lua and events dropped because the queue was full.
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+set_mental_state(def: string) -> boolean | Forces a mental state by def name. Prefer start_mental_state, which reports failure.
+clear_mental_state() -> boolean | Ends the current mental state.
+capable(capacity: string) -> boolean | Whether the pawn is capable of a capacity such as Moving or Manipulation.
+relations_count() -> integer | Number of direct relations.
+
+@kit domain=ui op=ui subject=none title="UI" page=ui
+close_panel() -> boolean | Closes the Lua panel window if one is open.
+
+@kit domain=util op=util subject=none title="Utilities" page=util
+mod_export_dir(package_id: string) -> string | The Export folder of a mod.
+
+@kit domain=inventory op=inventory subject=pawn:RimPawnRef title="Inventory" page=pawns
+count_def(def: string) -> integer | How many of a thing def the pawn carries.
+drop_carried() -> boolean | Drops what the pawn is carrying.
+
+@kit domain=weather op=world subject=none title="Weather" page=maps
+temperature(h?: RimMapRef, x?: integer, z?: integer) -> number | Temperature at a cell of a map, the map center when the cell is missing.
+
+@kit domain=maps op=map subject=none title="Maps" page=maps
+pawns_of_faction(faction: RimFactionRef, h?: RimMapRef) -> RimPawn[] | Pawns of a faction on a map.
+things_of_def_count(def: string, h?: RimMapRef) -> integer | How many things of a def are on a map.
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+mental_state() -> string | Def name of the current mental state, empty when sane. mental_info returns details.

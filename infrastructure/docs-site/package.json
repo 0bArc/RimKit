@@ -1,0 +1,17 @@
+{
+  "name": "rimkit-docs",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Custom Stratware-themed RimKit docs site",
+  "scripts": {
+    "build": "node build.js",
+    "build:rimkit": "node -e \"process.env.DOCS_BASE='/rimkit'; require('./build.js')\"",
+    "serve": "node serve.js",
+    "dev": "node serve.js --watch"
+  },
+  "dependencies": {
+    "highlight.js": "^11.11.1",
+    "marked": "^15.0.12",
+    "sanitize-html": "^2.18.0"
+  }
+}

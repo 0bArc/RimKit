@@ -1,0 +1,147 @@
+# Presentation kits: widgets, gizmos, tabs, designators, areas (P3-01 to P3-04).
+# Arguments typed as functions are Lua callbacks: the host calls them with a value and reads their result.
+
+@class RimWidgetNode | One node of a widget tree. type is column, row, label, button, checkbox, slider, text, dropdown, list, table, tabs, scroll, progress, image, space or separator.
+type: string Widget type: label, button, column, row, table and others
+id?: string Names the widget in events and state
+text?: string Text of the widget
+children?: RimWidgetNode[] Column and row
+gap?: number Space between children
+w?: number Fixed width inside a row
+h?: number Fixed height
+value?: any Initial value of checkbox, slider, text, dropdown, list selection
+min?: number Lowest value of a slider
+max?: number Highest value of a slider
+step?: number Step of a slider
+options?: (string|{ value: string, label: string })[] Dropdown
+items?: (string|{ id: string, label: string, tip?: string })[] List
+selected?: string List
+reorder?: boolean List: shift-drag items to reorder, reported as a reorder event
+columns?: { label: string, w?: number }[] Table
+rows?: any[][] Table cells are strings or nodes
+tabs?: { id: string, label: string, content: RimWidgetNode }[] Tabs
+child?: RimWidgetNode Scroll
+texture?: string Image texture path
+tip?: string Tooltip
+font?: string tiny, small or medium
+color?: string #rrggbb or a theme color: accent, good, warning, bad, muted
+align?: string left, center or right
+enabled?: boolean Whether the widget reacts
+multiline?: boolean Whether a text field takes several lines
+height?: number Height in pixels
+
+@class RimWidgetEvent
+window: integer Id of the window
+id?: string Id of the widget that raised it
+kind: string click, change, select, tab, reorder or close
+value?: any New value of the widget
+state: table<string, any> Current values of every input widget
+
+@class RimWidgetView
+state: table<string, any>
+window: integer Id of the window
+subject?: RimThing Inspect tabs: the selected thing
+
+@class RimWindowOptions
+width?: number Default 480
+height?: number Default 520
+refresh?: integer Frames between view calls, default 15
+pause?: boolean Whether the game pauses while it is open
+resizable?: boolean Whether the player can resize it
+
+@class RimWindowInfo
+id: integer Window id
+title: string Window title
+
+@class RimConfirmOptions
+yes_label?: string Text of the yes button
+no_label?: string Text of the no button
+
+@class RimTabOptions
+width?: number Width in pixels
+height?: number Height in pixels
+order?: number Position among tabs
+refresh?: integer Ticks between redraws of the view
+defs?: string[] Inspect tabs: thing def names
+target?: string Inspect tabs: pawn, building, item or plant
+
+@class RimColumnOptions
+width?: number Column width in pixels
+
+@class RimGizmoOptions
+label?: string Button text
+desc?: string Tooltip text
+icon?: string Texture path inside a mod's Textures folder
+hotkey?: string KeyBindingDef name
+target?: string pawn, colonist, building, item, plant, thing or any
+defs?: string[] Only things of these defs
+order?: number Position on the gizmo bar
+min?: number Slider
+max?: number Highest value of a slider
+step?: number Step of a slider
+
+@class RimGizmoInfo
+id: string Gizmo id
+kind: string action, toggle or slider
+label: string Name shown to the player
+target: string What it is shown on
+order: number Sort order, lower comes first
+
+@class RimToolOptions
+label?: string Button text
+desc?: string Tooltip text
+icon?: string Texture path inside the mod's Textures folder
+hotkey?: string KeyBindingDef name
+target?: string cell or thing
+drag?: string single or box
+color?: string Highlight color under the mouse
+category?: string Architect category to put the tool in, for example Orders
+
+@class RimToolInfo
+id: string Tool id
+label: string Name shown to the player
+target: string cell or thing
+drag: string single or box
+
+@class RimToolCell
+x: integer Cell x coordinate
+z: integer Cell z coordinate
+map: RimMap The map the tool is used on
+
+@kit domain=widgets op=widgets subject=none title="Widgets" page=widgets
+open(title: string, view: fun(view: RimWidgetView): RimWidgetNode, on_event?: fun(event: RimWidgetEvent), opts?: RimWindowOptions) -> integer | Opens a window. The view function returns a widget tree and is called again whenever the player interacts and every refresh interval. Returns the window id.
+close(id: integer) -> boolean | Closes a window.
+set_state(id: integer, key: string, value: any) -> boolean | Sets the value of an input widget by its id.
+state(id: integer) -> table<string, any> | The current values of the input widgets of a window.
+invalidate(id: integer) -> boolean | Makes the window call its view function on the next frame.
+windows() -> RimWindowInfo[] | Open Lua windows.
+confirm(text: string, on_yes: function, on_no?: function, opts?: RimConfirmOptions) -> boolean | A yes or no dialog.
+prompt(title: string, text: string, default: string, on_ok: fun(text: string), on_cancel?: function) -> boolean | A text input dialog.
+
+@kit domain=gizmos op=gizmo subject=none title="Gizmos" page=gizmos
+add(id: string, opts: RimGizmoOptions, on_click: fun(thing: RimThing), visible?: fun(thing: RimThing): boolean) -> string | Adds a button to the gizmo bar of matching things. With several things selected one click runs for each.
+add_toggle(id: string, opts: RimGizmoOptions, state: fun(thing: RimThing): boolean, on_toggle: fun(thing: RimThing), visible?: fun(thing: RimThing): boolean) -> string | Adds a toggle button.
+add_slider(id: string, opts: RimGizmoOptions, value: fun(thing: RimThing): number, on_change: fun(args: { value: number, thing: RimThing }), visible?: fun(thing: RimThing): boolean) -> string | Adds a slider.
+remove(id: string) -> boolean | Removes a gizmo.
+list() -> RimGizmoInfo[] | Lua gizmos.
+
+@kit domain=tabs op=tabs subject=none title="Tabs" page=tabs
+add_main(id: string, label: string, view: fun(view: RimWidgetView): RimWidgetNode, on_event?: fun(event: RimWidgetEvent), opts?: RimTabOptions) -> string | Adds a button to the main tab bar at the bottom of the screen, opening a widget view.
+add_inspect(id: string, label: string, view: fun(view: RimWidgetView): RimWidgetNode, on_event?: fun(event: RimWidgetEvent), opts?: RimTabOptions, visible?: fun(thing: RimThing): boolean) -> string | Adds an inspect tab next to Health and Needs for the defs or target in opts.
+add_column(table: string, id: string, label: string, cell: fun(pawn: RimPawn): string|{ text: string, color?: string, tip?: string }, sort?: fun(pawn: RimPawn): number, on_click?: fun(pawn: RimPawn), opts?: RimColumnOptions) -> string | Adds a column to a pawn table such as Work or Animals.
+remove(id: string) -> boolean | Removes a main tab, an inspect tab or a pawn column by the id it was added with. Main tabs and columns are hidden, because the game builds them from defs.
+pawn_tables() -> string[] | Pawn table def names.
+architect_categories() -> string[] | Architect category def names.
+
+@kit domain=designators op=designator subject=none title="Designators" page=designators
+add(id: string, opts: RimToolOptions, designate: fun(cell: RimToolCell), can_designate?: fun(cell: RimToolCell): boolean|string, on_finished?: function) -> string | Defines a click or drag tool. can_designate returns true, false or the reason it is not allowed. For thing tools the callbacks receive the thing.
+add_to_architect(id: string, category: string) -> boolean | Puts a tool in an architect category.
+remove(id: string) -> boolean | Removes a tool and takes it out of the architect menu.
+activate(id: string) -> boolean | Selects the tool as if the player clicked its button.
+list() -> RimToolInfo[] | Lua tools.
+
+@kit domain=areas op=area subject=map:RimMapRef title="Areas" page=designators
+create(label: string) -> boolean | Makes an allowed area. False when one with the label exists.
+set(label: string, x: integer, z: integer, value: boolean) -> boolean | Adds or removes a cell in an area.
+cells(label: string) -> RimCell[] | The cells of an area, at most 2000.
+remove(label: string) -> boolean | Deletes an area.

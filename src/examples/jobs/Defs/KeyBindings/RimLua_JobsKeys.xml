@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<Defs>
-  <KeyBindingDef>
-    <defName>RimLua_JobsOpenDebug</defName>
-    <label>Open Jobs Test debug / fun menu</label>
-    <category>Game</category>
-    <defaultKeyCodeA>F10</defaultKeyCodeA>
-  </KeyBindingDef>
-</Defs>

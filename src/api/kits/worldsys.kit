@@ -1,0 +1,190 @@
+# Generation, scenarios, plants, conditions, weather, saving (P2-08 to P2-12).
+
+@class RimTerrainInfo
+def: string Def name of the terrain
+label?: string Name shown to the player
+fertility: number Fertility
+path_cost: integer Cost of walking on it
+water: boolean Whether it is water
+smoothable: boolean Whether it can be smoothed
+affordances: string[] What can be built on it
+
+@class RimGenStep
+def: string Def name of the gen step
+order: number Order it runs in
+class?: string Name of the C# class that implements it
+
+@class RimWorldFeature
+name?: string Name shown on the world map
+def?: string Def name of the world feature
+id: integer Feature id
+max_draw_size: number Largest drawn size
+
+@class RimBaseGenOptions
+faction?: RimFaction Faction the base belongs to
+stuff?: string Wall material def name
+
+@class RimScenarioInfo
+def: string Def name of the scenario
+name?: string Scenario name
+summary?: string One line summary
+
+@class RimScenarioPart
+class: string Name of the C# class
+label?: string Name shown to the player
+def?: string Def name of the scenario part
+
+@class RimCurrentScenario
+name?: string Scenario name
+summary?: string One line summary
+description?: string Full description
+parts: RimScenarioPart[] The scenario's parts
+
+@class RimScenPartDef
+def: string Def name of the scen part
+label?: string Name shown to the player
+category: string Category of the part
+class?: string Name of the C# class that implements it
+
+@class RimPlantInfo
+def: string Def name of the plant
+growth: number 0 to 1
+stage: string Sowing, Growing or Mature
+harvestable: boolean Whether it can be harvested now
+yield: integer Amount a harvest gives
+grow_days: number Days to grow fully
+rate: number Growth rate now
+sown: boolean Whether a pawn sowed it
+dying: boolean Whether it is dying
+
+@class RimPlantDef
+def: string Def name of the plant
+label?: string Name shown to the player
+grow_days: number Days to grow fully
+fertility_min: number Lowest fertility it grows at
+fertility_sensitivity: number How much fertility changes growth
+harvest?: string Def name of what it gives
+yield: number Amount a harvest gives
+sowable: boolean Whether the player can sow it
+sow_work: number Work needed to sow
+
+@class RimCanGrow
+fertile: boolean Whether fertility is high enough
+terrain: boolean Whether the terrain allows it
+season: boolean Whether the season allows it
+free: boolean Whether the cell is free
+ok: boolean Whether it can grow there
+
+@class RimGrowingZone
+id: integer Id of the growing zone, to pass back to the functions that take one
+label?: string Name shown to the player
+plant?: string Plant def name set for the zone
+cells: integer How many cells the zone has
+sow: boolean Whether sowing is on
+
+@class RimConditionInfo
+def: string Def name of the condition
+label: string Name shown to the player
+permanent: boolean Whether it never ends
+ticks_left: integer -1 when permanent
+age: integer Ticks since it started
+
+@class RimConditionDef
+def: string Def name of the condition
+label?: string Name shown to the player
+temperature_offset: number Change to the temperature
+
+@class RimConditionOptions
+duration?: integer Ticks, default two days
+world?: boolean Start it on the whole world
+
+@class RimWeatherDef
+def: string Def name of the weather
+label?: string Name shown to the player
+rain: number Rain strength
+wind_factor: number Wind multiplier
+accuracy: number Shooting accuracy multiplier
+temperature_offset: number Change to the temperature
+
+@class RimSky
+glow: number Light level from 0 to 1
+wind: number Wind speed
+weather: string Weather def name
+last_weather: string Weather def name before the current one
+transition: number Progress of the change between weathers, 0 to 1
+outdoor_temperature: number Temperature outdoors now
+seasonal_temperature: number Average temperature for the season
+
+@class RimSeason
+season: string Season name: Spring, Summer, Fall or Winter
+label: string Name shown to the player
+year_percent: number How far through the year, 0 to 1
+day_of_season: integer Day of the season, from 0
+
+@class RimGameVersions
+running: string RimWorld version that is running
+loaded_save?: string The game version that wrote the save being played
+
+@class RimSaveFile
+name: string File name without the extension
+modified: string Time it was last saved
+bytes: integer Size in bytes
+
+@kit domain=generation op=generation subject=none title="Generation" page=generation
+terrains() -> RimTerrainInfo[] | Every terrain def with fertility and path cost.
+map_generators() -> string[] | Every map generator def name.
+map_steps(generator?: string) -> RimGenStep[] | Map generation steps, in order, optionally of one generator.
+world_steps() -> RimGenStep[] | World generation steps.
+features() -> RimWorldFeature[] | Named world features (mountain ranges, seas).
+rivers() -> string[] | Every river def.
+roads() -> string[] | Every road def.
+
+@kit domain=generation op=generation subject=map:RimMapRef title="Generation" page=generation
+base_gen(symbol: string, x: integer, z: integer, x2: integer, z2: integer, opts?: RimBaseGenOptions) -> boolean | Runs a base generation symbol (basePart_outdoors, ancientRuins, settlement, ...) on a rectangle.
+
+@kit domain=scenarios op=scenario subject=none title="Scenarios" page=generation
+list() -> RimScenarioInfo[] | Every scenario def.
+current() -> RimCurrentScenario | The scenario of the running game with its parts.
+part_defs() -> RimScenPartDef[] | Every scenario part def.
+disallowed_buildings() -> string[] | Buildings the game rules forbid.
+set_building_allowed(def: string, allowed: boolean) -> boolean | Allows or forbids a building in the game rules.
+
+@kit domain=plants op=plant subject=thing:RimThingRef title="Plants" page=plants
+info() -> RimPlantInfo | Growth, stage, yield and rate of a plant.
+set_growth(growth: number) -> number | Sets growth from 0 to 1.
+harvest() -> integer | Harvests a plant at once and drops its yield. Returns the amount.
+
+@kit domain=plants op=plant subject=map:RimMapRef title="Plants" page=plants
+can_grow(def: string, x: integer, z: integer) -> RimCanGrow | Whether a plant can grow on a cell, and what blocks it.
+sow(def: string, x: integer, z: integer, growth?: number) -> RimThing | Plants a plant at once.
+fertility(x: integer, z: integer) -> number | Soil fertility of a cell.
+zones() -> RimGrowingZone[] | Growing zones.
+set_zone_plant(id: integer, def: string) -> string | Changes what a growing zone grows.
+
+@kit domain=plants op=plant subject=none title="Plants" page=plants
+defs() -> RimPlantDef[] | Every plant def.
+
+@kit domain=conditions op=condition subject=none title="Game conditions" page=conditions
+list(h?: RimMapRef) -> RimConditionInfo[] | Active game conditions on a map, or on the world when no map is loaded.
+defs() -> RimConditionDef[] | Every game condition def.
+start(def: string, opts?: RimConditionOptions, h?: RimMapRef) -> boolean | Starts a game condition such as ColdSnap or HeatWave.
+stop(def: string, h?: RimMapRef) -> integer | Ends a game condition. Returns how many were ended.
+temperature_offset(h?: RimMapRef) -> number | Total temperature offset from active conditions.
+
+@kit domain=weather op=weather subject=none title="Weather" page=conditions
+defs() -> RimWeatherDef[] | Every weather def.
+sky(h?: RimMapRef) -> RimSky | Light, wind, weather transition and temperature of a map.
+season(h?: RimMapRef) -> RimSeason | Season and how far into the year the map is.
+
+@kit domain=save op=save subject=none title="Saving" page=save
+get(package_id: string, scope: string, key: string, h?: RimMapRef) -> string? | Raw string stored by a mod. Scope is game, map or world. Prefer fetch.
+set(package_id: string, scope: string, key: string, value: string, h?: RimMapRef) -> boolean | Stores a raw string in the save. Prefer put.
+remove(package_id: string, scope: string, key: string, h?: RimMapRef) -> boolean | Removes a stored value.
+keys(package_id: string, scope: string, h?: RimMapRef) -> string[] | The keys a mod stored in a scope.
+version(package_id: string) -> integer | The data version a mod last wrote into this save, 0 when none.
+set_version(package_id: string, version: integer) -> integer | Records the data version of a mod in this save.
+game_version() -> RimGameVersions | The running game version and the version that wrote the loaded save.
+autosave_interval() -> number | Days between autosaves.
+set_autosave_interval(days: number) -> number | Sets the autosave interval, 0.125 to 14 days.
+now(name?: string) -> string | Saves the game under a name and returns the name.
+files() -> RimSaveFile[] | Saved games on disk.

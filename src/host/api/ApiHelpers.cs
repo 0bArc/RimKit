@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Text;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class ApiHelpers
     {
@@ -70,5 +70,11 @@ namespace RimLuaKit
         }
 
         public static string Err(string msg) => "{\"ok\":false,\"e\":" + JsonLite.Quote(msg ?? "") + "}";
+
+        /// <summary>Structured result. The JSON is decoded to Lua tables, with handles wrapped as RimPawn and friends.</summary>
+        public static string OkJson(string json) => "{\"ok\":true,\"t\":\"j\",\"v\":" + json + "}";
+
+        /// <summary>Error with a stable RKS code (see docs/standard/rks.md).</summary>
+        public static string Fail(string code, string message) => Err(code + ": " + message);
     }
 }

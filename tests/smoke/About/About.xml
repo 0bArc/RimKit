@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>RimKit Smoke Test</name>
+  <author>RimKit</author>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <packageId>stratware.rimkit_smoke</packageId>
+  <description>Temporary smoke test for the RimKit hook and reflection API. Safe to delete.</description>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+    </li>
+    <li>
+      <packageId>stratware.rimkit</packageId>
+      <displayName>RimKit</displayName>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+    <li>stratware.rimkit</li>
+  </loadAfter>
+</ModMetaData>

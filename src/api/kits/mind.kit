@@ -1,0 +1,47 @@
+# game.pawns mind (P1-09): mental states, break thresholds, inspirations, drugs.
+
+@class RimMentalState
+def: string Def name of the mental state
+label: string Name shown to the player
+age_ticks: integer Ticks since it began
+caused_by_mood: boolean Whether low mood caused it
+aggro: boolean Whether the pawn attacks others
+category: string Category it is listed under
+
+@class RimMentalStateDef
+def: string Def name of the mental state
+category: string Category it is listed under
+aggro: boolean Whether the pawn attacks others
+recoverable: boolean Whether the pawn recovers by themselves
+
+@class RimBreakThresholds
+minor: number Mood below this can cause a minor break
+major: number Mood below which a major break can happen
+extreme: number Mood below which an extreme break can happen
+can_break: boolean Whether the pawn can have mental breaks
+mood: number Current mood from 0 to 1
+
+@class RimMindSummary
+in_mental_state: boolean Whether the pawn is in a mental break
+inspired: boolean Whether the pawn is inspired
+mood?: number Mood from 0 to 1
+memories?: integer How many memories the pawn has
+mental_state?: string Def name of the current mental state
+inspiration?: string Def name of the current inspiration
+
+@class RimInspirationInfo
+def: string Def name of the inspiration
+label: string Name shown to the player
+age_ticks: integer Ticks since it began
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+mental_info() -> RimMentalState? | The pawn current mental state with details, nil when sane.
+start_mental_state(def: string, reason?: string) -> boolean | Forces a mental state such as Berserk or Wander_Sad. False when the game refuses.
+stop_mental_state() -> boolean | Ends the current mental state. False when there was none.
+mental_state_defs!() -> RimMentalStateDef[] | Every mental state def.
+break_thresholds() -> RimBreakThresholds | Mood levels at which minor, major and extreme breaks start.
+mind_summary() -> RimMindSummary | Mood, mental state and inspiration in one call.
+inspiration() -> RimInspirationInfo? | The pawn's current inspiration.
+give_inspiration(def: string) -> boolean | Starts an inspiration such as Inspired_Creativity.
+end_inspiration() -> boolean | Ends the current inspiration.
+use_drug(def: string) -> boolean | Makes the pawn take one unit of a drug def with all its effects and tolerance changes.

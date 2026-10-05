@@ -4,58 +4,13 @@ using System.Linq;
 using HarmonyLib;
 using RimWorld;
 using UnityEngine;
+using RimLuaKit;
 using Verse;
 using Verse.AI;
 using Verse.AI.Group;
 
-namespace RimLuaKit
+namespace RimKit
 {
-    // Saves which pawns we made draftable (hediff + this component).
-    public class GameComponent_PawnControl : GameComponent
-    {
-        public List<int> ControlledIds = new List<int>();
-
-        public GameComponent_PawnControl(Game game)
-        {
-        }
-
-        public override void ExposeData()
-        {
-            base.ExposeData();
-            Scribe_Collections.Look(ref ControlledIds, "rimlua_controlled_pawns", LookMode.Value);
-            ControlledIds ??= new List<int>();
-        }
-
-        public override void FinalizeInit()
-        {
-            base.FinalizeInit();
-            PawnControl.RestoreFromSave(ControlledIds);
-        }
-
-        public static GameComponent_PawnControl GetOrCreate()
-        {
-            Game g = Current.Game;
-            if (g == null)
-            {
-                return null;
-            }
-
-            var c = g.GetComponent<GameComponent_PawnControl>();
-            if (c == null)
-            {
-                c = new GameComponent_PawnControl(g);
-                g.components.Add(c);
-            }
-
-            return c;
-        }
-
-        public void WriteIds(HashSet<int> ids)
-        {
-            ControlledIds = ids.ToList();
-        }
-    }
-
     // Draft/control for non-humanlike pawns (entities, etc.).
     internal static class PawnControl
     {
@@ -230,9 +185,12 @@ namespace RimLuaKit
                 return markerDef;
             }
 
+            // Normally loaded from Defs/HediffDefs/RimLua_Controllable.xml, so it exists before any save loads.
+            // The code definition below is only a fallback for a build shipped without the XML.
             markerDef = DefDatabase<HediffDef>.GetNamedSilentFail("RimLua_Controllable");
             if (markerDef == null)
             {
+                Log.Warning("[RimKit] RimLua_Controllable is missing from Defs, creating it at runtime. Saves that already contain it may show null def errors once.");
                 markerDef = new HediffDef
                 {
                     defName = "RimLua_Controllable",
@@ -398,18 +356,23 @@ namespace RimLuaKit
                 return false;
             }
 
+            if (!Engage.Enabled || Engage.Disabled.Contains(pawn.thingIDNumber))
+            {
+                return false;
+            }
+
             if (IsCastingOrWarming(pawn))
             {
                 return false;
             }
 
             EnsureDrafter(pawn);
-            if (pawn.drafter != null && !pawn.drafter.Drafted)
+            if (Engage.AutoDraft && pawn.drafter != null && !pawn.drafter.Drafted)
             {
                 pawn.drafter.Drafted = true;
             }
 
-            Thing hostile = FindHostileTarget(pawn, 55f);
+            Thing hostile = FindHostileTarget(pawn, Engage.Range);
             if (hostile == null)
             {
                 return false;
@@ -473,8 +436,13 @@ namespace RimLuaKit
 
         public static Job BuildEngageJob(Pawn pawn)
         {
-            Thing hostile = FindHostileTarget(pawn, 55f);
-            if (hostile == null || pawn == null)
+            if (pawn == null || pawn.Downed || pawn.Dead || !pawn.Spawned)
+            {
+                return null;
+            }
+
+            Thing hostile = FindHostileTarget(pawn, Engage.Range);
+            if (hostile == null)
             {
                 return null;
             }
@@ -516,7 +484,7 @@ namespace RimLuaKit
                 }
             }
 
-            if (dist <= 14f)
+            if (dist <= Engage.MeleeRange)
             {
                 return JobMaker.MakeJob(JobDefOf.AttackMelee, hostile);
             }
@@ -558,7 +526,7 @@ namespace RimLuaKit
             for (int i = 0; i < sel.Count; i++)
             {
                 Pawn p = sel[i];
-                if (p == null || !IsControlled(p) || p.drafter == null || !p.Drafted)
+                if (p == null || !IsControlled(p) || p.drafter == null || !p.Drafted || p.Downed || p.Dead || !p.Spawned)
                 {
                     continue;
                 }
@@ -629,7 +597,7 @@ namespace RimLuaKit
                 return;
             }
 
-            if ((Find.TickManager.TicksGame + __instance.thingIDNumber) % 20 != 0)
+            if ((Find.TickManager.TicksGame + __instance.thingIDNumber) % Engage.Interval != 0)
             {
                 return;
             }
@@ -658,6 +626,15 @@ namespace RimLuaKit
                 return;
             }
 
+            // A pawn that went down mid attack must stop the order we gave it.
+            if (__instance.Downed && __instance.CurJob != null &&
+                (__instance.CurJob.def == JobDefOf.AttackMelee || __instance.CurJob.def == JobDefOf.AttackStatic ||
+                 __instance.CurJob.def == JobDefOf.Goto))
+            {
+                __instance.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                return;
+            }
+
             PawnControl.TryEngage(__instance);
         }
     }
@@ -669,6 +646,13 @@ namespace RimLuaKit
         {
             Pawn pawn = Traverse.Create(__instance).Field("pawn").GetValue<Pawn>();
             if (pawn == null || !PawnControl.IsControlled(pawn))
+            {
+                return true;
+            }
+
+            // A downed, dead or unspawned pawn must get vanilla jobs. Giving it an attack or move job makes the
+            // pather log "tried to path while downed".
+            if (pawn.Downed || pawn.Dead || !pawn.Spawned)
             {
                 return true;
             }
@@ -850,5 +834,16 @@ namespace RimLuaKit
             PawnControl.OrderSelectedToCell(cell);
             Event.current.Use();
         }
+    }
+
+    // How recruited and controlled pawns pick fights. Lua tunes it with game.anomaly.engagement and set_engagement (P5-04).
+    internal static class Engage
+    {
+        public static bool Enabled = true;
+        public static float Range = 55f;          // how far a pawn looks for a hostile
+        public static int Interval = 20;          // ticks between checks
+        public static bool AutoDraft = true;      // draft a controlled pawn so it can fight
+        public static float MeleeRange = 14f;     // closer than this it charges in, farther it uses abilities or ranged attacks
+        public static readonly HashSet<int> Disabled = new HashSet<int>();
     }
 }

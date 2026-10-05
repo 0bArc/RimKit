@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using HarmonyLib;
 using RimWorld;
+using RimLuaKit;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
     [StaticConstructorOnStartup]
     public static class HostMain
@@ -20,11 +22,11 @@ namespace RimLuaKit
                 EnsureNativePath();
                 var harmony = new Harmony(HarmonyId);
                 HarmonyBridge.Init(harmony);
+                EventCatalog.Init(harmony);
                 harmony.PatchAll();
 
                 BindCallbacksAndInit();
                 // Wait until play + auth.
-                BrandOptionsCategory();
                 RunStartupAuthCheck();
                 Log.Message("[RimKit] Host assembled. Waiting for play + builtin pAuth gate.");
             }
@@ -52,22 +54,6 @@ namespace RimLuaKit
             catch (Exception e)
             {
                 Log.Error("[RimKit] startup pAuth check failed: " + e.Message);
-            }
-        }
-
-        private static void BrandOptionsCategory()
-        {
-            try
-            {
-                OptionCategoryDef mods = DefDatabase<OptionCategoryDef>.GetNamedSilentFail("Mods");
-                if (mods != null)
-                {
-                    mods.label = "RimKit";
-                }
-            }
-            catch (Exception e)
-            {
-                Log.Warning("[RimKit] could not brand Options category: " + e.Message);
             }
         }
 
@@ -112,7 +98,7 @@ namespace RimLuaKit
 
         private static void BindCallbacksAndInit()
         {
-            NativeAbi.KeepLog = msg => Log.Message("[RimLua] " + NativeAbi.ReadCString(msg));
+            NativeAbi.KeepLog = msg => Log.Message("[Lua] " + NativeAbi.ReadCString(msg));
             NativeAbi.KeepMessage = msg =>
             {
                 string text = NativeAbi.ReadCString(msg);
@@ -125,12 +111,12 @@ namespace RimLuaKit
                     }
                     else
                     {
-                        Log.Message("[RimLua][msg] " + text);
+                        Log.Message("[RimKit][msg] " + text);
                     }
                 }
                 catch (Exception e)
                 {
-                    Log.Message("[RimLua][msg] " + text + " (fallback: " + e.GetType().Name + ")");
+                    Log.Message("[RimKit][msg] " + text + " (fallback: " + e.GetType().Name + ")");
                 }
             };
             NativeAbi.KeepRegister = HarmonyBridge.RegisterHook;
@@ -162,6 +148,19 @@ namespace RimLuaKit
                 host_free = Marshal.GetFunctionPointerForDelegate(NativeAbi.KeepFree)
             };
 
+            // Host and native are built from one version file. A mismatch means a stale DLL was copied.
+            string nativeVersion = NativeAbi.NativeVersion();
+            if (nativeVersion != RimKitVersion.Version)
+            {
+                Log.Error("[RimKit] version mismatch: host " + RimKitVersion.Version + " but native core " +
+                          (string.IsNullOrEmpty(nativeVersion) ? "unknown" : nativeVersion) +
+                          ". Reinstall RimKit so both files come from the same build.");
+            }
+            else
+            {
+                Log.Message("[RimKit] version " + RimKitVersion.Version + " (api_level " + RimKitVersion.ApiLevel + ")");
+            }
+
             int rc = NativeAbi.rimlua_init(ref cb);
             if (rc != 0)
             {
@@ -171,6 +170,20 @@ namespace RimLuaKit
 
         internal static void TryLoadLuaModsGated()
         {
+            if (SafeMode.IsActive(out string safeReason))
+            {
+                Log.Warning("[RimKit] SAFE MODE: no Lua will run (" + safeReason + "). Remove it to run Lua mods again.");
+                try
+                {
+                    Messages.Message("[RimKit] Safe mode is on: Lua mods are not running.", MessageTypeDefOf.CautionInput, false);
+                }
+                catch (Exception)
+                {
+                }
+
+                return;
+            }
+
             if (!PAuthProbe.AllowLuaLoad(out string reason))
             {
                 string shortReason = reason ?? "unauthorized";
@@ -203,6 +216,31 @@ namespace RimLuaKit
             LoadAllLuaMods();
         }
 
+        // Lua/ folders of a mod, oldest folder first. A mod with LoadFolders.xml can keep a Lua/ in each version folder.
+        private static List<string> LuaFolders(ModContentPack pack)
+        {
+            var dirs = new List<string>();
+            try
+            {
+                var field = HarmonyLib.AccessTools.Field(typeof(ModContentPack), "foldersToLoadDescendingOrder");
+                if (field?.GetValue(pack) is List<string> folders)
+                {
+                    for (int i = folders.Count - 1; i >= 0; i--)
+                    {
+                        string d = Path.Combine(folders[i], "Lua");
+                        if (Directory.Exists(d) && !dirs.Contains(d)) dirs.Add(d);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            string root = Path.Combine(pack.RootDir, "Lua");
+            if (dirs.Count == 0 && Directory.Exists(root)) dirs.Add(root);
+            return dirs;
+        }
+
         private static void LoadAllLuaMods()
         {
             int loaded = 0;
@@ -214,8 +252,8 @@ namespace RimLuaKit
                     continue;
                 }
 
-                string luaDir = Path.Combine(pack.RootDir, "Lua");
-                if (!Directory.Exists(luaDir))
+                List<string> luaDirs = LuaFolders(pack);
+                if (luaDirs.Count == 0)
                 {
                     continue;
                 }
@@ -223,12 +261,24 @@ namespace RimLuaKit
                 if (LuaThreatScanner.IsQuarantined(pack.PackageId))
                 {
                     skipped++;
-                    Log.Warning("[RimKit] Quarantined Lua skipped: " + pack.PackageId + " -> " + luaDir);
+                    Log.Warning("[RimKit] Quarantined Lua skipped: " + pack.PackageId + " -> " + luaDirs[0]);
                     continue;
                 }
 
-                Log.Message("[RimKit] Loading Lua from " + pack.PackageId + " -> " + luaDir);
-                NativeAbi.rimlua_load_directory(luaDir);
+                NativeAbi.rimlua_set_mod_context(pack.PackageId);
+                try
+                {
+                    foreach (string luaDir in luaDirs)
+                    {
+                        Log.Message("[RimKit] Loading Lua from " + pack.PackageId + " -> " + luaDir);
+                        NativeAbi.rimlua_load_directory(luaDir);
+                    }
+                }
+                finally
+                {
+                    NativeAbi.rimlua_set_mod_context(null);
+                }
+
                 loaded++;
             }
 
@@ -264,7 +314,11 @@ namespace RimLuaKit
             listing.End();
 
             UnityEngine.Rect rest = new UnityEngine.Rect(inRect.x, inRect.y + topH + 8f, inRect.width, inRect.height - topH - 8f);
-            LuaConfigBridge.DrawSettings(rest);
+            // Pages that Lua mods define with game.options.page appear as tabs. The general page is the one below.
+            if (!OptionsPages.Draw(rest, out UnityEngine.Rect general))
+            {
+                LuaConfigBridge.DrawSettings(general);
+            }
             base.DoSettingsWindowContents(inRect);
         }
 

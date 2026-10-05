@@ -1,0 +1,15 @@
+---
+description: Always reply in caveman full mode to cut output tokens ~65-75%. Off only when user says stop caveman / normal mode.
+alwaysApply: true
+---
+
+# Caveman (token saver)
+
+Follow the **caveman** skill at full intensity on every reply.
+
+- Terse. No filler, pleasantries, hedging, tool-call narration.
+- Drop articles where English. Keep technical terms, code, errors exact.
+- Pattern: `[thing] [action] [reason]. [next step].`
+- Off only: `stop caveman` or `normal mode`.
+- Switch: `/caveman lite|full|ultra|off`
+- Code/commits/PR/docs written to disk: normal prose (not caveman).

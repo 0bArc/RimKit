@@ -1,0 +1,52 @@
+-- Run with: rimkit mod test src/examples/SmartPause
+local t = game.test
+
+local function setup(setting)
+  t.mock("ui.translate", function(a) return a.key end)
+  t.mock("config.get", setting)
+  t.mock("time.paused", false)
+  t.mock("time.set_paused", true)
+  t.mock("ui.message", true)
+  t.mock("pawn.is_colonist", true)
+end
+
+t.describe("SmartPause", function()
+  t.it("pauses when a raid arrives", function()
+    setup("true")
+    t.start()
+    t.emit("incident.fired", { incident = "RaidEnemy", success = true })
+    t.expect(#t.calls("time.set_paused")).to_be(1)
+    t.expect(t.calls("time.set_paused")[1].args.paused).to_be(true)
+  end)
+
+  t.it("ignores other incidents and failed raids", function()
+    setup("true")
+    t.start()
+    t.emit("incident.fired", { incident = "TraderCaravanArrival", success = true })
+    t.emit("incident.fired", { incident = "RaidEnemy", success = false })
+    t.expect(#t.calls("time.set_paused")).to_be(0)
+  end)
+
+  t.it("does nothing when the player turned the trigger off", function()
+    setup("false")
+    t.start()
+    t.emit("incident.fired", { incident = "RaidEnemy", success = true })
+    t.expect(#t.calls("time.set_paused")).to_be(0)
+  end)
+
+  t.it("does not pause twice", function()
+    setup("true")
+    t.mock("time.paused", true)
+    t.start()
+    t.emit("research.finished", { project = "Smithing" })
+    t.expect(#t.calls("time.set_paused")).to_be(0)
+  end)
+
+  t.it("pauses for a colonist who is down", function()
+    setup("true")
+    t.start()
+    t.mock("pawn.name", "Ana")
+    t.emit("pawn.downed", { pawn = rim.wrap(5) })
+    t.expect(#t.calls("time.set_paused")).to_be(1)
+  end)
+end)

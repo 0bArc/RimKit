@@ -5,9 +5,9 @@ using HarmonyLib;
 using RimWorld;
 using Verse;
 using Verse.AI;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Anomaly ops for Lua (menus are authored in Lua).
     internal static class ApiAnomaly
@@ -17,6 +17,7 @@ namespace RimLuaKit
             ApiRegistry.Register("anomaly.dlc_active", DlcActive, "gameplay");
             ApiRegistry.Register("anomaly.is_entity", IsEntity, "gameplay");
             ApiRegistry.Register("anomaly.list_on_map", ListOnMap, "gameplay");
+            ApiRegistry.Register("anomaly.get_on_map", GetOnMap, "gameplay");
             ApiRegistry.Register("anomaly.try_set_faction_player", TrySetFactionPlayer, "gameplay");
             ApiRegistry.Register("anomaly.release_to_hostile", ReleaseToHostile, "gameplay");
             ApiRegistry.Register("anomaly.knock_out", KnockOut, "gameplay");
@@ -106,6 +107,8 @@ namespace RimLuaKit
             if (!AnomalyActive()) return Err("Anomaly DLC not active");
             Pawn p = PawnOf(args);
             if (p == null) return Err("no pawn");
+            // Only pawns we control can be released. A wild or foreign entity is left alone.
+            if (!PawnControl.IsControlled(p)) return OkBool(false);
             PawnControl.ReleaseControl(p);
             Faction hostile = Find.FactionManager?.RandomEnemyFaction(allowHidden: true, allowDefeated: false, allowNonHumanlike: true)
                               ?? Faction.OfAncientsHostile;
@@ -123,7 +126,8 @@ namespace RimLuaKit
             Hediff h = HediffMaker.MakeHediff(anes, p);
             h.Severity = args.ContainsKey("severity") ? Float(args, "severity") : 1f;
             p.health.AddHediff(h);
-            return OkBool(p.Downed || true);
+            // Report the real outcome: the hediff is on the pawn.
+            return OkBool(p.health.hediffSet.HasHediff(anes));
         }
 
         private static string FindPlatform(Dictionary<string, string> args)
@@ -166,10 +170,36 @@ namespace RimLuaKit
             {
                 foreach (Pawn p in map.mapPawns.AllPawns)
                 {
-                    if (p != null && LooksLikeEntity(p)) list.Add(p);
+                    if (p != null && !p.Dead && LooksLikeEntity(p)) list.Add(p);
                 }
             }
             return OkHandles(list);
+        }
+
+        // Match order: PawnKindDef.defName, ThingDef.defName, then labels (case-sensitive).
+        private static bool MatchesEntityName(Pawn p, string name)
+        {
+            if (p == null || string.IsNullOrEmpty(name)) return false;
+            if (p.kindDef?.defName == name) return true;
+            if (p.def?.defName == name) return true;
+            if (p.kindDef?.label == name) return true;
+            if (p.def?.label == name) return true;
+            return false;
+        }
+
+        private static string GetOnMap(Dictionary<string, string> args)
+        {
+            string name = Str(args, "name");
+            if (string.IsNullOrEmpty(name)) name = Str(args, "v");
+            if (string.IsNullOrEmpty(name)) return Err("need name=");
+            Map map = MapOf(args) ?? Find.CurrentMap;
+            if (map?.mapPawns?.AllPawns == null) return OkInt(0);
+            foreach (Pawn p in map.mapPawns.AllPawns)
+            {
+                if (p == null || p.Dead || !LooksLikeEntity(p)) continue;
+                if (MatchesEntityName(p, name)) return OkHandle(p);
+            }
+            return OkInt(0);
         }
     }
 

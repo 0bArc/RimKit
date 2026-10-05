@@ -2,34 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using RimLuaKit;
 using Verse;
 
-namespace RimLuaKit
+namespace RimKit
 {
-    public class RimLuaSettings : ModSettings
-    {
-        public Dictionary<string, bool> Bools = new Dictionary<string, bool>();
-        public Dictionary<string, float> Floats = new Dictionary<string, float>();
-        public Dictionary<string, string> Strings = new Dictionary<string, string>();
-
-        public override void ExposeData()
-        {
-            base.ExposeData();
-            Scribe_Collections.Look(ref Bools, "bools", LookMode.Value, LookMode.Value);
-            Scribe_Collections.Look(ref Floats, "floats", LookMode.Value, LookMode.Value);
-            Scribe_Collections.Look(ref Strings, "strings", LookMode.Value, LookMode.Value);
-            Bools ??= new Dictionary<string, bool>();
-            Floats ??= new Dictionary<string, float>();
-            Strings ??= new Dictionary<string, string>();
-        }
-    }
-
     internal sealed class ConfigEntry
     {
         public string Key;
         public string Type; // bool | float | string
         public string Label;
         public string DefaultValue;
+        public bool Hidden;   // belongs to an options page, so the general page does not list it
     }
 
     internal static class LuaConfigBridge
@@ -37,7 +21,7 @@ namespace RimLuaKit
         public static RimLuaSettings Settings;
         public static readonly List<ConfigEntry> Entries = new List<ConfigEntry>();
 
-        public static void Register(string key, string type, string label, string defaultValue)
+        public static void Register(string key, string type, string label, string defaultValue, bool hidden = false)
         {
             if (string.IsNullOrEmpty(key))
             {
@@ -50,7 +34,8 @@ namespace RimLuaKit
                 Key = key,
                 Type = string.IsNullOrEmpty(type) ? "bool" : type,
                 Label = string.IsNullOrEmpty(label) ? key : label,
-                DefaultValue = defaultValue ?? ""
+                DefaultValue = defaultValue ?? "",
+                Hidden = hidden,
             });
 
             EnsureDefault(key, type, defaultValue);
@@ -96,7 +81,19 @@ namespace RimLuaKit
                 return "";
             }
 
-            if (Settings.Bools.TryGetValue(key, out bool b))
+            // A registered key reads from the store of its declared type, so an old value of another type cannot shadow it.
+            string declared = Entries.Find(e => e.Key == key)?.Type?.ToLowerInvariant();
+            if (declared == "float" && Settings.Floats.TryGetValue(key, out float df))
+            {
+                return df.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            if (declared == "string" && Settings.Strings.TryGetValue(key, out string ds))
+            {
+                return ds ?? "";
+            }
+
+            if (Settings.Bools.TryGetValue(key, out bool b) && declared != "float" && declared != "string")
             {
                 return b ? "true" : "false";
             }
@@ -167,6 +164,7 @@ namespace RimLuaKit
 
             foreach (ConfigEntry e in Entries)
             {
+                if (e.Hidden) continue;
                 if (e.Type == "float")
                 {
                     float v = Settings != null && Settings.Floats.TryGetValue(e.Key, out float f) ? f : 0f;

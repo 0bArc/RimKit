@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Deny OS / process / filesystem through Lua host ops. C# Assemblies/*.dll are unrestricted.
     internal static class LuaSandbox

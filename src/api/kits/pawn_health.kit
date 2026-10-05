@@ -1,0 +1,56 @@
+# game.pawns health (P1-05). Part arguments are the index from game.pawns.body_parts.
+
+
+@class RimHediffInfo
+def: string Def name of the hediff
+label: string Name shown to the player
+severity: number Severity from 0 up to the maximum
+bleeding: number Bleed rate
+injury: boolean Whether it is an injury
+permanent: boolean Whether it is permanent
+tended: boolean Whether it was tended
+tendable: boolean Whether it can be tended
+visible: boolean Whether it shows in the health tab
+age_ticks: integer How many ticks old it is
+stage?: string Current stage label
+part?: integer Body part index
+part_label?: string Name of the body part it is on
+comps?: string[] Class names of the hediff comps
+
+@class RimBodyPart
+index: integer Index of the part, to pass to the part functions
+def: string Def name of the body part
+label: string Name shown to the player
+missing: boolean Whether the part is missing
+hp: number Current hit points
+max_hp: number Maximum hit points
+coverage: number Share of the body it covers
+depth: string Depth: Outside, Inside or Undefined
+
+@class RimHealthSummary
+health: number 0 to 1
+pain: number Total pain
+bleed_rate: number Total bleeding
+downed: boolean Whether the pawn is downed
+dead: boolean Whether the pawn is dead
+in_pain_shock: boolean Whether the pawn is in pain shock
+hediffs: integer How many hediffs the pawn has
+
+@class RimSurgeryInfo
+def: string Def name of the surgery
+label: string Name shown to the player
+available: boolean Whether it can be queued now
+on_body_part: boolean Whether it is done on a body part
+
+@kit domain=pawns op=pawn subject=pawn:RimPawnRef title="Pawns" page=pawns
+hediff_list() -> RimHediffInfo[] | Every hediff on the pawn with severity, part, tending and comps.
+injuries() -> RimHediffInfo[] | Only the injuries.
+body_parts() -> RimBodyPart[] | Every body part with current and maximum hit points.
+damage_part(amount: number, damage_def?: string, part?: integer) -> number | Deals damage to a part (whole body when part is nil). Damage def defaults to Cut. Returns the health fraction left.
+heal_injuries(permanent?: boolean) -> integer | Removes injuries. Pass true to include permanent ones. Returns how many.
+restore_part(part: integer) -> boolean | Regrows a missing part.
+remove_part(part: integer) -> boolean | Makes a part missing. False when it already was.
+add_hediff_on_part(def: string, part?: integer, severity?: number) -> boolean | Adds a hediff to a part, restoring the part first when it is missing. Use it for prosthetics.
+immunity(def: string) -> number | Immunity level against a disease hediff, 0 to 1.
+health_summary() -> RimHealthSummary | Health, pain, bleeding and downed state in one call.
+surgeries() -> RimSurgeryInfo[] | Surgery recipes this pawn kind can receive.

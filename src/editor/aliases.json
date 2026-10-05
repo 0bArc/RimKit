@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "removed_in": "1.0.0",
+  "note": "Single source for UNC names. Read by rimlua_core (runtime warnings), rimkit migrate and the VS Code extension. A name 'old>new' renames, 'old>domain.name' moves to another domain under game. deprecate=false only adds the canonical name.",
+  "groups": [
+    { "from": "rim.pawn", "to": "game.pawns", "names": ["is_humanlike", "is_colonist", "is_prisoner", "is_slave", "is_downed", "is_dead", "faction_is_player", "name", "gender", "age", "kind", "map", "hunger", "hunger_pct>hunger", "rest", "recreation", "mood", "set_hunger", "set_rest", "health_pct>health_ratio", "kill", "drafted", "set_drafted", "equipment", "apparel", "inventory", "carry", "give_hediff", "remove_hediff", "hediffs", "skill", "set_skill", "give_thing", "strip", "job_def", "end_job"] },
+    { "from": "pawn", "to": "game.pawns", "names": ["make_controllable", "release_control", "is_controllable"] },
+    { "from": "health", "to": "game.pawns", "names": ["has_hediff", "hediff_severity", "set_hediff_severity", "tend"] },
+    { "from": "surgery", "to": "game.pawns", "names": ["queue_operation>queue_surgery"] },
+    { "from": "rim.thing", "to": "game.things", "names": ["def", "label", "label_short", "destroy", "despawn", "pos", "set_pos", "hp", "max_hp", "set_hp", "stack", "set_stack", "faction", "set_faction", "map", "spawned"] },
+    { "from": "rim.map", "to": "game.maps", "names": ["nutrition", "total_human_edible_nutrition>nutrition", "width", "height", "pawns", "colonists", "prisoners", "things", "things_of_def", "spawn"] },
+    { "from": "rim.faction", "to": "game.factions", "names": ["player", "list", "name", "of_def"] },
+    { "from": "rim.defs", "to": "game.defs", "names": ["get", "exists", "list", "label"] },
+    { "from": "defs", "to": "game.defs", "names": ["register_thing", "exists"] },
+    { "from": "rim.job", "to": "game.jobs", "names": ["make", "start>start_job"] },
+    { "from": "jobs", "to": "game.jobs", "names": ["register", "start"] },
+    { "from": "rim.find", "to": "game", "names": ["tick>time.ticks", "current_map>maps.current", "world>world.current", "selected>selection.first", "selected_things>selection.things", "maps>maps.list", "any_player_pawn>pawns.any_player"] },
+    { "from": "rim.ui", "to": "game.ui", "names": ["message", "letter"] },
+    { "from": "ui", "to": "game.ui", "names": ["message", "letter", "window", "float_menu", "on_map_float_menu", "panel"] },
+    { "from": "config", "to": "game.config", "names": ["register", "get", "get_bool", "set"] },
+    { "from": "data", "to": "game.data", "names": ["get", "set", "remove", "keys"] },
+    { "from": "input", "to": "game.input", "names": ["binding_just_pressed"] },
+    { "from": "util", "to": "game.util", "names": ["open_folder", "write_export"] },
+    { "from": "building", "to": "game.buildings", "names": ["power_on", "set_power", "flick"] },
+    { "from": "work", "to": "game.work", "names": ["get_priority", "set_priority", "list_types"] },
+    { "from": "world_api", "to": "game.weather", "names": ["weather>current", "set_weather>set"] },
+    { "from": "incident", "to": "game.incidents", "names": ["try_fire", "list"] },
+    { "from": "audio", "to": "game.audio", "names": ["play"] },
+    { "from": "control", "to": "game.control", "names": ["claim", "clear", "get"] },
+    { "from": "path", "to": "game.paths", "names": ["can_reach", "walk", "wander", "compute", "stop"] },
+    { "from": "anomaly", "to": "game.anomaly", "names": ["dlc_active", "is_entity", "try_set_faction_player", "release_to_hostile", "list_on_map", "get_on_map", "knock_out", "find_platform", "start_capture", "recruit"] },
+    { "from": "rim.hooks", "to": "game.hooks", "names": ["prefix", "postfix", "finalizer", "patch", "replace_call", "remove", "list", "has_patch", "type_exists", "method_exists"] },
+    { "from": "rim.hooks", "to": "game.hooks", "deprecate": false, "names": ["check_target", "check_events"] },
+    { "from": "rim", "to": "game", "names": ["on_load>events.on_load", "on_tick>events.on_tick", "log>log.info", "message>ui.message"] },
+    { "from": "player", "to": "game", "names": ["send_message>ui.message"] },
+    { "from": "events", "to": "game.events", "deprecate": false, "names": ["on", "off", "list"] },
+    { "from": "log", "to": "game.log", "deprecate": false, "names": ["info", "error"] },
+    { "from": "timer", "to": "game.timer", "deprecate": false, "names": ["after"] },
+    { "from": "game", "to": "game", "deprecate": false, "names": ["tick>time.ticks", "current_map>maps.current", "player_faction>factions.player"] }
+  ],
+  "events": [
+    { "from": "pawn_spawned", "to": "pawn.spawned", "payload_key": "pawn" },
+    { "from": "pawn_died", "to": "pawn.died", "payload_key": "pawn" }
+  ],
+  "globals": [
+    { "from": "on_pawn_spawned", "event": "pawn.spawned" },
+    { "from": "on_pawn_died", "event": "pawn.died" }
+  ],
+  "methods": [
+    { "type": "RimPawn", "from": "seek_medical_help", "to": "seek_medical" },
+    { "type": "RimMap", "from": "spawn_thing", "to": "spawn" }
+  ],
+  "manual": [
+    { "from": "rim.reflect", "to": "game.reflect", "note": "Different argument and result shapes. See docs/api/reflect.md." },
+    { "from": "rim.cs", "to": "game.reflect", "note": "Same as rim.reflect." },
+    { "from": "rim.harmony", "to": "game.hooks", "note": "Same table as rim.hooks." }
+  ]
+}

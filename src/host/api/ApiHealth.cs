@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using RimWorld;
 using Verse;
 using Verse.AI;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     internal static class ApiHealth
     {

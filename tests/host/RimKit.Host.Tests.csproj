@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unit tests for the pure parts of the host. They compile the host sources directly, so they need the same
+       RimWorld references as src/host (set RimWorldDir if the game is installed elsewhere). -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>11.0</LangVersion>
+    <IsPackable>false</IsPackable>
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\RimWorld</RimWorldDir>
+    <HarmonyWorkshopDir Condition="'$(HarmonyWorkshopDir)' == ''">C:\Program Files (x86)\Steam\steamapps\workshop\content\294100\2009463077</HarmonyWorkshopDir>
+    <HarmonyPath Condition="'$(HarmonyPath)' == '' and Exists('$(HarmonyWorkshopDir)\Current\Assemblies\0Harmony.dll')">$(HarmonyWorkshopDir)\Current\Assemblies\0Harmony.dll</HarmonyPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\host\Json.cs" Link="host\Json.cs" />
+    <Compile Include="..\..\src\host\LuaThreatScanner.cs" Link="host\LuaThreatScanner.cs" />
+    <Compile Include="..\..\src\host\JsonLite.cs" Link="host\JsonLite.cs" />
+    <Compile Include="..\..\src\host\JsonOut.cs" Link="host\JsonOut.cs" />
+    <Compile Include="..\..\src\host\ObjectHandles.cs" Link="host\ObjectHandles.cs" />
+    <Compile Include="..\..\src\host\HookCodec.cs" Link="host\HookCodec.cs" />
+    <Compile Include="..\..\src\host\api\ApiHelpers.cs" Link="host\ApiHelpers.cs" />
+    <Compile Include="..\..\src\host\api\ApiOpts.cs" Link="host\ApiOpts.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(HarmonyPath)</HintPath><Private>False</Private></Reference>
+  </ItemGroup>
+</Project>

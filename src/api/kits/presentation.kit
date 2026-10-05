@@ -1,0 +1,195 @@
+# Graphics, materials, effects, input, audio, alerts, HUD and options (P3-05 to P3-10).
+
+@class RimTextureInfo
+exists: boolean Whether the texture exists in a mod's Textures folder
+width?: integer Width in pixels
+height?: integer Height in pixels
+
+@class RimGraphicOptions
+shader?: string A shader name from game.materials.shaders, or one from a loaded bundle
+color?: string #rrggbb or a theme color
+width?: number Draw size
+height?: number Draw height
+
+@class RimRenderNodeOptions
+layer?: number Draw order inside the parent, default 50
+parent?: string Body or Head
+color?: string Tint as a hex string
+width?: number Draw width
+height?: number Draw height
+
+@class RimMaterialOptions
+color?: string Colour as a hex string
+texture?: string Texture path
+
+@class RimMaterialInfo
+shader: string Shader name
+color: string Colour as a hex string
+has_texture: boolean Whether a texture is set
+render_queue: integer Render queue number
+
+@class RimFleckOptions
+scale?: number Size multiplier
+rotation?: number Rotation in degrees
+speed?: number Speed of movement
+angle?: number Direction of the speed, in degrees
+
+@class RimOverlayOptions
+color?: string Outline colour as a hex string
+ticks?: integer How long it stays, default until cleared
+
+@class RimMouseState
+x: number Mouse x on the screen
+y: number Mouse y on the screen
+left: boolean Whether the left button went down this frame
+right: boolean Whether the right button went down this frame
+middle: boolean Whether the middle button went down this frame
+left_down: boolean Whether the left button is held
+right_down: boolean Whether the right button is held
+scroll: number Scroll wheel movement this frame
+cell_x?: integer Map cell x under the mouse
+cell_z?: integer Map cell z under the mouse
+on_map?: boolean Whether the mouse is over the map, not a window or menu
+
+@class RimModifiers
+ctrl: boolean Whether Ctrl is held
+shift: boolean Whether Shift is held
+alt: boolean Whether Alt is held
+
+@class RimKeyBinding
+def: string Key binding def name
+label?: string Name shown to the player
+category?: string Category it is listed under
+key: string Key assigned to it
+
+@class RimSoundOptions
+volume?: number 0 to 1
+pitch?: number 0.5 to 2
+context?: string Any, MapOnly or WorldOnly
+max_voices?: integer How many copies may play at once
+
+@class RimSongInfo
+def: string Song def name
+clip?: string Name of the audio clip
+volume: number Volume from 0 to 1
+
+@class RimAlertOptions
+label?: string Alert title
+explanation?: string Text shown when the alert is clicked
+priority?: string Medium, High or Critical
+
+@class RimAlertResult
+active: boolean Whether it is active now
+label?: string Alert title for this check
+explanation?: string Text shown when the alert is clicked
+culprits?: RimThing[] Things the alert points at
+
+@class RimAlertInfo
+id: string Alert id
+label: string Name shown to the player
+priority: string Priority: Medium, High or Critical
+
+@class RimOptionField
+key: string Config key, read back with game.config.get
+type?: string bool, float, string or choice
+label?: string Label of the field
+default?: any Value used until the player changes it
+min?: number Lowest value, for numbers
+max?: number Highest value, for numbers
+step?: number Step of the slider, for numbers
+tip?: string Tooltip text
+choices?: string[] Allowed values for a choice field
+
+@class RimOptionsPageInfo
+package_id: string Package id of the mod that owns the page
+title: string Page title
+fields: integer How many fields it has
+
+@kit domain=graphics op=graphics subject=none title="Graphics" page=graphics
+texture_info(path: string) -> RimTextureInfo | Whether a texture exists in a mod's Textures folder and how big it is.
+set_def_graphic(def: string, texture: string, opts?: RimGraphicOptions) -> boolean | Replaces the texture, colour, size or shader of a thing def and refreshes the things on the map.
+body_types() -> string[] | Body type defs.
+hairs() -> string[] | Hair defs.
+head_types() -> string[] | Head type defs.
+add_render_node(race: string, id: string, texture: string, opts?: RimRenderNodeOptions) -> boolean | Adds a texture layer to every pawn of a race through the render tree.
+
+@kit domain=graphics op=graphics subject=thing:RimThingRef title="Graphics" page=graphics
+set_color(color: string) -> boolean | Colours a thing (items, apparel, buildings that allow colouring).
+refresh() -> boolean | Redraws a thing or pawn.
+set_body_type(def: string) -> boolean | Sets a pawn's body type and redraws it.
+set_hair(def: string) -> boolean | Sets a pawn's hair.
+set_hair_color(color: string) -> boolean | Sets a pawn's hair colour.
+set_skin_color(color: string) -> boolean | Overrides a pawn's skin colour.
+set_head_type(def: string) -> boolean | Sets a pawn's head type.
+play_animation(def: string) -> boolean | Plays an animation def on a pawn, where the game version supports it.
+
+@kit domain=materials op=material subject=none title="Materials" page=graphics
+shaders() -> string[] | Shader names you can use: the game's own and those from loaded bundles.
+create(shader: string, opts?: RimMaterialOptions) -> integer | Creates a material and returns its id.
+set_color(id: integer, color: string, property?: string) -> boolean | Sets a colour property, _Color by default.
+set_float(id: integer, property: string, value: number) -> boolean | Sets a float property.
+set_texture(id: integer, path: string, property?: string) -> boolean | Sets a texture property, _MainTex by default.
+info(id: integer) -> RimMaterialInfo | Shader, colour and texture of a material.
+destroy(id: integer) -> boolean | Frees a material.
+load_bundle(package_id: string, path: string) -> string[] | Loads an asset bundle from the mod folder and registers its shaders. Returns their names.
+
+@kit domain=effects op=effects subject=map:RimMapRef title="Effects" page=effects
+fleck(def: string, x: integer, z: integer, opts?: RimFleckOptions) -> boolean | Spawns a fleck, a short visual effect, on a cell.
+text(x: integer, z: integer, text: string, color?: string) -> boolean | Floats a line of text up from a cell.
+effecter(def: string, x: integer, z: integer) -> boolean | Plays an effecter once at a cell.
+highlight_cells(cells: RimCell[], opts?: RimOverlayOptions) -> integer | Outlines a set of cells. Returns an overlay id.
+line(x: integer, z: integer, x2: integer, z2: integer, opts?: RimOverlayOptions) -> integer | Draws a line between two cells.
+circle(x: integer, z: integer, radius: number, opts?: RimOverlayOptions) -> integer | Draws a circle outline.
+
+@kit domain=effects op=effects subject=thing:RimThingRef title="Effects" page=effects
+mark(ticks?: integer) -> integer | Highlights a thing with the selection bracket.
+
+@kit domain=effects op=effects subject=none title="Effects" page=effects
+screen_shake(magnitude: number) -> boolean | Shakes the camera, 0 to 2.
+clear(id?: integer) -> integer | Removes one overlay, or all of them. Returns how many.
+fleck_defs() -> string[] | Fleck defs.
+effecter_defs() -> string[] | Effecter defs.
+
+@kit domain=input op=input subject=none title="Input" page=input
+register_key(name: string, label?: string, default?: string, category?: string) -> boolean | Makes a key binding the player can rebind in the options. Read it with game.input.binding_just_pressed.
+key_down(key: string) -> boolean | Whether a key is held. Keys are Unity key names such as K, F9, LeftArrow.
+key_pressed(key: string) -> boolean | Whether a key went down this frame.
+chord_pressed(chord: string) -> boolean | A modifier chord such as ctrl+shift+K, true on the frame the key goes down.
+modifiers() -> RimModifiers | Which of ctrl, shift and alt are held.
+mouse() -> RimMouseState | Mouse position, buttons, scroll and the map cell under it.
+key_names() -> string[] | Every key name.
+bindings() -> RimKeyBinding[] | Every key binding with its current key.
+
+@kit domain=audio op=audio subject=none title="Audio" page=audio
+define(name: string, clips: string[], opts?: RimSoundOptions) -> boolean | Defines a sound from clips in a mod's Sounds folder (paths without extension). Play it with game.audio.play.
+sound_defs() -> string[] | Every sound def.
+songs() -> RimSongInfo[] | Every song def.
+play_song(def: string) -> boolean | Starts a song now.
+silence_music(seconds: number) -> boolean | Silences the music for a while.
+volume(kind: string) -> number | Volume of game, music or ambient sound, 0 to 1.
+set_volume(kind: string, value: number) -> number | Sets a volume and saves the preference.
+sustainer_end(id: integer) -> boolean | Stops a sustained sound.
+
+@kit domain=audio op=audio subject=map:RimMapRef title="Audio" page=audio
+play_at(def: string, x: integer, z: integer) -> boolean | Plays a sound at a cell, louder when the camera is near.
+sustainer_start(def: string, x: integer, z: integer) -> integer | Starts a looping sound at a cell. Returns an id for sustainer_end.
+
+@kit domain=alerts op=alert subject=none title="Alerts" page=hud
+add(id: string, check: fun(): boolean|RimAlertResult, opts?: RimAlertOptions) -> string | Adds an alert to the right edge. The check function runs regularly and returns true, false or { active, label, explanation, culprits }.
+remove(id: string) -> boolean | Stops an alert from being active.
+list() -> RimAlertInfo[] | Lua alerts.
+
+@kit domain=hud op=hud subject=none title="HUD" page=hud
+status(id: string, text: string, color?: string, corner?: string) -> boolean | Shows a line of text in a corner of the screen. Calling it again with the same id updates it. Corner is top_left, top_right or bottom_left.
+clear_status(id: string) -> boolean | Removes a status line.
+letter(label: string, text: string, choices: string[], tag?: string, target?: RimThing) -> boolean | Sends a letter with answer buttons. Answers raise the letter.choice event with the tag, index and label, and survive saving.
+colors() -> table<string, string> | The colour presets, name to #rrggbb. Names such as accent, good, warning, bad, muted work wherever a color is accepted.
+set_color(name: string, color: string) -> string | Defines or changes a colour preset.
+set_font(font: string) -> string | Default font for widgets: tiny, small or medium.
+
+@kit domain=options op=options subject=none title="Options" page=hud
+page(package_id: string, title: string, fields: RimOptionField[], on_change?: fun(change: { package_id: string, key: string, value: any })) -> integer | Adds a page to RimKit's entry in the mod settings. Values are stored with the settings and read with game.config.get or game.options.get.
+remove_page(package_id: string) -> boolean | Removes the settings pages a mod added. The stored values are kept.
+get(key: string) -> any | Reads an option by key.
+set(key: string, value: any) -> boolean | Changes an option.
+pages() -> RimOptionsPageInfo[] | Registered pages.

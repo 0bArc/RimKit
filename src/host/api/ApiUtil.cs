@@ -4,10 +4,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using RimWorld;
 using Verse;
-using static RimLuaKit.ApiHelpers;
+using static RimKit.ApiHelpers;
 
-namespace RimLuaKit
+namespace RimKit
 {
     // Folders / export helpers (fixed roots only).
     internal static class ApiUtil
@@ -17,6 +18,15 @@ namespace RimLuaKit
             ApiRegistry.Register("util.open_folder", OpenFolder, "util");
             ApiRegistry.Register("util.write_export", WriteExport, "util");
             ApiRegistry.Register("util.mod_export_dir", ExportDir, "util");
+            ApiRegistry.Register("util.game_version", GameVersion, "util", "0.5.0");
+        }
+
+        // Running RimWorld version. VersionControl.CurrentVersion is major.minor.build.
+        private static string GameVersion(Dictionary<string, string> args)
+        {
+            var v = VersionControl.CurrentVersion;
+            return OkJson("{\"major\":" + v.Major + ",\"minor\":" + v.Minor + ",\"build\":" + v.Build +
+                          ",\"text\":" + JsonLite.Quote(VersionControl.CurrentVersionString) + "}");
         }
 
         private static string ResolveTarget(string target, string packageId, out string err)

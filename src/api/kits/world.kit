@@ -1,0 +1,84 @@
+# game.world (P2-04): tiles, settlements, world objects, caravans, world pawns, map transitions.
+# game.world.current, game.weather.current and set come from the alias table.
+
+@class RimWorldInfo
+tiles: integer How many tiles the world has
+coverage: number Share of the planet that is land, 0 to 1
+seed: string World seed text
+objects: integer How many world objects exist
+settlements: integer How many settlements exist
+caravans: integer How many caravans exist
+maps: integer How many maps are loaded
+
+@class RimTileInfo
+tile: integer World tile id
+biome?: string Biome def name
+hilliness: string Hilliness name
+elevation: number Elevation in metres
+temperature: number Average temperature
+rainfall: number Rainfall in mm per year
+water: boolean Whether the tile is water
+pollution: number Pollution from 0 to 1
+map?: RimMap The loaded map on this tile
+object?: RimObject The world object on this tile
+
+@class RimWorldObjectInfo
+object: RimObject The world object
+def: string Def name of the world object
+label: string Name shown to the player
+tile: integer World tile it is on
+faction?: RimFaction The faction it belongs to
+name?: string Name of the world object
+has_map?: boolean Whether a map is loaded for it
+destroyed?: boolean Whether it was destroyed
+can_trade?: boolean Whether the player can trade with it
+
+@class RimCaravanInfo
+object: RimObject The caravan object
+def: string Def name of the caravan
+label: string Name shown to the player
+tile: integer World tile it is on
+faction?: RimFaction The faction it belongs to
+name: string Name of the caravan
+pawns: integer How many pawns travel in it
+player: boolean Whether it is the player's
+moving: boolean Whether it is moving
+destination?: integer World tile it travels to
+
+@class RimBiomeInfo
+def: string Def name of the biome
+label?: string Name shown to the player
+playable: boolean Whether the player can settle in it
+animal_density: number How many animals it holds
+plant_density: number How many plants it holds
+
+@class RimTileSearch
+biome?: string Only tiles of this biome
+near?: integer Tile to search around, the current map by default
+min_distance?: number In tiles
+max_distance?: number Give up beyond this many tiles
+allow_settled?: boolean Also consider tiles that hold a settlement
+
+@class RimWorldPawnQuery
+faction?: RimFaction Only pawns of this faction
+humanlike?: boolean Only humanlike pawns
+limit?: integer Return at most this many
+
+@kit domain=world op=world subject=none title="World" page=world
+info() -> RimWorldInfo | Size, seed and object counts of the world.
+tile_info(tile: integer) -> RimTileInfo | Biome, terrain, climate and what sits on a tile.
+distance(from: integer, to: integer) -> number | Approximate distance in tiles between two tiles.
+settlements(faction?: RimFactionRef) -> RimWorldObjectInfo[] | Settlements, optionally of one faction.
+objects(def?: string) -> RimWorldObjectInfo[] | Every world object, optionally one def.
+create_object(def: string, tile: integer, faction?: RimFactionRef) -> RimObject | Places a world object on a tile.
+caravans() -> RimCaravanInfo[] | Every caravan.
+pawns(opts?: RimWorldPawnQuery) -> RimPawn[] | Living pawns that are not on a map.
+map_at(tile: integer) -> RimMap? | The loaded map on a tile.
+generate_map(tile: integer, size?: integer) -> RimMap | Generates the map for a tile and returns it. Slow.
+biomes() -> RimBiomeInfo[] | Every biome def.
+find_tile(opts?: RimTileSearch) -> integer? | The nearest tile that matches the search.
+
+@kit domain=world op=world subject=object:RimObject title="World" page=world
+object_info() -> RimWorldObjectInfo | Details of a world object.
+remove_object() -> boolean | Removes a world object that has no loaded map.
+travel(tile: integer) -> boolean | Sends a caravan to a tile.

@@ -1,0 +1,44 @@
+# game.things (P1-01). def, label, pos, hp, stack, faction and destroy come from the alias table.
+
+@class RimThingInfo
+id: integer Unique id of the thing
+def: string Def name of the thing
+label: string Name shown to the player
+hp: integer Current hit points
+max_hp: integer Maximum hit points
+stack: integer Stack size
+spawned: boolean Whether it is spawned on a map
+is_pawn: boolean Whether it is a pawn
+is_building: boolean Whether it is a building
+rotation: integer 0 north, 1 east, 2 south, 3 west
+stuff?: string Stuff (material) def name
+quality?: string Quality category name, for example Normal or Masterwork
+x?: integer Present when spawned
+z?: integer Cell z coordinate, present when spawned
+map?: RimMap The map it is on
+forbidden?: boolean Whether it is forbidden
+faction?: RimFaction The faction that owns it
+
+@class RimMakeOptions
+stuff?: string Material def name, defaults to the def's default material
+quality?: string Quality category name
+count?: integer Clamped to the stack limit
+
+@kit domain=things op=thing subject=thing:RimThingRef title="Things" page=things
+info() -> RimThingInfo | Everything about a thing in one call.
+quality() -> string? | Awful to Legendary, nil when the thing has no quality.
+set_quality(quality: string|integer) -> string | Accepts a name (any case) or 0 to 6. Raises RK3003 when the thing has no quality.
+stuff() -> string? | The material def name.
+forbidden() -> boolean | Whether the thing is forbidden for the player.
+set_forbidden(forbidden: boolean) -> boolean | Forbids or allows the thing. It must be spawned.
+rotation() -> integer | 0 north, 1 east, 2 south, 3 west.
+set_rotation(rotation: integer) -> integer | Sets the rotation, 0 to 3.
+comps() -> string[] | Class names of the comps, for example CompQuality.
+has_comp(class: string) -> boolean | Whether the thing has a comp of this class, with or without the Comp prefix.
+damage(amount: number, damage_def?: string) -> integer | Deals damage. Damage def defaults to Cut. Returns hit points left.
+heal() -> integer | Restores hit points to the maximum. Not for pawns.
+destroy_with(mode?: string) -> boolean | Destroys with a mode: Vanish, Deconstruct, KillFinalize, Refund, Cancel or FailConstruction.
+
+@kit domain=things op=thing subject=none title="Things" page=things
+make(def: string, opts?: RimMakeOptions) -> RimThing | Creates a thing without placing it.
+spawn_at(def: string, map: RimMapRef, x: integer, z: integer, opts?: RimMakeOptions) -> RimThing | Creates a thing and puts it on the map.

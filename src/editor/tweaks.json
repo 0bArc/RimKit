@@ -1,0 +1,18 @@
+{
+ "note": "Tweak catalog (P4-02). Each row is a named place where a mod can change a value. game.tweaks.on(name, fn) installs the hook and passes { value, instance, args } to fn, and fn returns the new value. Docs and stubs are generated from this file.",
+ "tweaks": [
+  { "name": "pawn.hunger_rate", "type": "RimWorld.Need_Food", "method": "get_FoodFallPerTick", "kind": "value", "result": "number", "doc": "How fast a pawn's food need falls each tick." },
+  { "name": "pawn.rest_fall_rate", "type": "RimWorld.Need_Rest", "method": "get_RestFallPerTick", "kind": "value", "result": "number", "doc": "How fast a pawn's rest need falls each tick." },
+  { "name": "pawn.joy_fall_rate", "type": "RimWorld.Need_Joy", "method": "get_FallPerInterval", "kind": "value", "result": "number", "doc": "How fast a pawn's recreation need falls per need interval." },
+  { "name": "pawn.carry_capacity", "type": "RimWorld.MassUtility", "method": "Capacity", "kind": "value", "result": "number", "doc": "How much mass a pawn can carry. args[1] is the pawn." },
+  { "name": "plant.growth_rate", "type": "RimWorld.Plant", "method": "get_GrowthRate", "kind": "value", "result": "number", "doc": "How fast a plant grows. instance is the plant." },
+  { "name": "thing.max_hit_points", "type": "Verse.Thing", "method": "get_MaxHitPoints", "kind": "value", "result": "integer", "doc": "The most hit points a thing can have. Called very often." },
+  { "name": "thing.market_value", "type": "Verse.Thing", "method": "get_MarketValue", "kind": "value", "result": "number", "doc": "What a thing is worth, which feeds wealth, raids and trade." },
+  { "name": "time.rate_multiplier", "type": "Verse.TickManager", "method": "get_TickRateMultiplier", "kind": "value", "result": "number", "doc": "How fast the game runs for the current speed setting." },
+  { "name": "shot.hit_factor_shooter", "type": "Verse.ShotReport", "method": "HitFactorFromShooter", "kind": "value", "result": "number", "doc": "The part of a shot's hit chance that comes from the shooter's skill. args[1] is the shooter." },
+  { "name": "health.bleed_rate", "type": "Verse.HediffSet", "method": "get_BleedRateTotal", "kind": "value", "result": "number", "doc": "How fast a pawn bleeds in total." },
+  { "name": "health.pain_total", "type": "Verse.HediffSet", "method": "get_PainTotal", "kind": "value", "result": "number", "doc": "A pawn's total pain." },
+  { "name": "social.opinion", "type": "RimWorld.Pawn_RelationsTracker", "method": "OpinionOf", "kind": "value", "result": "integer", "doc": "What one pawn thinks of another, from -100 to 100. args[1] is the other pawn." },
+  { "name": "power.plant_output", "type": "RimWorld.CompPowerPlant", "method": "get_DesiredPowerOutput", "kind": "value", "result": "number", "doc": "The power a generator wants to produce." }
+ ]
+}

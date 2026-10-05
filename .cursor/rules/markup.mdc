@@ -11,7 +11,7 @@ Never use:
 - em dash: `—` (U+2014)
 - en dash: `–` (U+2013)
 
-This applies **everywhere**: chat replies, commits, comments, UI strings, and **all docs** (`docs/**`, README, About text, meta descriptions).
+This applies **everywhere**: chat replies, commits, comments, UI strings, and **all docs** (`infrastructure/docs/**`, README, About text, meta descriptions).
 
 Use instead:
 

@@ -1,0 +1,170 @@
+{
+  "site_name": "RimKit",
+  "site_description": "Write RimWorld mods in Lua. Stratware.win.",
+  "site_url": "https://team.stratware.win/rimkit/",
+  "repo_url": "https://github.com/0bArc/RimWorldModdingDocs",
+  "repo_name": "0bArc/RimWorldModdingDocs",
+  "tabs": [
+    {
+      "title": "Home",
+      "path": "index.md"
+    },
+    {
+      "title": "Guide",
+      "path": "guide/index.md",
+      "children": [
+        {
+          "title": "Start",
+          "children": [
+            { "title": "Quickstart", "path": "guide/quickstart.md" },
+            { "title": "Mod structure", "path": "guide/mod-structure.md" },
+            { "title": "meta.lua", "path": "guide/meta.md" },
+            { "title": "Defs and strings", "path": "guide/defs-xml.md" },
+            { "title": "Build and ship", "path": "guide/build.md" }
+          ]
+        },
+        {
+          "title": "Learn",
+          "children": [
+            { "title": "Tutorials", "path": "guide/tutorials.md" },
+            { "title": "Cookbook", "path": "guide/cookbook.md" },
+            { "title": "Capabilities", "path": "guide/capabilities.md" }
+          ]
+        },
+        {
+          "title": "Quality",
+          "children": [
+            { "title": "Testing", "path": "guide/testing.md" },
+            { "title": "Save safety", "path": "guide/save-safety.md" },
+            { "title": "Performance", "path": "guide/performance.md" },
+            { "title": "Security", "path": "guide/security.md" },
+            { "title": "Troubleshooting", "path": "guide/troubleshooting.md" }
+          ]
+        },
+        {
+          "title": "Ship",
+          "children": [
+            { "title": "Publishing", "path": "guide/publishing.md" },
+            { "title": "CLI reference", "path": "guide/cli.md" },
+            { "title": "Request a feature", "path": "guide/request-a-feature.md" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "API",
+      "path": "api/index.md",
+      "children": [
+        {
+          "title": "Catalog",
+          "children": [
+            { "title": "Overview", "path": "api/overview.md" },
+            { "title": "Reference", "path": "api/reference.md" },
+            { "title": "Types", "path": "api/types.md" },
+            { "title": "Host operations", "path": "api/ops.md" },
+            { "title": "Events", "path": "api/events.md" },
+            { "title": "Hooks", "path": "api/hooks.md" },
+            { "title": "Kits and domains", "path": "api/domains.md" },
+            { "title": "Tweaks", "path": "api/tweaks.md" },
+            { "title": "Lua classes", "path": "api/classes.md" }
+          ]
+        },
+        {
+          "title": "Game",
+          "children": [
+            {
+              "title": "Actors",
+              "children": [
+                { "title": "Pawns", "path": "api/pawns.md" },
+                { "title": "AI", "path": "api/ai.md" },
+                { "title": "Factions", "path": "api/factions.md" }
+              ]
+            },
+            {
+              "title": "Things and map",
+              "children": [
+                { "title": "Things", "path": "api/things.md" },
+                { "title": "Plants", "path": "api/plants.md" },
+                { "title": "Maps", "path": "api/maps.md" }
+              ]
+            },
+            {
+              "title": "Action",
+              "children": [
+                { "title": "Jobs", "path": "api/jobs.md" },
+                { "title": "Combat", "path": "api/combat.md" },
+                { "title": "Selection and camera", "path": "api/selection.md" }
+              ]
+            },
+            {
+              "title": "Query and gen",
+              "children": [
+                { "title": "Queries", "path": "api/query.md" },
+                { "title": "Conditions", "path": "api/conditions.md" },
+                { "title": "Generation", "path": "api/generation.md" }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "Systems",
+          "children": [
+            { "title": "Time and version", "path": "api/time.md" },
+            { "title": "Storyteller and quests", "path": "api/storyteller.md" },
+            { "title": "Research and stats", "path": "api/research.md" },
+            { "title": "World", "path": "api/world.md" },
+            { "title": "Build and power", "path": "api/build.md" },
+            { "title": "Economy and raids", "path": "api/economy.md" },
+            { "title": "Saving", "path": "api/save.md" },
+            { "title": "Defs", "path": "api/defs.md" },
+            { "title": "Patch and mods", "path": "api/patch.md" },
+            { "title": "Anomaly", "path": "api/anomaly.md" },
+            { "title": "DLC", "path": "api/dlc.md" }
+          ]
+        },
+        {
+          "title": "Presentation",
+          "children": [
+            { "title": "Widgets", "path": "api/widgets.md" },
+            { "title": "Gizmos", "path": "api/gizmos.md" },
+            { "title": "Tabs", "path": "api/tabs.md" },
+            { "title": "Designators", "path": "api/designators.md" },
+            { "title": "Graphics", "path": "api/graphics.md" },
+            { "title": "Effects", "path": "api/effects.md" },
+            { "title": "Input", "path": "api/input.md" },
+            { "title": "Audio", "path": "api/audio.md" },
+            { "title": "HUD and options", "path": "api/hud.md" }
+          ]
+        },
+        {
+          "title": "Advanced",
+          "children": [
+            { "title": "Reflect", "path": "api/reflect.md" },
+            { "title": "Interop", "path": "api/interop.md" },
+            { "title": "Developer tools", "path": "api/dev.md" },
+            { "title": "Naming", "path": "api/naming.md" },
+            { "title": "Stability", "path": "api/stability.md" },
+            { "title": "Migration", "path": "api/migration.md" },
+            { "title": "Legacy names", "path": "api/legacy.md" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Concepts",
+      "children": [
+        { "title": "Architecture", "path": "concepts/architecture.md" },
+        { "title": "Game inventory", "path": "concepts/game-inventory.md" },
+        { "title": "RimKit Standard", "path": "standard/rks.md" }
+      ]
+    },
+    {
+      "title": "Project",
+      "children": [
+        { "title": "What is missing", "path": "missing.md" },
+        { "title": "Gaps and next steps", "path": "gaps.md" },
+        { "title": "Mod ideas", "path": "mod-ideas.md" }
+      ]
+    }
+  ]
+}

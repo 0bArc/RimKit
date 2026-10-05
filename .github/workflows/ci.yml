@@ -1,0 +1,82 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint, docs, kits and editor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Version sources agree
+        run: node infrastructure/tools/check-version.js
+      - name: Kit table is built from its sources
+        run: node infrastructure/tools/build-kits.js --check
+      - name: Kit pages are generated
+        run: node infrastructure/tools/gen-kit-pages.js --check
+      - name: Event table is generated
+        run: node infrastructure/tools/gen-events-doc.js --check
+      - name: Op conformance
+        run: node infrastructure/tools/check-ops.js
+      - name: Editor extension
+        run: node infrastructure/tools/check-editor.js
+      - name: Docs check
+        run: node infrastructure/tools/check-docs.js
+      - name: Hook target list is current
+        run: node infrastructure/tools/gen-hook-targets.js --check
+      - name: Lua class and tweak generators are current
+        run: |
+          node infrastructure/tools/gen-lua-classes.js --check
+          node infrastructure/tools/gen-tweaks.js --check
+      - name: Package the extension
+        working-directory: src/editor
+        run: npx --yes @vscode/vsce package --no-dependencies
+
+  native:
+    name: Native core and tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure and build
+        run: |
+          cmake -S src/native -B build/native -A x64
+          cmake --build build/native --config Release
+      - name: Native tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cl /nologo /EHsc tests\native\budget_test.cpp /Fe:budget_test.exe
+          budget_test.exe build\native\Release\rimlua_core.dll tests\native\budget_noisy.lua tests\native\budget_quiet.lua
+          cl /nologo /EHsc tests\native\kits_test.cpp /Fe:kits_test.exe
+          kits_test.exe build\native\Release\rimlua_core.dll tests\native\kits_expect.lua tests\native\kits_args.lua tests\native\eco_test.lua
+          cl /nologo /EHsc tests\native\aliastest.cpp /Fe:aliastest.exe
+          aliastest.exe build\native\Release\rimlua_core.dll tests\native\aliastest.lua
+      - name: Mod tests (examples, guide mods, dev tools)
+        shell: bash
+        run: |
+          for d in src/examples/*/ guide/*/final/*/ mod/; do
+            if [ -d "$d/Tests" ]; then
+              echo "== $d"
+              build/native/Release/rimkit.exe mod test "$d" || exit 1
+              if [ "$d" != "mod/" ]; then build/native/Release/rimkit.exe mod check "$d" || exit 1; fi
+            fi
+          done
+
+  host:
+    name: Host build, unit tests and release check (self-hosted)
+    # The host references RimWorld's Assembly-CSharp, which cannot be redistributed.
+    # Register a self-hosted runner with the label "rimworld" on a machine that has the game installed.
+    runs-on: [self-hosted, rimworld]
+    steps:
+      - uses: actions/checkout@v4
+      - run: dotnet build src/host/RimLuaHost.csproj -c Release
+      - name: Host unit tests
+        run: dotnet test tests/host/RimKit.Host.Tests.csproj
+      - name: Release check (hashes match the allowlist)
+        run: node infrastructure/tools/release.js --verify

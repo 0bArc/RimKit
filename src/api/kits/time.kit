@@ -1,0 +1,25 @@
+# game.time (P1-03). game.time.ticks comes from the alias table. The tick constants are set in native code.
+
+@class RimTimeNow
+ticks: integer Ticks since this game started
+abs_ticks: integer Absolute ticks, including the start offset
+hour?: integer 0 to 23 at the current map
+hour_float?: number Hour of the day with a fraction
+day_of_year?: integer Day of the year, from 0
+day_of_season?: integer Day of the season, from 0
+day_of_quadrum?: integer Day of the quadrum, from 0
+year?: integer Year number
+season?: string Spring, Summer, Fall, Winter, PermanentSummer, PermanentWinter
+quadrum?: string Aprimay, Jugust, Septober, Decembary
+day_percent?: number 0 to 1
+is_night?: boolean Whether it is night
+ticks_per_hour: integer Ticks in one hour
+ticks_per_day: integer Ticks in one day
+
+@kit domain=time op=time subject=none title="Time" page=time
+now() -> RimTimeNow | Calendar fields for the current map. Raises RK3001 when no game is loaded.
+speed() -> string | Current game speed: Paused, Normal, Fast, Superfast or Ultrafast.
+set_speed(speed: string|integer) -> string | Sets the speed. Accepts a name (any case) or 0 to 4. Returns the speed that was set.
+paused() -> boolean | Whether the game is paused.
+set_paused(paused: boolean) -> boolean | Pauses or unpauses. Returns the state after the call.
+date_text(ticks?: integer) -> string | Readable date such as "5th of Aprimay, 5500". Without an argument it uses now.

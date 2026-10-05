@@ -1,0 +1,97 @@
+{
+  "name": "rimkit",
+  "displayName": "RimKit (RimWorld Lua)",
+  "description": "Completions, def name completion from the running game, go to definition, tests, release checks, deprecation warnings with quick fixes, Lua API stubs and auto-ship for RimKit mods.",
+  "version": "0.10.0",
+  "publisher": "stratware",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:lua",
+    "workspaceContains:meta.lua"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "rimkit.ship",
+        "title": "RimKit: Ship Mod"
+      },
+      {
+        "command": "rimkit.sync",
+        "title": "RimKit: Sync meta.lua"
+      },
+      {
+        "command": "rimkit.migrate",
+        "title": "RimKit: Migrate deprecated API names"
+      },
+      {
+        "command": "rimkit.test",
+        "title": "RimKit: Run mod tests"
+      },
+      {
+        "command": "rimkit.check",
+        "title": "RimKit: Check mod content"
+      },
+      {
+        "command": "rimkit.releaseCheck",
+        "title": "RimKit: Release check"
+      },
+      {
+        "command": "rimkit.assets",
+        "title": "RimKit: Check or make preview and icon"
+      },
+      {
+        "command": "rimkit.diag",
+        "title": "RimKit: Make a diagnostics zip"
+      },
+      {
+        "command": "rimkit.newMod",
+        "title": "RimKit: New mod from a template"
+      }
+    ],
+    "configuration": {
+      "title": "RimKit",
+      "properties": {
+        "rimkit.autoShipOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-run rimkit mod ship when saving Lua/meta.lua in a RimKit mod."
+        },
+        "rimkit.executable": {
+          "type": "string",
+          "default": "rimkit",
+          "description": "Path to rimkit.exe (or rimkit on PATH)."
+        },
+        "rimkit.modsDir": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Mods folder. Empty = rimkit default / RIMWORLD_MODS."
+        },
+        "rimkit.defsFile": {
+          "type": "string",
+          "default": "",
+          "description": "Def names exported by the dev tools (rimkit_defs.json). Empty looks in .rimkit/defs.json and the game's Config folder."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "lua",
+        "extensions": [
+          ".lua"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "gen": "node tools/gen-unc-stubs.js",
+    "package": "node tools/gen-unc-stubs.js && npx @vscode/vsce package --no-dependencies"
+  }
+}

@@ -1,0 +1,63 @@
+# game.ai (P2-01): work givers, think trees, duties, lords, path costs, danger.
+
+@class RimWorkGiverInfo
+def: string Def name of the work giver
+label?: string Name shown to the player
+work_type?: string Work type it belongs to
+priority: integer Higher runs first inside its work type
+emergency: boolean Whether it is an emergency work giver
+class?: string Name of the C# class that implements it
+
+@class RimWorkTypeInfo
+def: string Def name of the work type
+label?: string Name shown to the player
+order: integer Sort order, lower comes first
+always_on: boolean Whether the work type cannot be turned off
+givers: string[] Work giver defs in priority order
+
+@class RimThinkNode
+depth: integer How deep in the tree the node is, 0 for the root
+class: string Name of the C# class that implements it
+children: integer How many child nodes it has
+
+@class RimDuty
+def: string Def name of the duty
+thing?: RimThing The thing the duty is about, when there is one
+x?: integer Cell x coordinate
+z?: integer Cell z coordinate
+
+@class RimLordOptions
+pawns: RimPawn[] Pawns to put under the lord
+faction?: RimFaction Defaults to the player faction
+job?: string ExitMap, ExitMapBest, DefendPoint or Lua
+class?: string For job Lua: the Lua lord_toil class that gives the duties
+x?: integer DefendPoint position
+z?: integer Cell z coordinate of the group's meeting point
+
+@class RimLordOf
+job?: string Name of the group's lord job class
+toil?: string Name of the group's current toil
+pawns: integer How many pawns are in the group
+faction?: RimFaction The faction the group belongs to
+
+@kit domain=ai op=ai subject=none title="AI" page=ai
+work_givers(work_type?: string) -> RimWorkGiverInfo[] | Every work giver, optionally only one work type.
+set_work_giver_priority(def: string, priority: integer) -> integer | Reorders a work giver inside its work type. Higher runs first.
+work_types() -> RimWorkTypeInfo[] | Work types with their givers in priority order.
+think_trees() -> string[] | Every think tree def name.
+think_nodes(def: string) -> RimThinkNode[] | A think tree flattened depth first, with node class names.
+think_remove(def: string, class: string) -> integer | Removes every node of a class from a think tree. Returns how many.
+think_insert(def: string, class: string, parent?: string, index?: integer) -> boolean | Adds a node of a class (it needs a parameterless constructor) under a parent node class, first by default.
+duty_defs() -> string[] | Every duty def name.
+
+@kit domain=ai op=ai subject=map:RimMapRef title="AI" page=ai
+lord_make(opts: RimLordOptions) -> boolean | Puts pawns under a new lord running ExitMap, ExitMapBest, DefendPoint or a Lua class.
+
+@kit domain=ai op=ai subject=pawn:RimPawnRef title="AI" page=ai
+duty() -> RimDuty? | The pawn's current duty.
+set_duty(def: string, x?: integer, z?: integer) -> boolean | Gives the pawn a duty, with an optional cell focus, and interrupts its job.
+lord_of() -> RimLordOf? | The lord the pawn belongs to.
+remove_from_lord() -> boolean | Takes the pawn out of its lord.
+path_cost(x: integer, z: integer) -> integer | What the pawn's pathfinding thinks a cell costs.
+danger(x: integer, z: integer) -> string | Danger of a cell for this pawn: None, Some or Deadly.
+max_danger() -> string | The highest danger this pawn will path through.
