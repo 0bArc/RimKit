@@ -2,17 +2,19 @@
 
 Publisher: **Team Stratware.win** (`stratware`)
 
-Version: **0.5.0**
+RimKit mods are written in Luau. This extension gives the editor the RimKit API: completions, types, checks and one-key shipping.
 
-Features:
+## Features
 
-- Completions for the canonical `game.<domain>` API and the older `rim.*` snippets.
-- Deprecation warnings for old names, with a quick fix and "replace all in this file". The data comes from `aliases.json`, the same table the runtime and `rimkit migrate` use.
-- Command **RimKit: Migrate deprecated API names** (runs `rimkit migrate` on the mod root, dry run first).
-- Lua API stubs for the Lua language server (`stubs/`). The extension offers to add them to `Lua.workspace.library` for a RimKit mod workspace.
-- Auto-ship on save.
+- Completions and hover for the whole `game.<domain>` API.
+- Luau types through the Luau Language Server (`JohnnyMorganz.luau-lsp`): `stubs/rimkit.d.luau` types every function, every `RimThing` and `RimPawn` member and every event payload. `game.events.on_pawn_damaged(function(pawn, e) ... end)` types both arguments from the function name.
+- Command **RimKit: Set up Luau types** points luau-lsp at the RimKit definitions for the workspace. The extension offers it when it finds a `meta.lua`.
+- Typed `rimkit.signal` and `rimkit.promise`, the built-in event and promise libraries.
+- Checks for unknown `game.*` calls, with a did-you-mean suggestion.
+- **Auto-ship** on save of `*.lua` or `meta.lua` (setting `rimkit.autoShipOnSave`).
+- Commands: `RimKit: Ship Mod`, `Sync meta.lua`, `Run mod tests`, `Check mod content`, `Release check`, `Check or make preview and icon`, `Make a diagnostics zip`, `New mod from a template`.
 
-Maintainers: `npm run gen` regenerates `stubs/rimkit_unc.lua` and marks old names `@deprecated` in `stubs/rimkit.lua`. `npm run package` runs it first.
+Needs `rimkit` on PATH.
 
 ## Install (dev)
 
@@ -21,40 +23,28 @@ cd src/editor
 code --install-extension . --force
 ```
 
-Or package VSIX:
+Or package a VSIX:
 
 ```powershell
 cd src/editor
 npx --yes @vscode/vsce package --no-dependencies
-cursor --install-extension .\rimkit-0.10.0.vsix
+cursor --install-extension .\rimkit-<version>.vsix
 ```
 
-## Features
-
-- Completions for `rim.*`, `anomaly.*`, `ui.on_map_float_menu`, Strong API tables
-- EmmyLua stubs in `stubs/rimkit.lua`
-- **Auto-ship** on save of `*.lua` or `meta.lua` (setting `rimkit.autoShipOnSave`)
-- Commands: `RimKit: Ship Mod`, `RimKit: Sync meta.lua`
-
-Needs `rimkit` on PATH.
-
-## New hook syntax
+## Example
 
 ```lua
-rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(pawn)
-  return true
-end
+-- Floating damage numbers above people.
+game.events.on_pawn_damaged(function(pawn, e)
+  game.effects.text(pawn, tostring(math.floor(e.dealt)), pawn.is_colonist and "red" or "orange")
+end, { humanlike = true, min_dealt = 1 })
 
-rim.events.prefix["RimWorld.JobGiver_GetFood.TryGiveJob"] = function(pawn)
-  return true
-end
-```
-
-## Anomaly float menu
-
-```lua
-ui.on_map_float_menu(function(ctx)
-  if anomaly.is_entity(ctx.clicked) ~= true then return nil end
-  return { { label = "Recruit", on_click = function() anomaly.recruit(ctx.clicked) end } }
+-- Change the result of a game method.
+game.hooks.postfix("Verse.ShotReport", "HitFactorFromShooter", function(ctx)
+  ctx:set_result(1)
 end)
 ```
+
+## Maintainers
+
+`node tools/gen-luau-defs.js` regenerates the Luau definitions and the per-event stubs. `npm run package` runs the generators first.

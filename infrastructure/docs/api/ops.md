@@ -983,53 +983,53 @@ Subject-first calls name the subject `h`. A DLC operation fails with `RK3003` wh
 
 | Operation | Tier | Since | Lua function |
 |-----------|------|-------|--------------|
-| `thing.assign_owner` | gameplay |  | `game.things.assign_owner` |
-| `thing.comps` | gameplay | 0.5.0 | `game.things.comps` |
-| `thing.damage` | gameplay | 0.5.0 | `game.things.damage` |
+| `thing.assign_owner` | gameplay |  | `thing:assign_owner` |
+| `thing.comps` | gameplay | 0.5.0 | `thing:comps` |
+| `thing.damage` | gameplay | 0.5.0 | `thing:damage` |
 | `thing.def` | legacy |  | native binding |
 | `thing.despawn` | legacy |  | native binding |
 | `thing.destroy` | legacy |  | native binding |
-| `thing.destroy_with` | gameplay | 0.5.0 | `game.things.destroy_with` |
+| `thing.destroy_with` | gameplay | 0.5.0 | `thing:destroy_with` |
 | `thing.faction` | legacy |  | native binding |
-| `thing.forbidden` | gameplay | 0.5.0 | `game.things.forbidden` |
-| `thing.has_comp` | gameplay | 0.5.0 | `game.things.has_comp` |
-| `thing.heal` | gameplay | 0.5.0 | `game.things.heal` |
+| `thing.forbidden` | gameplay | 0.5.0 | `thing:forbidden` |
+| `thing.has_comp` | gameplay | 0.5.0 | `thing:has_comp` |
+| `thing.heal` | gameplay | 0.5.0 | `thing:heal` |
 | `thing.hp` | legacy |  | native binding |
-| `thing.info` | gameplay | 0.5.0 | `game.things.info` |
-| `thing.inner` | gameplay |  | `game.things.inner` |
+| `thing.info` | gameplay | 0.5.0 | `thing:info` |
+| `thing.inner` | gameplay |  | `thing:inner` |
 | `thing.label` | legacy |  | native binding |
 | `thing.label_short` | legacy |  | native binding |
 | `thing.make` | gameplay | 0.5.0 | `game.things.make` |
 | `thing.map` | legacy |  | native binding |
 | `thing.max_hp` | legacy |  | native binding |
-| `thing.minify` | gameplay |  | `game.things.minify` |
-| `thing.owners` | gameplay |  | `game.things.owners` |
+| `thing.minify` | gameplay |  | `thing:minify` |
+| `thing.owners` | gameplay |  | `thing:owners` |
 | `thing.pos` | legacy |  | native binding |
-| `thing.quality` | gameplay | 0.5.0 | `game.things.quality` |
+| `thing.quality` | gameplay | 0.5.0 | `thing:quality` |
 | `thing.random_stuff` | gameplay |  | `game.things.random_stuff` |
 | `thing.roll_quality` | gameplay |  | `game.things.roll_quality` |
-| `thing.rotation` | gameplay | 0.5.0 | `game.things.rotation` |
+| `thing.rotation` | gameplay | 0.5.0 | `thing:rotation` |
 | `thing.set_faction` | legacy |  | native binding |
-| `thing.set_forbidden` | gameplay | 0.5.0 | `game.things.set_forbidden` |
+| `thing.set_forbidden` | gameplay | 0.5.0 | `thing:set_forbidden` |
 | `thing.set_hp` | legacy |  | native binding |
 | `thing.set_pos` | legacy |  | native binding |
-| `thing.set_quality` | gameplay | 0.5.0 | `game.things.set_quality` |
-| `thing.set_rotation` | gameplay | 0.5.0 | `game.things.set_rotation` |
+| `thing.set_quality` | gameplay | 0.5.0 | `thing:set_quality` |
+| `thing.set_rotation` | gameplay | 0.5.0 | `thing:set_rotation` |
 | `thing.set_stack` | legacy |  | native binding |
-| `thing.set_storage_priority` | gameplay |  | `game.things.set_storage_priority` |
-| `thing.set_style` | gameplay |  | `game.things.set_style` |
+| `thing.set_storage_priority` | gameplay |  | `thing:set_storage_priority` |
+| `thing.set_style` | gameplay |  | `thing:set_style` |
 | `thing.spawn_at` | gameplay | 0.5.0 | `game.things.spawn_at` |
 | `thing.spawned` | legacy |  | native binding |
 | `thing.stack` | legacy |  | native binding |
-| `thing.storage_allows` | gameplay |  | `game.things.storage_allows` |
-| `thing.storage_priority` | gameplay |  | `game.things.storage_priority` |
-| `thing.storage_set_allowed` | gameplay |  | `game.things.storage_set_allowed` |
-| `thing.stuff` | gameplay | 0.5.0 | `game.things.stuff` |
+| `thing.storage_allows` | gameplay |  | `thing:storage_allows` |
+| `thing.storage_priority` | gameplay |  | `thing:storage_priority` |
+| `thing.storage_set_allowed` | gameplay |  | `thing:storage_set_allowed` |
+| `thing.stuff` | gameplay | 0.5.0 | `thing:stuff` |
 | `thing.stuff_options` | gameplay |  | `game.things.stuff_options` |
-| `thing.style` | gameplay |  | `game.things.style` |
+| `thing.style` | gameplay |  | `thing:style` |
 | `thing.thing_set` | gameplay |  | `game.things.thing_set` |
 | `thing.thing_set_defs` | gameplay |  | `game.things.thing_set_defs` |
-| `thing.unassign_owner` | gameplay |  | `game.things.unassign_owner` |
+| `thing.unassign_owner` | gameplay |  | `thing:unassign_owner` |
 
 ## time
 

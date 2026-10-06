@@ -134,9 +134,9 @@ destroy(id: integer) -> boolean | Frees a material.
 load_bundle(package_id: string, path: string) -> string[] | Loads an asset bundle from the mod folder and registers its shaders. Returns their names.
 
 @kit domain=effects op=effects subject=map:RimMapRef title="Effects" page=effects
-fleck(def: string, x: integer, z: integer, opts?: RimFleckOptions) -> boolean | Spawns a fleck, a short visual effect, on a cell.
-text(x: integer, z: integer, text: string, color?: string) -> boolean | Floats a line of text up from a cell.
-effecter(def: string, x: integer, z: integer) -> boolean | Plays an effecter once at a cell.
+fleck(def: string, x: integer, z: integer, opts?: RimFleckOptions) -> boolean | Spawns a fleck, a short visual effect, on a cell. Also fleck(anchor, def, opts?) with a thing or pawn as the anchor.
+text(x: integer, z: integer, text: string, color?: string) -> boolean | Floats a line of text up from a cell. Also text(anchor, text, color?) where the anchor is a thing or pawn, and the color can be a name such as red, orange, yellow, green, blue, white, gray, purple or cyan.
+effecter(def: string, x: integer, z: integer) -> boolean | Plays an effecter once at a cell. Also effecter(anchor, def) with a thing or pawn as the anchor.
 highlight_cells(cells: RimCell[], opts?: RimOverlayOptions) -> integer | Outlines a set of cells. Returns an overlay id.
 line(x: integer, z: integer, x2: integer, z2: integer, opts?: RimOverlayOptions) -> integer | Draws a line between two cells.
 circle(x: integer, z: integer, radius: number, opts?: RimOverlayOptions) -> integer | Draws a circle outline.

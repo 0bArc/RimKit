@@ -3,7 +3,7 @@
 Experimental. Skills, needs, traits, thoughts, relations, backstory, capacities, timetable and genes for any pawn, without `game.reflect`. See [API stability](stability.md) and [naming](naming.md).
 
 ```lua
-local pawn = rim.wrap(game.maps.colonists(game.current_map().handle)[1])
+local pawn = game.selection.pawns()[1]
 
 game.pawns.set_passion(pawn, "Shooting", "Major")
 game.pawns.add_trait(pawn, "Beauty", 2)
@@ -39,7 +39,7 @@ Without the kit, setting a passion needs `game.reflect` and knowledge of `Pawn_S
 | `set_passion(pawn, skill, passion)` | `true`. `passion` is `"None"`, `"Minor"` or `"Major"` |
 | `add_skill_xp(pawn, skill, amount [, direct])` | The level after the XP |
 
-The older `skill(pawn, name)` (level only) and `set_skill(pawn, name, level)` keep working.
+`skill(pawn, name)` returns the level only, and `set_skill(pawn, name, level)` sets it.
 
 ## Needs
 
@@ -58,7 +58,7 @@ The older `skill(pawn, name)` (level only) and `set_skill(pawn, name, level)` ke
 | `add_trait(pawn, def [, degree])` | `true`, or `false` if the pawn already has it. A degree the trait does not have raises RK1001 and lists the valid ones |
 | `remove_trait(pawn, def)` | boolean |
 
-Degrees matter: `Beauty` has -2 to 2, `Nerves` has -2 to 2, and so on. The older `pawn:add_trait(def)` always used degree 0.
+Degrees matter: `Beauty` has -2 to 2, `Nerves` has -2 to 2, and so on. `pawn:add_trait(def)` uses degree 0.
 
 ## Thoughts and opinions
 
@@ -150,7 +150,7 @@ Every function above is in the [reference](reference.md#pawns) with its paramete
 ```
 
 ```lua
-game.ui.message(game.ui.translate("TameAnomalies_Recruited", "Revenant"))
+game.ui.say("TameAnomalies_Recruited", "Revenant")  -- same as game.ui.message(game.ui.translate(...))
 ```
 
 ## Notes

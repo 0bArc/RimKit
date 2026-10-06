@@ -1,6 +1,6 @@
 # Cookbook
 
-One recipe for every row of the [mod ideas](../mod-ideas.md) list. Each is a starting point: copy it into `Lua/main.lua`, change the numbers, and read the kit page it links to. The recipes are short on purpose. They show which functions to reach for, not a finished mod.
+One recipe for every row of the [mod ideas](../mod-ideas.md) list. Each is a starting point: copy it into `Lua/main.luau`, change the numbers, and read the kit page it links to. The recipes are short on purpose. They show which functions to reach for, not a finished mod.
 
 How to read them:
 
@@ -222,9 +222,9 @@ end)
 **Damage numbers.** Floating text for hits. [effects](../api/effects.md)
 
 ```lua
-game.events.on("thing.damaged", function(e)
-  local c = game.things.info(e.thing)
-  game.effects.text(game.maps.current(), c.x, c.z, tostring(math.floor(e.dealt)), "warning")
+-- the filter runs before the function, so walls and animals never reach it
+game.events.on("pawn.damaged", { humanlike = true, min_dealt = 1 }, function(e)
+  game.effects.text(e.pawn, tostring(math.floor(e.dealt)), "orange")
 end)
 ```
 
@@ -406,7 +406,7 @@ end
 
 ```lua
 game.events.on("pawn.died", function(e)
-  local c = game.things.info(e.pawn)
+  local c = e.pawn:info()
   game.things.spawn_at("Grave", game.maps.current(), c.x, c.z)
 end)
 ```
@@ -447,7 +447,7 @@ end)
 function pay_tribute(faction, silver)
   local have = game.query.count_by_def({ map = game.maps.current(), def = "Silver" }).Silver or 0
   if have >= silver then
-    -- take the silver with game.things.destroy_with on the stacks, then raise goodwill
+    -- take the silver with stack:destroy_with() on the stacks, then raise goodwill
     game.factions.adjust_goodwill(faction, game.factions.player(), silver / 10)
   end
 end
@@ -516,7 +516,7 @@ game.defs.set("ThingDef", "Steel", "stackLimit", 300)
 
 ```lua
 game.events.on("pawn.died", function(e)
-  if game.pawns.is_colonist(e.pawn) then game.ui.message("Permadeath: " .. e.pawn.name) end
+  if e.pawn.is_colonist then game.ui.message("Permadeath: " .. e.pawn.name) end
 end)
 ```
 
@@ -743,14 +743,6 @@ t.describe("my mod", function()
     t.expect(t.logged("Low on medicine")).to_be(true)
   end)
 end)
-```
-
-**Migration and lint bots.** Run the CLI in CI. [publishing](publishing.md)
-
-```text
-rimkit migrate --check src
-rimkit mod check .
-rimkit mod test .
 ```
 
 **Mod pack manager.** List active mods and switch one off. [interop](../api/interop.md)

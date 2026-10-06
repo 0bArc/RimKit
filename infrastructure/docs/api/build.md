@@ -7,7 +7,7 @@ Four kits cover building: `game.build` (blueprints, frames, instant building), `
 
 ```lua
 local map = game.maps.current()
-local c = game.things.info(colonist)
+local c = colonist:info()
 
 -- Plan a wall line
 for dx = 1, 5 do

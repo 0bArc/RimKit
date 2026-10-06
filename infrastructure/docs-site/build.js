@@ -66,6 +66,8 @@ const marked = new Marked(
   markedHighlight({
     langPrefix: "hljs language-",
     highlight(code, lang) {
+      // Diagrams stay as plain text. app.js turns them into SVG in the browser.
+      if (lang === "mermaid") return escapeHtml(code);
       if (lang && hljs.getLanguage(lang)) {
         return hljs.highlight(code, { language: lang }).value;
       }
@@ -74,12 +76,26 @@ const marked = new Marked(
   })
 );
 
+// Set when a page has a diagram, so the library is copied into the site only then.
+let usesMermaid = false;
+
+// The page being rendered, so a relative link such as "../api/pawns.md" can be resolved against it.
+let currentRel = "index.md";
+
 function safeHref(href) {
   let url = href || "";
   if (!url) return "#";
   if (/^\s*(javascript|vbscript|data):/i.test(url)) return "#";
   if (!/^(https?:|mailto:|steam:|#|\/)/i.test(url)) {
-    url = url.replace(/\.md(?=(#|$))/, ".html");
+    const m = /^([^#]*)(#.*)?$/.exec(url);
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(currentRel), m[1]));
+    if (m[1] && /\.md$/.test(target) && !target.startsWith("..")) {
+      url = htmlHref(target) + (m[2] || "");
+    } else if (m[1] && target.startsWith("..")) {
+      // Outside the docs folder: the file in the repository on GitHub.
+      const inRepo = path.posix.normalize(path.posix.join("infrastructure/docs", target));
+      url = nav.repo_url + "/blob/main/" + inRepo + (m[2] || "");
+    }
   }
   return url;
 }
@@ -120,9 +136,11 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// a/b.md is written to a/b/index.html so the address is /a/b/ with no extension. A page called index.md stays index.html.
 function mdToHtmlPath(rel) {
   if (rel === "index.md") return "index.html";
-  return rel.replace(/\.md$/, ".html");
+  if (/(^|\/)index\.md$/.test(rel)) return rel.replace(/\.md$/, ".html");
+  return rel.replace(/\.md$/, "/index.html");
 }
 
 function withBase(p) {
@@ -132,7 +150,7 @@ function withBase(p) {
 
 function htmlHref(rel) {
   if (rel === "index.md") return withBase("/");
-  return withBase("/" + mdToHtmlPath(rel).replace(/\\/g, "/"));
+  return withBase("/" + mdToHtmlPath(rel).replace(/\\/g, "/").replace(/index\.html$/, ""));
 }
 
 function collectPaths(nodes, out = []) {
@@ -332,6 +350,14 @@ function layout({ title, description, rel, bodyHtml, tocHtml, hasSidebar, hasToc
     ? `<aside class="toc"><p class="toc__label">On this page</p><nav>${tocHtml}</nav></aside>`
     : "";
 
+  // Mermaid is served from the site itself (the page policy only allows scripts from 'self') and only on pages that have a diagram.
+  let diagramScript = "";
+  if (bodyHtml.includes("language-mermaid")) {
+    usesMermaid = true;
+    diagramScript = `<script src="${withBase("/assets/mermaid.min.js")}"></script>
+  `;
+  }
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -369,8 +395,8 @@ function layout({ title, description, rel, bodyHtml, tocHtml, hasSidebar, hasToc
   <div class="${shellClass}">
     ${side}
     <main class="content">
-      <div class="crumbs">${breadcrumbs(rel, title)}</div>
-      <article class="prose">${bodyHtml}</article>
+      <div class="crumbs${rel === "index.md" ? " crumbs--home" : ""}">${breadcrumbs(rel, title)}<a class="crumbs__source" href="${escapeAttr(nav.repo_url + "/blob/main/infrastructure/docs/" + rel)}" target="_blank" rel="noopener noreferrer">View source (.md)</a></div>
+      <article class="prose${rel === "index.md" ? " prose--home" : ""}">${bodyHtml}</article>
     </main>
     ${toc}
   </div>
@@ -378,7 +404,7 @@ function layout({ title, description, rel, bodyHtml, tocHtml, hasSidebar, hasToc
     <span>© 2026 Stratware.win</span>
     <span>Efficiency First</span>
   </footer>
-  <script src="${withBase("/assets/app.js")}"></script>
+  ${diagramScript}<script src="${withBase("/assets/app.js")}"></script>
 </body>
 </html>
 `;
@@ -394,6 +420,7 @@ function main() {
   ensureDir(path.join(outDir, "assets"));
   fs.copyFileSync(path.join(themeDir, "styles.css"), path.join(outDir, "assets", "styles.css"));
   fs.copyFileSync(path.join(themeDir, "app.js"), path.join(outDir, "assets", "app.js"));
+  if (fs.existsSync(path.join(themeDir, "api-details.json"))) fs.copyFileSync(path.join(themeDir, "api-details.json"), path.join(outDir, "assets", "api-details.json"));
 
   const navPaths = new Set(collectPaths(nav.tabs));
   const allMd = walk(docsDir).filter((f) => f.endsWith(".md"));
@@ -405,7 +432,10 @@ function main() {
     const raw = fs.readFileSync(file, "utf8");
     const title = extractTitle(raw, path.basename(rel, ".md"));
     const processed = preprocessMarkdown(raw);
+    currentRel = rel;
     let bodyHtml = marked.parse(processed);
+    // Links written as raw HTML (the home page cards and buttons) get the same .md to page rewrite as markdown links.
+    bodyHtml = bodyHtml.replace(/<a ([^>]*?)href="([^"]+)"/g, (m, before, href) => `<a ${before}href="${escapeAttr(safeHref(href))}"`);
     bodyHtml = sanitizeHtml(String(bodyHtml), SANITIZE);
     bodyHtml = addHeadingIds(bodyHtml);
     const toc = extractToc(bodyHtml);
@@ -414,7 +444,7 @@ function main() {
       .join("");
 
     const hasSidebar = Boolean(sidebarFor(rel));
-    const hasToc = toc.length > 0;
+    const hasToc = toc.length > 0 && rel !== "index.md";
     const page = layout({
       title,
       description: nav.site_description,
@@ -438,6 +468,12 @@ function main() {
       .trim()
       .slice(0, 8000);
     searchIndex.push({ title, url: htmlHref(rel), text, inNav: navPaths.has(rel) });
+  }
+
+  if (usesMermaid) {
+    const lib = path.join(__dirname, "node_modules", "mermaid", "dist", "mermaid.min.js");
+    if (!fs.existsSync(lib)) throw new Error("a page has a diagram but mermaid is not installed: run npm install in infrastructure/docs-site");
+    fs.copyFileSync(lib, path.join(outDir, "assets", "mermaid.min.js"));
   }
 
   fs.writeFileSync(path.join(outDir, "search.json"), JSON.stringify(searchIndex), "utf8");

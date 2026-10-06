@@ -13,9 +13,45 @@ rimkit mod test src\examples\hello_lua
 rimkit mod test --verbose
 ```
 
-`rimkit mod create` adds `Tests/main_test.lua`, a test of the new mod's own on_load code. The command exits with 1 when a test fails, so it fits a CI job. It needs `rimlua_core.dll`: it looks next to `rimkit.exe`, in `../mod/Native`, and in the `RIMKIT_CORE` environment variable (or pass `--core path`).
+`rimkit mod create` adds `Tests/main_test.luau`, a test of the new mod's own on_load code. The command exits with 1 when a test fails, so it fits a CI job. It needs `rimlua_core.dll`: it looks next to `rimkit.exe`, in `../mod/Native`, and in the `RIMKIT_CORE` environment variable (or pass `--core path`).
 
 ## Writing a test
+
+In files under `Tests/` you get `describe`, `it`, `expect`, `mock` and `effects` without importing anything. `mock.pawn()` makes a pawn the game would describe, `game.emit` sends an event with it, and `expect(effects.text)` checks what the mod asked the game to show.
+
+```lua
+describe("damage", function()
+  it("shows damage for a hurt colonist", function()
+    local pawn = mock.pawn({ colonist = true, position = { x = 12, z = 30 } })
+
+    game.emit.pawn_damaged(pawn, 7.8)
+
+    expect(effects.text).to_have_been_called({ target = pawn, text = "7", color = "#ff4d4d" })
+  end)
+
+  it("ignores animals", function()
+    local pawn = mock.pawn({ humanlike = false })
+
+    game.emit.pawn_damaged(pawn, 5)
+
+    expect(effects.text).not_to_have_been_called()
+  end)
+end)
+```
+
+| Piece | Does |
+|-------|------|
+| `mock.pawn({ humanlike, colonist, name, position, map, def, hp })` | A pawn. It answers `is_humanlike`, `is_colonist`, `name`, its cell and its map. `position = false` is a pawn that is not on a map. Defaults: humanlike, not a colonist, at 10, 10 |
+| `mock.thing({ def, hp, stack, position, map })` | A thing that answers `def`, `hp`, `stack`, its cell and its map |
+| `game.emit.<domain>_<event>(subject, extra)` | Sends the event `domain.event`. `game.emit.pawn_damaged(pawn, 7.8)` sends `pawn.damaged`. A number fills the amount the event is about (`dealt` for `damaged`, `amount` otherwise). A table adds fields: `game.emit.pawn_damaged(pawn, { dealt = 7 })` |
+| `effects.text`, `spy.<domain>.<name>` | A spy on the host call `effects.text`. Any call a mod makes to the game can be spied on this way |
+| `expect(spy).to_have_been_called(match?)` | The call happened. With a table, one call has these argument values. `target = pawn` matches the cell of a mock pawn or thing |
+| `expect(spy).not_to_have_been_called(match?)` | The call never happened, or never with these values |
+| `expect(spy).to_have_been_called_times(n)` | The call happened exactly `n` times |
+| `game.test.errors()` | How many handler errors the mod raised during this test |
+| `game.test.handler_calls("pawn.damaged")` | How often handlers for the event ran after their filter let the event through |
+
+The same API also works with the long names (`local t = game.test`, `t.mock(op, answer)`, `t.emit(name, payload)`), which you use to answer any other call the game would make:
 
 ```lua
 local t = game.test
@@ -53,6 +89,38 @@ The mock host is strict where the real game would be, so a passing test cannot h
 
 Op names are the kit names: `game.pawns.skills` is the op `pawn.skills`, and the argument keys are the parameter names, with the subject object under `h`. The reference page of each kit lists the functions, and `t.calls()` shows the exact op and arguments when you are unsure.
 
+## Generate tests
+
+You do not have to write the first tests by hand. `rimkit mod gen-tests` loads the mod against the mock host, sees which events it registered and with which filters, and writes `Tests/generated_test.luau`:
+
+```text
+rimkit mod gen-tests
+rimkit mod test
+```
+
+For the damage example it writes tests like these:
+
+```lua
+it("pawn.damaged: handles a matching event", function()
+  local subject = mock.pawn({ humanlike = true })
+  game.emit.pawn_damaged(subject, { dealt = 2 })
+  expect(game.test.errors()).to_be(0)
+  expect(game.test.handler_calls("pawn.damaged") >= 1).to_be(true)
+end)
+
+it("pawn.damaged: ignores a pawn that is not humanlike", function()
+  local subject = mock.pawn({ humanlike = false })
+  game.emit.pawn_damaged(subject, { dealt = 2 })
+  expect(game.test.handler_calls("pawn.damaged")).to_be(0)
+end)
+```
+
+- Every event handler gets a test that sends a matching event and checks that nothing raised an error and the handler ran.
+- Every filter key gets a test that breaks it (`humanlike`, `colonist`, `def`, `min_dealt`, or a payload field) and checks that the handler did not run. Those are skipped for an event that has more than one handler, because the count cannot tell them apart.
+- There is one test that the mod loads without errors.
+- The generator reads what the mod registers, not what it does. It cannot know that the number should be red, so add checks like `expect(effects.text).to_have_been_called(...)` by hand, in your own `Tests/main_test.luau`.
+- Run it again after you change a filter. It overwrites `generated_test.luau` only while the file still starts with its "Generated by" line. Remove that line to keep a hand-edited copy safe, or pass `--force` to replace it anyway.
+
 ## Tips
 
 - Keep logic in small functions and publish them with `game.interop.publish`, or test them through the Lua class or tweak that uses them.
@@ -62,4 +130,4 @@ Op names are the kit names: `game.pawns.skills` is the op `pawn.skills`, and the
 
 ## In game
 
-`game.test` only works under `rimkit mod test`. In the running game its functions raise `RK4001`, because mocks and fake events would corrupt a real game. For scripted checks against a real game, see the in-game smoke suite (`tests/smoke/Lua/main.lua`): it launches RimWorld with `-quicktest`, runs the checks and prints `SMOKE PASS` and `SMOKE FAIL` lines to the log. Copy its runner for your own scenarios.
+`game.test` only works under `rimkit mod test`. In the running game its functions raise `RK4001`, because mocks and fake events would corrupt a real game. For scripted checks against a real game, see the in-game smoke suite (`tests/smoke/Lua/main.luau`): it launches RimWorld with `-quicktest`, runs the checks and prints `SMOKE PASS` and `SMOKE FAIL` lines to the log. Copy its runner for your own scenarios.

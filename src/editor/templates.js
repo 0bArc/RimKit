@@ -14,7 +14,7 @@ const templates = [
     detail: "A lamp whose behaviour is a Lua class (game.classes).",
     capabilities: [],
     files: {
-      "Lua/main.lua": [
+      "Lua/main.luau": [
         "-- {{name}}: a component written in Lua. Defs/Building.xml names the class \"{{id}}_comp\".",
         "game.classes.define(\"comp\", \"{{id}}_comp\", {",
         "  tick_rare = function(thing)",
@@ -53,7 +53,7 @@ const templates = [
     detail: "A new storyteller incident with a Lua worker.",
     capabilities: [],
     files: {
-      "Lua/main.lua": [
+      "Lua/main.luau": [
         "-- {{name}}: an incident written in Lua.",
         "game.classes.define(\"incident\", \"{{id}}_incident\", {",
         "  can_fire = function(parms) return parms.map ~= nil end,",
@@ -88,7 +88,7 @@ const templates = [
     detail: "Change game numbers with the tweak catalog (needs the hooks capability).",
     capabilities: ["hooks"],
     files: {
-      "Lua/main.lua": [
+      "Lua/main.luau": [
         "-- {{name}}: colonists get hungry at half speed. See game.tweaks.list() for every tweak point.",
         "game.tweaks.on(\"pawn.hunger_rate\", function(t)",
         "  return t.value * 0.5",
@@ -103,7 +103,7 @@ const templates = [
     detail: "A key opens a window built from tables.",
     capabilities: [],
     files: {
-      "Lua/main.lua": [
+      "Lua/main.luau": [
         "-- {{name}}: F9 opens a window.",
         "game.input.register_key(\"{{id}}_open\", \"Open {{name}}\", \"F9\")",
         "game.events.on_tick(function()",

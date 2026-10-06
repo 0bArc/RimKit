@@ -215,6 +215,14 @@ std::vector<fs::path> files_with(const fs::path& dir, const std::string& ext) {
     return out;
 }
 
+// Scripts of a mod: .luau first, .lua still accepted.
+std::vector<fs::path> lua_files(const fs::path& dir) {
+    std::vector<fs::path> out = files_with(dir, ".luau");
+    const std::vector<fs::path> more = files_with(dir, ".lua");
+    out.insert(out.end(), more.begin(), more.end());
+    return out;
+}
+
 // Keyed translation keys of one language folder.
 std::map<std::string, std::string> keyed_of(const fs::path& lang_dir) {
     std::map<std::string, std::string> out;
@@ -232,7 +240,7 @@ std::map<std::string, std::string> keyed_of(const fs::path& lang_dir) {
 std::set<std::string> translate_uses(const fs::path& mod_dir) {
     std::set<std::string> keys;
     std::regex re("translate\\(\\s*[\"']([^\"']+)[\"']");
-    for (const fs::path& f : files_with(mod_dir / "Lua", ".lua")) {
+    for (const fs::path& f : lua_files(mod_dir / "Lua")) {
         const std::string text = read_all(f);
         for (const std::string& k : all_matches(text, re)) keys.insert(k);
     }
@@ -420,7 +428,7 @@ int content_check(const fs::path& mod_dir, bool quiet) {
 
     // Capabilities: the permissions the Lua will need should be declared.
     std::string lua_all;
-    for (const fs::path& f : files_with(mod_dir / "Lua", ".lua")) lua_all += read_all(f) + "\n";
+    for (const fs::path& f : lua_files(mod_dir / "Lua")) lua_all += read_all(f) + "\n";
     auto uses_api = [&](const char* needle) { return lua_all.find(needle) != std::string::npos; };
     auto declared = [&](const char* cap) { return std::find(m.capabilities.begin(), m.capabilities.end(), cap) != m.capabilities.end(); };
     if (m.caps_declared) {
@@ -622,7 +630,7 @@ void scaffold_extras(const fs::path& out, const std::string& name, const std::st
     write_if_missing(out / "Workshop.md", "[h1]" + name + "[/h1]\n\nOne sentence that says what the mod does for the player.\n\n[h2]Features[/h2]\n[list]\n[*] First feature\n[*] Second feature\n[/list]\n\n"
                                           "[h2]Requirements[/h2]\n[list]\n[*] Harmony\n[*] RimKit\n[/list]\n\n[h2]Compatibility[/h2]\nSafe to add to a running save. Removing it later leaves no errors.\n\n"
                                           "[h2]Credits[/h2]\nSee CREDITS.md. Source and issues: your repository link.\n");
-    write_if_missing(out / "Tests" / "main_test.lua",
+    write_if_missing(out / "Tests" / "main_test.luau",
                      "-- Run with: rimkit mod test\n"
                      "-- Tests run against a mock host, so no game is needed. Mock what the game would answer, call your code, check the result.\n"
                      "local t = game.test\n\n"

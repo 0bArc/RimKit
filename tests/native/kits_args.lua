@@ -51,7 +51,7 @@ log.info("RESULT tweak " .. tostring(err3):match("RK%d+") .. " " .. #game.tweaks
 game.pawns.set_drafted(leader, true)
 game.pawns.set_drafted(21, false)
 game.pawns.give_hediff(leader, "Flu", 0.5)
-game.things.set_hp(leader, 10)
+leader.hp = 10
 game.anomaly.knock_out(leader, 1.0)
 game.anomaly.start_capture(leader, 22, 23)
 game.work.set_priority(leader, "Cooking", 2)
@@ -64,5 +64,5 @@ game.needs.remove("MyNeed")
 
 -- bind_op functions take a wrapped object as the subject too
 game.pawns.drafted(leader)
-game.things.def(leader)
+local _ = leader.def
 game.maps.width(leader)

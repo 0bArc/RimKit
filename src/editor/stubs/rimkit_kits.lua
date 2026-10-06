@@ -3221,7 +3221,7 @@ function game.materials.load_bundle(package_id, path) end
 
 game.effects = game.effects or {}
 
---- Spawns a fleck, a short visual effect, on a cell.
+--- Spawns a fleck, a short visual effect, on a cell. Also fleck(anchor, def, opts?) with a thing or pawn as the anchor.
 ---@param map RimMapRef
 ---@param def string
 ---@param x integer
@@ -3230,7 +3230,7 @@ game.effects = game.effects or {}
 ---@return boolean
 function game.effects.fleck(map, def, x, z, opts) end
 
---- Floats a line of text up from a cell.
+--- Floats a line of text up from a cell. Also text(anchor, text, color?) where the anchor is a thing or pawn, and the color can be a name such as red, orange, yellow, green, blue, white, gray, purple or cyan.
 ---@param map RimMapRef
 ---@param x integer
 ---@param z integer
@@ -3239,7 +3239,7 @@ function game.effects.fleck(map, def, x, z, opts) end
 ---@return boolean
 function game.effects.text(map, x, z, text, color) end
 
---- Plays an effecter once at a cell.
+--- Plays an effecter once at a cell. Also effecter(anchor, def) with a thing or pawn as the anchor.
 ---@param map RimMapRef
 ---@param def string
 ---@param x integer
@@ -4143,78 +4143,6 @@ function game.raids.fire(opts, h) end
 
 game.things = game.things or {}
 
---- Everything about a thing in one call.
----@param thing RimThingRef
----@return RimThingInfo
-function game.things.info(thing) end
-
---- Awful to Legendary, nil when the thing has no quality.
----@param thing RimThingRef
----@return string?
-function game.things.quality(thing) end
-
---- Accepts a name (any case) or 0 to 6. Raises RK3003 when the thing has no quality.
----@param thing RimThingRef
----@param quality string|integer
----@return string
-function game.things.set_quality(thing, quality) end
-
---- The material def name.
----@param thing RimThingRef
----@return string?
-function game.things.stuff(thing) end
-
---- Whether the thing is forbidden for the player.
----@param thing RimThingRef
----@return boolean
-function game.things.forbidden(thing) end
-
---- Forbids or allows the thing. It must be spawned.
----@param thing RimThingRef
----@param forbidden boolean
----@return boolean
-function game.things.set_forbidden(thing, forbidden) end
-
---- 0 north, 1 east, 2 south, 3 west.
----@param thing RimThingRef
----@return integer
-function game.things.rotation(thing) end
-
---- Sets the rotation, 0 to 3.
----@param thing RimThingRef
----@param rotation integer
----@return integer
-function game.things.set_rotation(thing, rotation) end
-
---- Class names of the comps, for example CompQuality.
----@param thing RimThingRef
----@return string[]
-function game.things.comps(thing) end
-
---- Whether the thing has a comp of this class, with or without the Comp prefix.
----@param thing RimThingRef
----@param class string
----@return boolean
-function game.things.has_comp(thing, class) end
-
---- Deals damage. Damage def defaults to Cut. Returns hit points left.
----@param thing RimThingRef
----@param amount number
----@param damage_def? string
----@return integer
-function game.things.damage(thing, amount, damage_def) end
-
---- Restores hit points to the maximum. Not for pawns.
----@param thing RimThingRef
----@return integer
-function game.things.heal(thing) end
-
---- Destroys with a mode: Vanish, Deconstruct, KillFinalize, Refund, Cancel or FailConstruction.
----@param thing RimThingRef
----@param mode? string
----@return boolean
-function game.things.destroy_with(thing, mode) end
-
 game.things = game.things or {}
 
 --- Creates a thing without placing it.
@@ -4233,68 +4161,6 @@ function game.things.make(def, opts) end
 function game.things.spawn_at(def, map, x, z, opts) end
 
 game.things = game.things or {}
-
---- Turns a minifiable building into a minified item in place. Returns the minified thing.
----@param thing RimThingRef
----@return RimThing
-function game.things.minify(thing) end
-
---- The thing inside a minified item.
----@param thing RimThingRef
----@return RimThing?
-function game.things.inner(thing) end
-
---- The style def name of the thing.
----@param thing RimThingRef
----@return string?
-function game.things.style(thing) end
-
---- Sets the style by def name, or clears it when nil.
----@param thing RimThingRef
----@param style? string
----@return boolean
-function game.things.set_style(thing, style) end
-
---- Pawns assigned to this thing, for beds and similar. Raises RK3003 when it cannot be assigned.
----@param thing RimThingRef
----@return RimPawn[]
-function game.things.owners(thing) end
-
---- Assigns a pawn to a bed or other assignable thing.
----@param thing RimThingRef
----@param pawn RimPawn
----@return boolean
-function game.things.assign_owner(thing, pawn) end
-
---- Removes an assignment.
----@param thing RimThingRef
----@param pawn RimPawn
----@return boolean
-function game.things.unassign_owner(thing, pawn) end
-
---- Whether a storage building or stockpile accepts a thing def.
----@param thing RimThingRef
----@param def string
----@return boolean
-function game.things.storage_allows(thing, def) end
-
---- Changes what a storage building accepts.
----@param thing RimThingRef
----@param def string
----@param allowed boolean
----@return boolean
-function game.things.storage_set_allowed(thing, def, allowed) end
-
---- Unstored, Low, Normal, Preferred, Important or Critical.
----@param thing RimThingRef
----@return string
-function game.things.storage_priority(thing) end
-
---- Sets the storage priority.
----@param thing RimThingRef
----@param priority string
----@return string
-function game.things.set_storage_priority(thing, priority) end
 
 game.factions = game.factions or {}
 
@@ -4873,3 +4739,116 @@ function game.save.now(name) end
 --- Saved games on disk.
 ---@return RimSaveFile[]
 function game.save.files() end
+
+---@class RimThing
+local RimThing = {}
+
+--- Everything about a thing in one call.
+---@return RimThingInfo
+function RimThing:info() end
+
+--- Awful to Legendary, nil when the thing has no quality.
+---@return string?
+function RimThing:quality() end
+
+--- Accepts a name (any case) or 0 to 6. Raises RK3003 when the thing has no quality.
+---@param quality string|integer
+---@return string
+function RimThing:set_quality(quality) end
+
+--- The material def name.
+---@return string?
+function RimThing:stuff() end
+
+--- Whether the thing is forbidden for the player.
+---@return boolean
+function RimThing:forbidden() end
+
+--- Forbids or allows the thing. It must be spawned.
+---@param forbidden boolean
+---@return boolean
+function RimThing:set_forbidden(forbidden) end
+
+--- 0 north, 1 east, 2 south, 3 west.
+---@return integer
+function RimThing:rotation() end
+
+--- Sets the rotation, 0 to 3.
+---@param rotation integer
+---@return integer
+function RimThing:set_rotation(rotation) end
+
+--- Class names of the comps, for example CompQuality.
+---@return string[]
+function RimThing:comps() end
+
+--- Whether the thing has a comp of this class, with or without the Comp prefix.
+---@param class string
+---@return boolean
+function RimThing:has_comp(class) end
+
+--- Deals damage. Damage def defaults to Cut. Returns hit points left.
+---@param amount number
+---@param damage_def? string
+---@return integer
+function RimThing:damage(amount, damage_def) end
+
+--- Restores hit points to the maximum. Not for pawns.
+---@return integer
+function RimThing:heal() end
+
+--- Destroys with a mode: Vanish, Deconstruct, KillFinalize, Refund, Cancel or FailConstruction.
+---@param mode? string
+---@return boolean
+function RimThing:destroy_with(mode) end
+
+--- Turns a minifiable building into a minified item in place. Returns the minified thing.
+---@return RimThing
+function RimThing:minify() end
+
+--- The thing inside a minified item.
+---@return RimThing?
+function RimThing:inner() end
+
+--- The style def name of the thing.
+---@return string?
+function RimThing:style() end
+
+--- Sets the style by def name, or clears it when nil.
+---@param style? string
+---@return boolean
+function RimThing:set_style(style) end
+
+--- Pawns assigned to this thing, for beds and similar. Raises RK3003 when it cannot be assigned.
+---@return RimPawn[]
+function RimThing:owners() end
+
+--- Assigns a pawn to a bed or other assignable thing.
+---@param pawn RimPawn
+---@return boolean
+function RimThing:assign_owner(pawn) end
+
+--- Removes an assignment.
+---@param pawn RimPawn
+---@return boolean
+function RimThing:unassign_owner(pawn) end
+
+--- Whether a storage building or stockpile accepts a thing def.
+---@param def string
+---@return boolean
+function RimThing:storage_allows(def) end
+
+--- Changes what a storage building accepts.
+---@param def string
+---@param allowed boolean
+---@return boolean
+function RimThing:storage_set_allowed(def, allowed) end
+
+--- Unstored, Low, Normal, Preferred, Important or Critical.
+---@return string
+function RimThing:storage_priority() end
+
+--- Sets the storage priority.
+---@param priority string
+---@return string
+function RimThing:set_storage_priority(priority) end

@@ -196,7 +196,7 @@ namespace RimKit
                 "Built on:\n" +
                 "  - RimWorld (Ludeon Studios)\n" +
                 "  - Harmony (pardeike)\n" +
-                "  - Lua 5.4\n" +
+                "  - Luau\n" +
                 "  - sol2\n\n" +
                 "Sandbox: Lua cannot reach os/io/process APIs.\n" +
                 "Builtin pAuth: binary allowlist + per-mod Lua quarantine + sandboxed VM.\n" +

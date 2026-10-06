@@ -18,7 +18,7 @@ How to author, test, and ship a RimKit Lua mod.
 
 ## Quality
 
-- [Testing](testing.md): `Tests/*.lua` and `rimkit mod test`
+- [Testing](testing.md): `Tests/*.luau` and `rimkit mod test`
 - [Save safety](save-safety.md): stamps, migrations, load failures
 - [Performance](performance.md): ticks, hooks, and profiler tips
 - [Security](security.md): sandbox and what Lua cannot do

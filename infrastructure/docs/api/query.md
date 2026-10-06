@@ -24,6 +24,6 @@ local map = game.maps.current()
 local counts = game.query.count_by_def({ map = map, group = "HaulableEver" })
 local steel = counts.Steel or 0
 -- Hostile pawns near the first colonist
-local c = game.things.info(game.maps.colonists(map)[1])
+local c = game.maps.colonists(map)[1]:info()
 local danger = game.query.pawns({ map = map, faction = "hostile", area = { x1 = c.x - 20, z1 = c.z - 20, x2 = c.x + 20, z2 = c.z + 20 } })
 ```

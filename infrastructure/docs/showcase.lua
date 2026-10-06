@@ -1,5 +1,5 @@
 -- RimKit showcase snippets
--- Copy any block into a mod Lua/main.lua (needs Harmony + RimKit).
+-- Copy any block into a mod Lua/main.luau (needs Harmony + RimKit).
 -- Prefer bound tables: rim.pawn.*, anomaly.*, ui.*, data.*
 -- rim.invoke is escape-only: api.list / reflect.*
 
@@ -50,7 +50,7 @@ end)
 -- 4) Harmony prefix (Experimental; ctx table)
 ------------------------------------------------------------------------
 
-rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(ctx)
+game.hooks.before["RimWorld.JobGiver_GetFood"].TryGiveJob = function(ctx)
   local pawn = ctx.pawn or ctx.instance
   -- return true = continue vanilla; false = skip
   if not pawn or not pawn.is_colonist then
@@ -60,8 +60,8 @@ rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(ctx)
   return true
 end
 
--- same idea, string form:
--- rim.events.prefix["RimWorld.JobGiver_GetFood.TryGiveJob"] = function(ctx) return true end
+-- same idea, one call with options:
+-- game.hooks.prefix("RimWorld.JobGiver_GetFood", "TryGiveJob", function(ctx) return true end)
 
 ------------------------------------------------------------------------
 -- 5) Save data + panel UI

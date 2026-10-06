@@ -37,19 +37,10 @@ file(STRINGS "${RIMKIT_VERSION_FILE}" RIMKIT_VERSION LIMIT_COUNT 1)
 file(STRINGS "${RIMKIT_API_LEVEL_FILE}" RIMKIT_API_LEVEL LIMIT_COUNT 1)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/core/version_data.hpp.in" "${CMAKE_CURRENT_BINARY_DIR}/generated/version_data.hpp" @ONLY)
 
-set(LUA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lua")
 set(SOL2_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/sol2")
-
-file(GLOB LUA_SOURCES "${LUA_DIR}/*.c")
-list(FILTER LUA_SOURCES EXCLUDE REGEX ".*/lua\\.c$")
-list(FILTER LUA_SOURCES EXCLUDE REGEX ".*/luac\\.c$")
-list(FILTER LUA_SOURCES EXCLUDE REGEX ".*/onelua\\.c$")
-
-add_library(lua_static STATIC ${LUA_SOURCES})
-target_include_directories(lua_static PUBLIC "${LUA_DIR}")
-if(MSVC)
-  target_compile_definitions(lua_static PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
+# Luau VM and compiler. sol2 has no Luau support, so core/luau_compat holds the Lua 5.4 names it expects.
+add_subdirectory(third_party/luau)
+set(LUAU_COMPAT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/core/luau_compat")
 
 add_library(rimlua_core SHARED
   core/abi.cpp
@@ -61,22 +52,23 @@ add_library(rimlua_core SHARED
   core/ecosystem.cpp
   core/canonical_bind.cpp
 )
-target_compile_definitions(rimlua_core PRIVATE RIMLUA_EXPORTS SOL_ALL_SAFETIES_ON=1)
+target_compile_definitions(rimlua_core PRIVATE RIMLUA_EXPORTS SOL_ALL_SAFETIES_ON=1 SOL_USING_CXX_LUA=1)
 target_include_directories(rimlua_core
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/core"
     "${CMAKE_CURRENT_BINARY_DIR}/generated"
+    "${LUAU_COMPAT_DIR}"
     "${SOL2_DIR}/include"
 )
-target_link_libraries(rimlua_core PRIVATE lua_static)
+target_link_libraries(rimlua_core PRIVATE luau_static)
 if(MSVC)
   target_compile_options(rimlua_core PRIVATE /EHsc /W3 /bigobj)
 endif()
 
 add_executable(rimkit cli/main.cpp cli/tools.cpp cli/tools_content.cpp)
-target_include_directories(rimkit PRIVATE "${SOL2_DIR}/include" "${LUA_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_BINARY_DIR}/generated")
-target_compile_definitions(rimkit PRIVATE SOL_ALL_SAFETIES_ON=1)
-target_link_libraries(rimkit PRIVATE lua_static)
+target_include_directories(rimkit PRIVATE "${LUAU_COMPAT_DIR}" "${SOL2_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/core" "${CMAKE_CURRENT_BINARY_DIR}/generated")
+target_compile_definitions(rimkit PRIVATE SOL_ALL_SAFETIES_ON=1 SOL_USING_CXX_LUA=1)
+target_link_libraries(rimkit PRIVATE luau_static)
 if(MSVC)
   target_compile_options(rimkit PRIVATE /EHsc /W3)
 endif()

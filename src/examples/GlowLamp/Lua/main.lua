@@ -12,7 +12,7 @@ game.classes.define("comp", "glow_pulse", {
     local pulses = (tonumber(game.classes.data_get(thing, "pulses")) or 0) + 1
     game.classes.data_set(thing, "pulses", tostring(pulses))
     if pulses % 4 == 0 then
-      local info = game.things.info(thing)
+      local info = thing:info()
       game.effects.text(info.map, info.x, info.z, game.ui.translate("glowlamp_Spark"), "good")
     end
   end,

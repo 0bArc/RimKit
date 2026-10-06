@@ -5,10 +5,12 @@
 
 Overlays stay until their `ticks` run out or you clear them, and return an id for `clear`.
 
+`text`, `fleck` and `effecter` also take a thing or pawn as the first argument, so you do not unpack its cell: `game.effects.text(pawn, "12", "red")`. `text` accepts the color names `red`, `orange`, `yellow`, `green`, `blue`, `white`, `gray`, `purple` and `cyan`, and the theme names such as `good` and `warning`, as well as hex.
+
 ```lua
 local map = game.maps.current()
 -- Show the reach of a turret
-local t = game.things.info(turret)
+local t = turret:info()
 game.effects.circle(map, t.x, t.z, 25, { color = "warning" })
 
 -- Highlight every cell of a stockpile for a few seconds
@@ -22,9 +24,9 @@ game.effects.text(map, t.x, t.z, "Nice!", "good")
 
 | Function | Parameters | Returns | Description |
 |----------|------------|---------|-------------|
-| `game.effects.fleck` | `map, def, x, z, opts?` | `boolean` | Spawns a fleck, a short visual effect, on a cell. |
-| `game.effects.text` | `map, x, z, text, color?` | `boolean` | Floats a line of text up from a cell. |
-| `game.effects.effecter` | `map, def, x, z` | `boolean` | Plays an effecter once at a cell. |
+| `game.effects.fleck` | `map, def, x, z, opts?` | `boolean` | Spawns a fleck, a short visual effect, on a cell. Also fleck(anchor, def, opts?) with a thing or pawn as the anchor. |
+| `game.effects.text` | `map, x, z, text, color?` | `boolean` | Floats a line of text up from a cell. Also text(anchor, text, color?) where the anchor is a thing or pawn, and the color can be a name such as red, orange, yellow, green, blue, white, gray, purple or cyan. |
+| `game.effects.effecter` | `map, def, x, z` | `boolean` | Plays an effecter once at a cell. Also effecter(anchor, def) with a thing or pawn as the anchor. |
 | `game.effects.highlight_cells` | `map, cells, opts?` | `integer` | Outlines a set of cells. Returns an overlay id. |
 | `game.effects.line` | `map, x, z, x2, z2, opts?` | `integer` | Draws a line between two cells. |
 | `game.effects.circle` | `map, x, z, radius, opts?` | `integer` | Draws a circle outline. |

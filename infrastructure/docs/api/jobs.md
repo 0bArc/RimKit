@@ -1,6 +1,6 @@
 # Jobs kit
 
-`game.jobs` orders pawns to do any vanilla job. The pawn is the first argument. The kit is Experimental in the [stability tiers](stability.md). The older `make`, `start` and `register` (Lua-defined jobs) are unchanged, see [mod structure](../guide/mod-structure.md). Every function is in the [reference](reference.md#jobs).
+`game.jobs` orders pawns to do any vanilla job. The pawn is the first argument. The kit is Experimental in the [stability tiers](stability.md). `make`, `start` and `register` define Lua jobs, see [mod structure](../guide/mod-structure.md). Every function is in the [reference](reference.md#jobs).
 
 | Function | What it does |
 |----------|--------------|

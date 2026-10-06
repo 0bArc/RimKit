@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Verse;
 
@@ -79,7 +80,7 @@ namespace RimKit
 
                 var packHits = new List<string>();
                 var packNotes = new List<string>();
-                foreach (string path in Directory.EnumerateFiles(luaDir, "*.lua", SearchOption.AllDirectories))
+                foreach (string path in Directory.EnumerateFiles(luaDir, "*.lua", SearchOption.AllDirectories).Concat(Directory.EnumerateFiles(luaDir, "*.luau", SearchOption.AllDirectories)))
                 {
                     files++;
                     string text;

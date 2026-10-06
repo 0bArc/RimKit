@@ -79,7 +79,3 @@ A failed call raises a Lua error whose message starts with an RK code.
 - Blocked: process, file, network, assembly, `Type` and delegate access, `UnityEngine.Application`, XML savers, mod loading, and members whose names suggest opening files, URLs or quitting the game.
 - A method can never return a `Type`, `MemberInfo`, `Assembly` or delegate.
 - Every call is recorded with an ISO 8601 UTC timestamp. Denied calls are written to the game log. Set `rimkit.audit_verbose` to log allowed calls too. Hook registration is audited the same way.
-
-## Migration
-
-The previous `rim.reflect` and `rim.cs` tables keep working unchanged (they now call the host ops `reflect_v1.*`). Their string arguments and integer results are kept for compatibility. New code should use `game.reflect`. The host op names `reflect.*` now belong to the typed API, so `rim.invoke("reflect.get", ...)` uses the new argument shape.

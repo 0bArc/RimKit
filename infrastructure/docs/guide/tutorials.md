@@ -7,14 +7,14 @@ Seven short tutorials, one for each step up in what a mod can do. Do them in ord
 Goal: a message when a colonist dies, saved between sessions.
 
 1. `rimkit mod create Elegy` and open the folder.
-2. In `Lua/main.lua`:
+2. In `Lua/main.luau`:
 
 ```lua
 local PKG = "stratware.elegy"
 game.events.on("pawn.died", function(e)
   local n = (tonumber(game.data.get(PKG, "deaths")) or 0) + 1
   game.data.set(PKG, "deaths", tostring(n))
-  game.ui.message(game.pawns.name(e.pawn) .. " is gone. Losses so far: " .. n)
+  game.ui.message(e.pawn.name .. " is gone. Losses so far: " .. n)
 end)
 ```
 

@@ -6,7 +6,7 @@
 ```lua
 local map = game.maps.current()
 -- A farm planner: where would potatoes grow?
-local c = game.things.info(colonist)
+local c = colonist:info()
 for dx = 0, 10 do
   local can = game.plants.can_grow(map, "Plant_Potato", c.x + dx, c.z + 6)
   if can.ok then game.plants.sow(map, "Plant_Potato", c.x + dx, c.z + 6) end

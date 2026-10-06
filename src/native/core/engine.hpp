@@ -226,6 +226,8 @@ private:
     std::string current_mod_;  // package id of the mod whose scripts are loading, empty otherwise
     std::unordered_map<std::string, ModBudget> mod_budgets_;
     sol::protected_function event_adapter_maker_;
+    sol::table thing_methods_;  // subject functions of the things kit, reached as thing:method() through the RimThing and RimPawn index fallback
+    sol::protected_function event_filter_maker_;
     HookResponse* active_hook_response_ = nullptr;
     std::unordered_map<std::string, LuaJobDef> lua_jobs_;
     std::unordered_map<int, sol::protected_function> ui_callbacks_;
@@ -261,6 +263,7 @@ private:
     std::vector<std::string> map_float_menu_mods_;
     bool mock_active_ = false;
     bool test_mode_ = false;
+    int test_errors_ = 0;  // handler and callback errors since the last reset, read by game.test.errors()
     bool dev_watch_ = false;
     int watch_counter_ = 0;
     bool in_reload_ = false;

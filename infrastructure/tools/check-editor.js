@@ -25,6 +25,10 @@ let fns = 0;
 for (const kit of kits) {
   for (const fn of kit.fns) {
     fns++;
+    if (api.isThingMethod(kit, fn)) {
+      if (!known.has(`RimThing:${fn.name}`)) fail(`stub missing for RimThing:${fn.name}`);
+      continue;
+    }
     if (!known.has(`${kit.domain}.${fn.name}`)) fail(`stub missing for game.${kit.domain}.${fn.name}`);
     const label = `game.${kit.domain}.${fn.name}`;
     const item = items.find((i) => i.label === label);

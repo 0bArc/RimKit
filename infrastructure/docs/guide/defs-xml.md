@@ -67,9 +67,9 @@ def("ThingDef", "MyMod_Stool", {
 
 The script runs in a bare Lua state, so you can use `local`, functions, loops and `string`, `table` and `math` to generate many Defs from one helper. It cannot see the game. A picture for an item or building goes in `Textures/` and is named by `texPath`, without the extension. `rimkit mod check` fails when a `texPath` has no picture.
 
-Behavior goes in `Lua/`: a Def that needs code names a Lua class (see [Lua classes](../api/classes.md)), and everything else, such as events, settings and thoughts you hand out, is ordinary `Lua/main.lua`. [MoreChairs](../../../src/examples/README.md) is a whole mod written this way.
+Behavior goes in `Lua/`: a Def that needs code names a Lua class (see [Lua classes](../api/classes.md)), and everything else, such as events, settings and thoughts you hand out, is ordinary `Lua/main.luau`. [MoreChairs](../../../src/examples/README.md) is a whole mod written this way.
 
-`rimkit mod sync` refuses to overwrite an XML file it did not generate, so a hand-written `chairs.xml` next to `chairs.lua` is safe: it stops with a message. The older `defs.lua` in the mod root, which only makes simple items, still works.
+`rimkit mod sync` refuses to overwrite an XML file it did not generate, so a hand-written `chairs.xml` next to `chairs.lua` is safe: it stops with a message.
 
 ## Strings in Lua
 

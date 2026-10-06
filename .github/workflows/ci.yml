@@ -30,6 +30,8 @@ jobs:
         run: node infrastructure/tools/check-docs.js
       - name: Hook target list is current
         run: node infrastructure/tools/gen-hook-targets.js --check
+      - name: Luau definitions are current
+        run: node src/editor/tools/gen-luau-defs.js --check
       - name: Lua class and tweak generators are current
         run: |
           node infrastructure/tools/gen-lua-classes.js --check
@@ -56,8 +58,7 @@ jobs:
           cl /nologo /EHsc tests\native\kits_test.cpp /Fe:kits_test.exe
           kits_test.exe build\native\Release\rimlua_core.dll tests\native\kits_expect.lua tests\native\kits_args.lua tests\native\eco_test.lua
           cl /nologo /EHsc tests\native\aliastest.cpp /Fe:aliastest.exe
-          aliastest.exe build\native\Release\rimlua_core.dll tests\native\aliastest.lua
-      - name: Mod tests (examples, guide mods, dev tools)
+          aliastest.exe build\native\Release\rimlua_core.dll tests\native\aliastest.lua      - name: Mod tests (examples, guide mods, dev tools)
         shell: bash
         run: |
           for d in src/examples/*/ guide/*/final/*/ mod/; do

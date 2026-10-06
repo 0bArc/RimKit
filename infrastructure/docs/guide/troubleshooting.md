@@ -8,7 +8,7 @@ Look in Player.log first. RimKit lines start with `[RimKit]` or `[RimLua]`. On W
 |--------------------|-------|-----|
 | `Quarantined Lua skipped: <id>` | The safety scan matched text in your Lua | The line above names the file and rule. Remove or rename it. A function called `load()` is a common cause. See [security](security.md) |
 | `LUA BLOCKED by builtin pAuth` | RimKit's own files do not match the allowlist | Reinstall RimKit. If you built it yourself, run `rimkit build` so `mod/Auth/allowlist.json` is regenerated |
-| `RimKit mod (stratware.rimkit) not enabled` or `Auth/allowlist.json missing` | An older RimKit build that does not recognise the Steam package id `stratware.rimkit_steam`, or a copy whose files do not match | Update RimKit. If you built it, run `node infrastructure/tools/release.js --deploy <mod folder>` and restart the game. The game must be closed because it locks the host DLL |
+| `RimKit mod (stratware.rimkit) not enabled` or `Auth/allowlist.json missing` | A copy whose files do not match, or a build that does not recognise the Steam package id `stratware.rimkit_steam` | Update RimKit. If you built it, run `node infrastructure/tools/release.js --deploy <mod folder>` and restart the game. The game must be closed because it locks the host DLL |
 | `mod stratware.x was switched off after 20 Lua errors` | One mod raised 20 Lua errors in 60 seconds, so RimKit stopped its hooks, events and timers. Other mods keep running | Fix the errors listed above the message, then restart the game |
 | You want to start the game without any Lua | A mod is crashing the game or you want to compare | Start with `-rimkit-safe`, set the environment variable `RIMKIT_SAFE=1`, or create `Config/rimkit_safe.txt`. The log says Lua is off |
 | No RimKit lines at all | RimKit is not enabled, or loads before Harmony | Order: Harmony, RimKit, your mod |
@@ -29,10 +29,6 @@ Errors from the typed kits start with a code. See the table in [RKS](../standard
 | RK4001 | Blocked by policy |
 | RK4002 | `developer_reflect` is off |
 | RK5001 | The game method threw. The message carries the exception |
-
-## Deprecation lines
-
-`deprecated: rim.pawn.name is now game.pawns.name` is a warning, not an error. The old name works until 1.0. Fix all of them at once with `rimkit migrate` ([migration](../api/migration.md)).
 
 ## Hooks
 

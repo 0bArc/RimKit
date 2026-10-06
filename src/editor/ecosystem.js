@@ -50,7 +50,7 @@ function register(context, helpers) {
   // Def names from the running game inside string arguments: game.things.spawn_at("St...
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
-      { language: "lua" },
+      [{ language: "lua" }, { language: "luau" }],
       {
         provideCompletionItems(document, position) {
           const before = document.lineAt(position).text.substring(0, position.character);
@@ -76,7 +76,7 @@ function register(context, helpers) {
 
   // Go to definition: game.things.spawn_at jumps to its declaration in the bundled stubs.
   context.subscriptions.push(
-    vscode.languages.registerDefinitionProvider({ language: "lua" }, {
+    vscode.languages.registerDefinitionProvider([{ language: "lua" }, { language: "luau" }], {
       provideDefinition(document, position) {
         const range = document.getWordRangeAtPosition(position, /game\.\w+\.\w+/);
         if (!range) return undefined;

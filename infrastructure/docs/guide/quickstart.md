@@ -26,9 +26,9 @@ This makes:
 ```
 MyMod/
   meta.lua                         name, author, package id, version, dependencies, capabilities. Edit this.
-  Lua/main.lua                     your script, with a first game.events.on_load handler
+  Lua/main.luau                     your script, with a first game.events.on_load handler
   Languages/English/Keyed/*.xml    the mod's text, read with game.ui.translate
-  Tests/main_test.lua              a first test that runs without the game: rimkit mod test
+  Tests/main_test.luau              a first test that runs without the game: rimkit mod test
   LICENSE, CREDITS.md, CHANGELOG.md, Workshop.md   what you need to publish
   About/About.xml                  generated, do not edit
 ```
@@ -37,7 +37,7 @@ The package id is made from `RIMKIT_AUTHOR` and the mod name (`yourname.mymod` w
 
 ## 3. Write some Lua
 
-Edit `Lua/main.lua`:
+Edit `Lua/main.luau`:
 
 ```lua
 local rk = require("rimkit")
@@ -54,7 +54,7 @@ end)
 game.log.info("MyMod ready")
 ```
 
-What is available is in the [API overview](../api/overview.md). The editor extension (see below) completes names and warns about old ones.
+What is available is in the [API overview](../api/overview.md). The editor extension (see below) completes names and checks types.
 
 ## 4. Ship it
 
@@ -77,7 +77,6 @@ If your Lua does not load, see [troubleshooting](troubleshooting.md). The usual 
 Install the RimKit VS Code extension (`src/editor/rimkit-<version>.vsix`):
 
 - completions for the whole API
-- warnings for deprecated names, with a quick fix
 - API definitions for the Lua language server
 
 ## Next

@@ -165,10 +165,22 @@ function RimMap:colonists() end
 
 ---@class RimThing
 ---@field handle integer Integer handle of the thing
+---@field id integer Unique id of the thing
 ---@field def string Def name of the thing
 ---@field label string Name shown to the player
+---@field label_short string Short name
+---@field hp integer Hit points. Assign to change them.
+---@field max_hp integer Maximum hit points
+---@field stack integer Stack size. Assign to change it.
+---@field spawned boolean Whether it is on a map
+---@field is_pawn boolean Whether it is a pawn
+---@field is_building boolean Whether it is a building
+---@field position RimCell|nil The cell it is on, nil when it is not on a map. Assign a cell to move it.
+---@field map RimMap|nil The map it is on
+---@field faction RimFaction|nil The faction that owns it. Assign a faction to change it.
 local RimThing = {}
 function RimThing:destroy() end
+function RimThing:despawn() end
 
 ---@class RimObject
 ---@field handle integer Integer handle of the object
@@ -437,6 +449,11 @@ rim.prefix = {}
 rim.prefixes = rim.prefix
 rim.postfix = {}
 rim.postfixes = rim.postfix
+
+---@type table Assignment sugar: game.hooks.before["Type"].Method = fn (a prefix)
+game.hooks.before = rim.prefix
+---@type table Assignment sugar: game.hooks.after["Type"].Method = fn (a postfix)
+game.hooks.after = rim.postfix
 rim.events = { prefix = {}, postfix = {} }
 rim.hooks = {}
 rim.harmony = rim.hooks
@@ -771,6 +788,9 @@ function game.reflect.audit(n) end
 ---@param key string
 ---@return string
 function game.ui.translate(key, ...) end
+---Translates a Keyed string and shows it as a message. Text that is not a key shows as it is.
+---@param key string
+function game.ui.say(key, ...) end
 
 ---@class RimWorldVersion
 ---@field major integer Major version, for example 1
@@ -1043,10 +1063,22 @@ function game.test.before_each(fn) end
 ---@field to_contain fun(value: any)
 ---@field to_have_length fun(n: integer)
 ---@field to_error fun(part?: string)
+---@field to_have_been_called fun(match?: table) Passes when the spied op was called, and one call has these argument values. target = a mock pawn or thing matches its cell
+---@field not_to_have_been_called fun(match?: table) Passes when the spied op was never called (with these values)
+---@field to_have_been_called_times fun(n: integer)
 
 ---@param value any
 ---@return RimExpect
 function game.test.expect(value) end
+
+--- Handler and callback errors since the test started.
+---@return integer
+function game.test.errors() end
+
+--- How often handlers registered for this event ran after their filter passed, since the test started.
+---@param event string
+---@return integer
+function game.test.handler_calls(event) end
 
 --- Replaces what the host answers for an op. A function gets the argument table, any other value is returned as is.
 ---@param op string

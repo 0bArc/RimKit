@@ -9,7 +9,7 @@ meta.capabilities = { "hooks" }
 | Capability | Lets the Lua use |
 |------------|------------------|
 | `reflect` | `game.reflect` and `rim.reflect`: read and call any member of any game object |
-| `hooks` | `game.hooks`, `game.tweaks` and the `rim.prefix` and `rim.postfix` sugar: change what game methods do |
+| `hooks` | `game.hooks`, `game.tweaks` and the `game.hooks.before` and `game.hooks.after` sugar: change what game methods do |
 | `files` | `game.defs.write_xml`, `game.patch.write`, `game.dev.export_defs` and the diagnostics bundle: write files next to the mod |
 | `dev` | `game.dev.eval` and `game.dev.reload`: run code from a string and reload another mod's Lua |
 
@@ -19,7 +19,7 @@ Everything else (reading and changing the colony through the kits, UI, saving, e
 
 - A call to something undeclared raises `RK4001` with the capability name, so the mod author sees what to add.
 - `meta.capabilities = {}` means the mod declared that it needs none, and any of the calls above fail.
-- A mod that does not declare the field at all keeps full access, so existing mods keep working. The RimKit hub (`Tab Mods`) marks them "not declared: everything is allowed". A mod that sets `meta.api_level = 1` is different: it gets exactly what it declares, and nothing when it declares nothing. `rimkit mod create` sets it.
+- A mod that does not declare the field at all keeps full access. The RimKit hub (`Tab Mods`) marks them "not declared: everything is allowed". A mod that sets `meta.api_level = 1` is different: it gets exactly what it declares, and nothing when it declares nothing. `rimkit mod create` sets it.
 - `rimkit mod check` finds the usage the Lua makes and fails when a capability it needs is not listed.
 - The list is written to `About/RimKit.json` by `rimkit mod sync`. RimKit reads it when the mod loads.
 

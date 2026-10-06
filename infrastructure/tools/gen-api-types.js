@@ -38,6 +38,7 @@ for (const rel of ["src/editor/stubs/rimkit_kits.lua", "src/editor/stubs/rimkit.
 
 // Which functions use each class.
 const returnedBy = new Map();
+const luaName = (k, f) => (k.domain === "things" && f.subject ? `thing:${f.name}` : `game.${k.domain}.${f.name}`);
 const takenBy = new Map();
 const baseName = (t) => (t || "").replace(/\?$/, "").replace(/\[\]$/, "").trim();
 const note = (map, type, label) => {
@@ -47,7 +48,7 @@ const note = (map, type, label) => {
 };
 for (const k of kits) {
   for (const f of k.fns) {
-    const label = `game.${k.domain}.${f.name}`;
+    const label = luaName(k, f);
     note(returnedBy, baseName(f.returns), label);
     for (const p of f.params) for (const part of baseName(p.type).split("|")) note(takenBy, baseName(part), label);
   }

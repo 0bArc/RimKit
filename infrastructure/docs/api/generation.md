@@ -7,7 +7,7 @@
 
 ```lua
 local map = game.maps.current()
-local c = game.things.info(colonist)
+local c = colonist:info()
 game.generation.base_gen(map, "ancientRuins", c.x + 10, c.z + 10, c.x + 22, c.z + 20)
 ```
 

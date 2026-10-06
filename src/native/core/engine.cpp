@@ -1,4 +1,7 @@
 #include "engine.hpp"
+#include "lua_file.hpp"
+#include "stdlib_promise.hpp"
+#include "stdlib_signal.hpp"
 #include "handle_util.hpp"
 
 #include <algorithm>
@@ -148,8 +151,9 @@ int Engine::init(const rimlua_callbacks* cb) {
     callbacks_ = *cb;
     lua_ = std::make_unique<sol::state>();
     // Strip io/os/debug/bit32.
-    lua_->open_libraries(sol::lib::base, sol::lib::package, sol::lib::coroutine, sol::lib::string, sol::lib::table,
-                         sol::lib::math, sol::lib::utf8);
+    lua_->open_libraries(sol::lib::base, sol::lib::coroutine, sol::lib::string, sol::lib::table, sol::lib::math, sol::lib::utf8,
+                         sol::lib::bit32);
+    luaopen_buffer(lua_->lua_state());
     apply_sandbox();
     bind_rim_api();
     bind_oo_types();
@@ -166,6 +170,67 @@ int Engine::init(const rimlua_callbacks* cb) {
     bind_kit_helpers();
     bind_ecosystem();
     bind_rimkit_module();
+    // One function per event, like on_load and on_tick: game.events.on_pawn_damaged(function(e) ... end, filter?).
+    // The name is on_ plus the event name with the dot as an underscore. The editor types e from the function name,
+    // which a string argument cannot do.
+    lua_->safe_script(R"LUA(
+local events = game.events
+if type(events) == "table" and getmetatable(events) == nil then
+  local multi = { "mental_state", "world_object" }
+  setmetatable(events, { __index = function(t, k)
+    if type(k) ~= "string" or k:sub(1, 3) ~= "on_" then return nil end
+    local rest = k:sub(4)
+    local domain, name
+    for _, m in ipairs(multi) do
+      if rest:sub(1, #m + 1) == m .. "_" then domain, name = m, rest:sub(#m + 2) break end
+    end
+    if not domain then domain, name = rest:match("^([a-z]+)_(.+)$") end
+    if not domain then return nil end
+    local event = domain .. "." .. name
+    return function(fn, filter)
+      -- The handler gets the subject of the event first (the pawn, else the thing) and the whole payload second.
+      local function handler(e)
+        local subject = e and (e.pawn or e.thing)
+        if subject ~= nil then return fn(subject, e) end
+        return fn(e)
+      end
+      if filter ~= nil then return t.on(event, filter, handler) end
+      return t.on(event, handler)
+    end
+  end })
+end
+)LUA");
+    // Built-in libraries: require("rimkit.signal") and require("rimkit.promise"), also reachable as rimkit.signal and rimkit.promise (the global rimkit is require("rimkit")).
+    {
+        sol::table preload = (*lua_)["package"]["preload"];
+        const struct {
+            const char* name;
+            const char* source;
+        } libs[] = {{"rimkit.signal", kSignalSource}, {"rimkit.promise", kPromiseSource}};
+        for (const auto& lib : libs) {
+            sol::load_result lr = lua_->load(lib.source, std::string("=") + lib.name);
+            if (lr.valid()) {
+                preload[lib.name] = lr.get<sol::protected_function>();
+            } else if (callbacks_.log) {
+                sol::error e = lr;
+                callbacks_.log((std::string("[RimKit] built-in library ") + lib.name + " failed to load: " + e.what()).c_str());
+            }
+        }
+        lua_->safe_script(R"LUA(
+local rk = require("rimkit")
+rimkit = rk
+if type(rk) == "table" and getmetatable(rk) == nil then
+  setmetatable(rk, { __index = function(t, k)
+    if k == "signal" or k == "promise" then
+      local module = require("rimkit." .. k)
+      rawset(t, k, module)
+      return module
+    end
+    return nil
+  end })
+end
+)LUA");
+    }
     ready_ = true;
     if (callbacks_.log) {
         callbacks_.log("[RimKit] C++ core initialized (sandboxed Lua)");
@@ -190,31 +255,18 @@ void Engine::apply_sandbox() {
     if (!lua_) {
         return;
     }
-    // Strip loaders.
-    (*lua_)["dofile"] = sol::lua_nil;
-    (*lua_)["loadfile"] = sol::lua_nil;
-    (*lua_)["load"] = sol::lua_nil;
-    (*lua_)["loadstring"] = sol::lua_nil;  // alias on older Lua; harmless if absent
-    (*lua_)["io"] = sol::lua_nil;
-    (*lua_)["os"] = sol::lua_nil;
-    (*lua_)["debug"] = sol::lua_nil;
-
-    sol::table package = (*lua_)["package"];
-    package["loadlib"] = sol::lua_nil;
-    package["cpath"] = "";
-    package["path"] = "";
-
-    // Keep Lua searchers only.
-    sol::object searchers_obj = package["searchers"];
-    if (searchers_obj.is<sol::table>()) {
-        sol::table searchers = searchers_obj.as<sol::table>();
-        for (int i = 3; i <= 8; ++i) {
-            searchers[i] = sol::lua_nil;
-        }
+    // Strip loaders. Luau has no io, package, dofile or loadlib. loadstring, getfenv and setfenv exist and are removed.
+    for (const char* name : {"dofile", "loadfile", "load", "loadstring", "getfenv", "setfenv", "io", "os", "debug", "package"}) {
+        (*lua_)[name] = sol::lua_nil;
     }
 
-    // require only under allowed Lua roots.
-    package["searchers"][2] = [this](const std::string& modname) -> sol::object {
+    // A package table for loaded and preload, and a require that only reads files under the allowed Lua roots.
+    sol::table package = lua_->create_table();
+    package["loaded"] = lua_->create_table();
+    package["preload"] = lua_->create_table();
+    (*lua_)["package"] = package;
+
+    sol::function find_module = sol::make_object(*lua_, [this](const std::string& modname) -> sol::object {
         if (!lua_) {
             return sol::make_object(*lua_, "RimKit sandbox: no state");
         }
@@ -225,7 +277,9 @@ void Engine::apply_sandbox() {
             }
         }
         std::vector<std::string> candidates;
+        candidates.push_back(dotted + ".luau");
         candidates.push_back(dotted + ".lua");
+        candidates.push_back(dotted + "/init.luau");
         candidates.push_back(dotted + "/init.lua");
         for (const std::string& root : allowed_lua_roots_) {
             for (const std::string& rel : candidates) {
@@ -238,7 +292,7 @@ void Engine::apply_sandbox() {
                 if (ec || !is_lua_path_allowed(resolved)) {
                     continue;
                 }
-                sol::load_result lr = lua_->load_file(resolved);
+                sol::load_result lr = load_lua_file(*lua_, resolved);
                 if (!lr.valid()) {
                     sol::error e = lr;
                     return sol::make_object(*lua_, std::string(e.what()));
@@ -247,7 +301,31 @@ void Engine::apply_sandbox() {
             }
         }
         return sol::make_object(*lua_, "RimKit sandbox: module not in allowed Lua roots: " + modname);
-    };
+    });
+    {
+        sol::load_result lr = lua_->load(R"LUA(
+local find = ...
+local loaded, preload = package.loaded, package.preload
+return function(name)
+  local v = loaded[name]
+  if v ~= nil then return v end
+  local loader = preload[name]
+  if loader == nil then
+    loader = find(name)
+    if type(loader) ~= "function" then error(loader, 2) end
+  end
+  v = loader(name)
+  if v == nil then v = true end
+  loaded[name] = v
+  return v
+end
+)LUA");
+        sol::protected_function maker = lr;
+        sol::protected_function_result require_fn = maker(find_module);
+        if (require_fn.valid()) {
+            (*lua_)["require"] = require_fn.get<sol::object>();
+        }
+    }
 
     // Freeze _G after stripping.
     try {
@@ -282,7 +360,7 @@ package.cpath = ""
     }
 
     if (callbacks_.log) {
-        callbacks_.log("[RimKit] Lua sandbox on (no io/os/dofile/loadlib; require jailed; _G frozen)");
+        callbacks_.log("[RimKit] Luau sandbox on (no io/os/dofile/loadstring/getfenv; require jailed; _G frozen)");
     }
 }
 
@@ -1363,7 +1441,7 @@ int Engine::load_script(const std::string& path) {
         return 3;
     }
     ModScope scope(*this, current_mod_, PROF_LOAD);
-    sol::protected_function_result result = lua_->safe_script_file(resolved, sol::script_pass_on_error);
+    sol::protected_function_result result = run_lua_file(*lua_, resolved);
     if (!result.valid()) {
         log_lua_error(std::string("[RimKit] load ") + resolved, result);
         return 2;
@@ -1386,7 +1464,7 @@ int Engine::load_directory(const std::string& dir) {
         if (!it->is_regular_file()) {
             continue;
         }
-        if (it->path().extension() == ".lua") {
+        if (it->path().extension() == ".lua" || it->path().extension() == ".luau") {
             files.push_back(it->path());
         }
     }
@@ -1653,6 +1731,9 @@ void Engine::reset_mod_budget(const std::string& package_id) {
 
 // Counts one callback failure against the mod. Too many in a minute disables the mod's callbacks and its hooks.
 void Engine::record_mod_error(const std::string& mod, const std::string& where) {
+    if (test_mode_) {
+        ++test_errors_;
+    }
     if (mod.empty()) {
         return;
     }

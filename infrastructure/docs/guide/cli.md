@@ -7,8 +7,6 @@
 
 | Command | What it does |
 |---------|--------------|
-| `rimkit migrate [path] [--write]` | Rewrite deprecated API names to UNC names (dry run unless --write) |
-| `rimkit migrate --check [path]` | Exit 1 when deprecated names remain |
 | `rimkit init [name]` | Init Lua mod in cwd (or ./name) |
 | `rimkit build` | Build native core + C# host |
 | `rimkit mod create <name> [dir]` | Create Lua mod folder |
@@ -16,7 +14,8 @@
 | `rimkit mod defs [dir]` | Only the Lua to XML step, for a folder with no meta.lua |
 | `rimkit mod ship [path] [mods]` | Sync + copy mod into RimWorld Mods/ |
 | `rimkit mod check [path]` | Validate meta, Lua, Defs, patches, textures and translation keys |
-| `rimkit mod test [path]` | Run Tests/*.lua against a mock host (no game needed) |
+| `rimkit mod test [path]` | Run Tests/*.luau against a mock host (no game needed) |
+| `rimkit mod gen-tests [path]` | Write Tests/generated_test.luau from the events the mod registers (--force to overwrite) |
 | `rimkit mod assets [path] [--fix]` | Check the Workshop preview and mod icon, make placeholders |
 | `rimkit mod i18n <cmd> [path]` | extract \| missing <lang> \| export <lang> \| import <lang> <csv> |
 | `rimkit mod release-check [path]` | Checklist before publishing: version, changelog, licence, credits, assets |

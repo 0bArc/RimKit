@@ -134,7 +134,6 @@ Legend for effort: S is an afternoon, M is a few days, L is a few weeks.
 | Def explorer | Search and diff Defs across mods | `game.defs`, `game.reflect` | Kit | M |
 | Performance profiler | Per-mod time spent in hooks and ticks | hooks, `game.time` | Kit | M |
 | Test harness | Runs scripted scenarios and asserts outcomes (the smoke test, generalised) | all kits | Today | M |
-| Migration and lint bots | Run `rimkit migrate` and API lint in CI | CLI | Today | S |
 | Mod pack manager | Enables, orders and configures mod groups from Lua profiles | `game.config`, `game.util` | Kit | L |
 
 ## Suggested first wave

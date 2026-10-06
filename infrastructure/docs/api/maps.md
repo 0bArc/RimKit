@@ -2,7 +2,7 @@
 
 `game.maps` reads and changes the state of a map: cells, rooms, zones, designations, groups of pawns and reachability. The map (a `RimMap` or its handle) is the first argument and cells are integer `x`, `z`. The kit is Experimental in the [stability tiers](stability.md). Every function is listed with its parameters in the [reference](reference.md#maps).
 
-The older functions `current`, `list`, `width`, `height`, `pawns`, `colonists`, `prisoners`, `things`, `things_of_def`, `nutrition` and `spawn` are unchanged.
+The functions `current`, `list`, `width`, `height`, `pawns`, `colonists`, `prisoners`, `things`, `things_of_def`, `nutrition` and `spawn` read the map and place things on it.
 
 ## What you can do
 
@@ -22,7 +22,7 @@ Errors: a stale map handle raises `RK2001`, a cell outside the map raises `RK100
 ```lua
 -- Roof and floor a 3 by 3 patch next to the first colonist
 local map = game.maps.current()
-local c = game.things.info(game.maps.colonists(map)[1])
+local c = game.maps.colonists(map)[1]:info()
 for dx = 1, 3 do
   for dz = 0, 2 do
     game.maps.set_terrain(map, c.x + dx, c.z + dz, "WoodPlankFloor")

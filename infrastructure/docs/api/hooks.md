@@ -26,10 +26,9 @@ local ids = game.hooks.patch{
 }
 -- ids.prefix, ids.postfix, ids.finalizer
 
--- Assignment sugar (no options unless you assign a table).
-rim.prefix["RimWorld.JobGiver_GetFood"].TryGiveJob = function(ctx) end
-rim.postfix["Verse.Thing"].Destroy = { fn = function(ctx) end, sig = { "Verse.DestroyMode" } }
-rim.events.prefix["RimWorld.JobGiver_GetFood.TryGiveJob"] = function(ctx) end
+-- Assignment sugar: a prefix is "before", a postfix is "after". No options unless you assign a table.
+game.hooks.before["RimWorld.JobGiver_GetFood"].TryGiveJob = function(ctx) end
+game.hooks.after["Verse.Thing"].Destroy = { fn = function(ctx) end, sig = { "Verse.DestroyMode" } }
 ```
 
 ### Options
@@ -61,7 +60,7 @@ Every callback receives a context table.
 | `exception` | Finalizer only. Text of the exception, or `nil` |
 | `state` | Value stored by `ctx:set_state` earlier in the same call by a hook from the same `game.hooks.patch` (prefix, postfix and finalizer share one slot) |
 
-Legacy property access through the context still works when a primary pawn exists (`ctx.is_colonist`).
+Pawn properties are also available on the context when a primary pawn exists (`ctx.is_colonist`).
 
 ### Changing behaviour
 

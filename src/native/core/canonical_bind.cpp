@@ -165,6 +165,20 @@ void Engine::bind_canonical_surface() {
         // Documented only. These tables behave differently, so they are not rewritten at runtime.
         (void)m;
     }
+
+    // Assignment sugar under the game table: game.hooks.before["Verse.Thing"].Destroy = fn, game.hooks.after[...] = fn.
+    sol::object game_obj = L["game"];
+    sol::object rim_obj = L["rim"];
+    if (game_obj.is<sol::table>() && rim_obj.is<sol::table>()) {
+        sol::table game_t = game_obj.as<sol::table>();
+        sol::table rim_t = rim_obj.as<sol::table>();
+        sol::object hooks_obj = game_t["hooks"];
+        if (hooks_obj.is<sol::table>()) {
+            sol::table hooks_t = hooks_obj.as<sol::table>();
+            hooks_t["before"] = rim_t["prefix"];
+            hooks_t["after"] = rim_t["postfix"];
+        }
+    }
 }
 
 }  // namespace rimlua

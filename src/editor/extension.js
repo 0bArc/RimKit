@@ -11,10 +11,8 @@ const RIM_COMPLETIONS = [
   { label: "rim.on_load", detail: "After scripts load / play start", insert: "rim.on_load(function()\n\t$0\nend)" },
   { label: "rim.on_tick", detail: "Periodic tick", insert: "rim.on_tick(function()\n\t$0\nend)" },
   { label: "rim.invoke", detail: "Escape only: api.list / reflect.*", insert: 'rim.invoke("${1|api.list,reflect.get|}"${2:, { $3 }})' },
-  { label: "rim.prefix", detail: 'rim.prefix["Type"].Method = fn (Experimental)', insert: 'rim.prefix["${1:RimWorld.JobGiver_GetFood}"].${2:TryGiveJob} = function(ctx)\n\tlocal pawn = ctx.pawn or ctx.instance\n\t$0\n\treturn true\nend' },
-  { label: "rim.prefixes", detail: "Alias of rim.prefix", insert: 'rim.prefixes["${1:Type}"].${2:Method} = function(ctx)\n\t$0\n\treturn true\nend' },
-  { label: "rim.postfix", detail: 'rim.postfix["Type"].Method = fn', insert: 'rim.postfix["${1:Type}"].${2:Method} = function(ctx)\n\t$0\nend' },
-  { label: "rim.events.prefix", detail: 'rim.events.prefix["Type.Method"] = fn', insert: 'rim.events.prefix["${1:RimWorld.JobGiver_GetFood.TryGiveJob}"] = function(ctx)\n\t$0\n\treturn true\nend' },
+  { label: "game.hooks.before", detail: 'game.hooks.before["Type"].Method = fn', insert: 'game.hooks.before["${1:RimWorld.JobGiver_GetFood}"].${2:TryGiveJob} = function(ctx)\n\tlocal pawn = ctx.pawn or ctx.instance\n\t$0\n\treturn true\nend' },
+  { label: "game.hooks.after", detail: 'game.hooks.after["Type"].Method = fn', insert: 'game.hooks.after["${1:Type}"].${2:Method} = function(ctx)\n\t$0\nend' },
   { label: "rim.events.postfix", detail: 'rim.events.postfix["Type.Method"] = fn', insert: 'rim.events.postfix["${1:Type.Method}"] = function(ctx)\n\t$0\nend' },
   { label: "rim.hooks.prefix", detail: "rim.hooks.prefix(type, method, fn [, opts])", insert: 'rim.hooks.prefix("${1:Type}", "${2:Method}", function(ctx)\n\t$0\n\treturn true\nend)' },
   { label: "rim.hooks.postfix", detail: "rim.hooks.postfix(type, method, fn [, opts])", insert: 'rim.hooks.postfix("${1:Type}", "${2:Method}", function(ctx)\n\t$0\nend)' },
@@ -195,7 +193,7 @@ function findDeprecated(text) {
 }
 
 function refreshDiagnostics(doc, collection) {
-  if (doc.languageId !== "lua") return;
+  if (!isLuaDoc(doc)) return;
   const diagnostics = [];
   for (const hit of findDeprecated(doc.getText())) {
     const range = new vscode.Range(doc.positionAt(hit.start), doc.positionAt(hit.end));
@@ -287,27 +285,78 @@ function canonicalCompletions() {
   return items;
 }
 
-async function offerStubs(context) {
-  // Point the Lua language server at the bundled stubs once per workspace, only for RimKit mods.
+// RimKit mods are Luau. luau-lsp registers the .lua language as "luau" in some versions, so both ids count as a mod file.
+const LUA_SELECTOR = [{ language: "lua" }, { language: "luau" }];
+function isLuaDoc(doc) {
+  return doc && (doc.languageId === "lua" || doc.languageId === "luau");
+}
+
+// RimKit runs Luau. luau-lsp checks and completes mods from stubs/rimkit.d.luau, and the Lua language server is turned down in the
+// workspace because it cannot read the syntax.
+async function setupLuau(context, ask) {
   const folder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
-  if (!folder || !fs.existsSync(path.join(folder.uri.fsPath, "meta.lua"))) return;
-  if (context.workspaceState.get("rimkit.stubsAsked")) return;
+  if (!folder) return;
+  const defs = path.join(__dirname, "stubs", "rimkit.d.luau");
+  if (!fs.existsSync(defs)) return;
+  const cfg = vscode.workspace.getConfiguration("luau-lsp");
+  const current = cfg.get("types.definitionFiles");
+  const has = Array.isArray(current) ? current.includes(defs) : current && Object.values(current).includes(defs);
+  if (has) return;
+  if (ask) {
+    if (context.workspaceState.get("rimkit.luauAsked")) return;
+    await context.workspaceState.update("rimkit.luauAsked", true);
+    const pick = await vscode.window.showInformationMessage(
+      "RimKit mods are Luau. Point luau-lsp at the RimKit definitions for typed events and completion in this workspace?",
+      "Set up",
+      "Not now"
+    );
+    if (pick !== "Set up") return;
+  }
+  const target = vscode.ConfigurationTarget.Workspace;
+  if (Array.isArray(current)) await cfg.update("types.definitionFiles", [...current, defs], target);
+  else await cfg.update("types.definitionFiles", { ...(current || {}), "@rimkit": defs }, target);
+  await cfg.update("types.roblox", false, target);
+  await cfg.update("platform.type", "standard", target);
+  await cfg.update("sourcemap.enabled", false, target);
+  // luau-lsp fills call arguments with their parameter names ("fn"). A handler is better written as a function.
+  await cfg.update("completion.fillCallArguments", false, target);
+  // Let luau-lsp own the .lua files of this workspace, so completion and types come from it.
+  const files = vscode.workspace.getConfiguration("files");
+  const assoc = files.get("associations") || {};
+  if (assoc["*.lua"] !== "luau") await files.update("associations", { ...assoc, "*.lua": "luau" }, target);
   const lua = vscode.workspace.getConfiguration("Lua");
-  const library = lua.get("workspace.library") || [];
-  const stubs = path.join(__dirname, "stubs");
-  if (library.includes(stubs)) return;
-  await context.workspaceState.update("rimkit.stubsAsked", true);
-  const pick = await vscode.window.showInformationMessage(
-    "RimKit: add the RimKit API definitions to the Lua language server for this workspace?",
-    "Add",
-    "Not now"
-  );
-  if (pick === "Add") {
-    await lua.update("workspace.library", [...library, stubs], vscode.ConfigurationTarget.Workspace);
+  for (const key of ["diagnostics.enable", "completion.enable", "hover.enable", "signatureHelp.enable"]) {
+    try {
+      await lua.update(key, false, target);
+    } catch (e) {
+      // The older Lua language server is not installed, so there is nothing to turn down.
+    }
+  }
+  if (!vscode.extensions.getExtension("JohnnyMorganz.luau-lsp")) {
+    const pick = await vscode.window.showInformationMessage("RimKit: install the Luau Language Server extension (JohnnyMorganz.luau-lsp) for typed mods.", "Install");
+    if (pick === "Install") await vscode.commands.executeCommand("workbench.extensions.installExtension", "JohnnyMorganz.luau-lsp");
+  }
+}
+
+// luau-lsp reads the definitions file once, when its server starts. After the extension or the file changed, restart the server
+// once so new names (rimkit.signal, a new event) are known without anyone reloading the window by hand.
+function reloadLuauServerWhenDefinitionsChanged(context) {
+  try {
+    const defs = path.join(__dirname, "stubs", "rimkit.d.luau");
+    const stamp = String(fs.statSync(defs).mtimeMs);
+    const key = "rimkit.definitionsStamp";
+    if (context.globalState.get(key) === stamp) return;
+    context.globalState.update(key, stamp);
+    setTimeout(() => {
+      vscode.commands.executeCommand("luau-lsp.reloadServer").then(undefined, () => {});
+    }, 4000);
+  } catch (e) {
+    // luau-lsp is not installed or the file is missing: nothing to reload.
   }
 }
 
 function activate(context) {
+  reloadLuauServerWhenDefinitionsChanged(context);
   ecosystem.register(context, { findModRoot, runRimkit });
   const diagnostics = vscode.languages.createDiagnosticCollection("rimkit");
   context.subscriptions.push(diagnostics);
@@ -317,12 +366,114 @@ function activate(context) {
       vscode.workspace.onDidOpenTextDocument((d) => refreshDiagnostics(d, diagnostics)),
       vscode.workspace.onDidChangeTextDocument((e) => refreshDiagnostics(e.document, diagnostics)),
       vscode.workspace.onDidCloseTextDocument((d) => diagnostics.delete(d.uri)),
-      vscode.languages.registerCodeActionsProvider({ language: "lua" }, new DeprecatedFixProvider(), {
+      vscode.languages.registerCodeActionsProvider(LUA_SELECTOR, new DeprecatedFixProvider(), {
         providedCodeActionKinds: [vscode.CodeActionKind.QuickFix],
       })
     );
   }
-  offerStubs(context).catch(() => {});
+  // require("<TAB> lists the modules RimKit can load: its built-in libraries and the files in the mod's own Lua folder.
+  // luau-lsp only offers folders here, because it resolves require by file path while RimKit resolves it by name.
+  function ownModules(fileName) {
+    const root = findModRoot(fileName);
+    const out = [];
+    if (!root) return out;
+    const luaDir = path.join(root, "Lua");
+    const walk = (dir) => {
+      let entries = [];
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true });
+      } catch (e) {
+        return;
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.luau?$/.test(entry.name)) out.push(path.relative(luaDir, full).replace(/\.luau?$/, "").split(path.sep).join("."));
+      }
+    };
+    walk(luaDir);
+    return out;
+  }
+  const BUILT_IN_MODULES = [
+    { name: "rimkit", doc: "Version, tiers and the built-in libraries. The global rimkit is the same table." },
+    { name: "rimkit.signal", doc: "Events for your own code: Signal.new, connect, once, fire, wait. Also available as rimkit.signal." },
+    { name: "rimkit.promise", doc: "A value that arrives later: Promise.new, and_then, catch, await, delay, all. Also available as rimkit.promise." },
+  ];
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      LUA_SELECTOR,
+      {
+        provideCompletionItems(document, position) {
+          const line = document.lineAt(position).text.substring(0, position.character);
+          if (!/\brequire\s*\(?\s*["'][\w.]*$/.test(line)) return undefined;
+          const own = ownModules(document.fileName).filter((n) => !BUILT_IN_MODULES.some((b) => b.name === n));
+          const items = BUILT_IN_MODULES.map((m) => {
+            const item = new vscode.CompletionItem(m.name, vscode.CompletionItemKind.Module);
+            item.detail = "RimKit built-in";
+            item.documentation = new vscode.MarkdownString(m.doc);
+            item.sortText = "0" + m.name;
+            return item;
+          });
+          for (const name of own) {
+            const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.File);
+            item.detail = "this mod";
+            item.sortText = "1" + name;
+            items.push(item);
+          }
+          return items;
+        },
+      },
+      '"',
+      "'",
+      "."
+    )
+  );
+
+  // game.events.<TAB> inserts a whole handler: on_pawn_damaged(function(pawn, e) ... end), with the cursor in the body.
+  const eventHandlers = (() => {
+    try {
+      const text = fs.readFileSync(path.join(__dirname, "stubs", "rimkit_events.lua"), "utf8");
+      return [...text.matchAll(/---@param fn fun\(([^)]*)\)[\s\S]*?function game\.events\.(on_\w+)\(/g)].map((m) => ({
+        name: m[2],
+        params: m[1].split(",").map((p) => p.split(":")[0].trim()).join(", "),
+      }));
+    } catch (e) {
+      return [];
+    }
+  })();
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      LUA_SELECTOR,
+      {
+        provideCompletionItems(document, position) {
+          const line = document.lineAt(position).text.substring(0, position.character);
+          if (!/\bgame\.events\.\w*$/.test(line)) return undefined;
+          return eventHandlers.map(({ name, params }) => {
+            const item = new vscode.CompletionItem({ label: name, description: "handler" }, vscode.CompletionItemKind.Snippet);
+            item.insertText = new vscode.SnippetString(name + "(function(" + params + ")\n\t$0\nend)");
+            item.filterText = name;
+            item.sortText = "0" + name;
+            item.detail = "game.events." + name + "(function(" + params + ") ... end, filter?)";
+            item.documentation = new vscode.MarkdownString("Inserts a handler. The editor types its arguments from the event name.");
+            return item;
+          });
+        },
+      },
+      "."
+    )
+  );
+
+  context.subscriptions.push(vscode.commands.registerCommand("rimkit.setupLuau", () => setupLuau(context, false)));
+  if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.some((f) => fs.existsSync(path.join(f.uri.fsPath, "meta.lua")))) {
+    setupLuau(context, true).catch(() => {});
+  }
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((d) => {
+      if (isLuaDoc(d)) setupLuau(context, true).catch(() => {});
+    })
+  );
+  const openLua = vscode.window.activeTextEditor && vscode.window.activeTextEditor.document;
+  if (openLua && isLuaDoc(openLua)) setupLuau(context, true).catch(() => {});
 
   context.subscriptions.push(
     vscode.commands.registerCommand("rimkit.migrate", async () => {
@@ -372,7 +523,7 @@ function activate(context) {
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(async (doc) => {
       if (!vscode.workspace.getConfiguration("rimkit").get("autoShipOnSave")) return;
-      if (!doc.fileName.endsWith(".lua") && path.basename(doc.fileName) !== "meta.lua") return;
+      if (!doc.fileName.endsWith(".lua") && !doc.fileName.endsWith(".luau") && path.basename(doc.fileName) !== "meta.lua") return;
       const root = findModRoot(doc.fileName);
       if (!root) return;
       // Skip kit source tree accidental ships from src/native etc unless meta.lua present as mod
@@ -383,7 +534,7 @@ function activate(context) {
 
   // Hover: signature, description and parameter types of any kit function.
   context.subscriptions.push(
-    vscode.languages.registerHoverProvider({ language: "lua" }, {
+    vscode.languages.registerHoverProvider(LUA_SELECTOR, {
       provideHover(document, position) {
         const range = document.getWordRangeAtPosition(position, /game\.\w+\.\w+/);
         if (!range) return undefined;
@@ -396,7 +547,7 @@ function activate(context) {
 
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
-      { language: "lua" },
+      LUA_SELECTOR,
       {
         provideCompletionItems(document, position) {
           const line = document.lineAt(position).text.substring(0, position.character);

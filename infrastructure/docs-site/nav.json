@@ -2,8 +2,8 @@
   "site_name": "RimKit",
   "site_description": "Write RimWorld mods in Lua. Stratware.win.",
   "site_url": "https://team.stratware.win/rimkit/",
-  "repo_url": "https://github.com/0bArc/RimWorldModdingDocs",
-  "repo_name": "0bArc/RimWorldModdingDocs",
+  "repo_url": "https://github.com/0bArc/RimKit",
+  "repo_name": "0bArc/RimKit",
   "tabs": [
     {
       "title": "Home",
@@ -28,7 +28,9 @@
           "children": [
             { "title": "Tutorials", "path": "guide/tutorials.md" },
             { "title": "Cookbook", "path": "guide/cookbook.md" },
-            { "title": "Capabilities", "path": "guide/capabilities.md" }
+            { "title": "Capabilities", "path": "guide/capabilities.md" },
+            { "title": "Luau", "path": "guide/luau.md" },
+            { "title": "How RimKit loads your mod", "path": "guide/how-mods-load.md" }
           ]
         },
         {
@@ -141,11 +143,10 @@
           "children": [
             { "title": "Reflect", "path": "api/reflect.md" },
             { "title": "Interop", "path": "api/interop.md" },
+            { "title": "Signal and Promise", "path": "api/signal-promise.md" },
             { "title": "Developer tools", "path": "api/dev.md" },
             { "title": "Naming", "path": "api/naming.md" },
-            { "title": "Stability", "path": "api/stability.md" },
-            { "title": "Migration", "path": "api/migration.md" },
-            { "title": "Legacy names", "path": "api/legacy.md" }
+            { "title": "Stability", "path": "api/stability.md" }
           ]
         }
       ]
@@ -161,7 +162,7 @@
     {
       "title": "Project",
       "children": [
-        { "title": "What is missing", "path": "missing.md" },
+        { "title": "Roadmap and status", "path": "missing.md" },
         { "title": "Gaps and next steps", "path": "gaps.md" },
         { "title": "Mod ideas", "path": "mod-ideas.md" }
       ]

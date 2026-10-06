@@ -40,6 +40,23 @@ int Engine::current_tick() {
     return 0;
 }
 
+namespace {
+// "x,z" from the host to a {x=, z=} cell. The game's invalid cell and an empty string are nil.
+sol::object cell_from_text(sol::state& L, const sol::object& o) {
+    if (!o.is<std::string>()) return sol::make_object(L, sol::lua_nil);
+    const std::string s = o.as<std::string>();
+    const size_t comma = s.find(',');
+    if (comma == std::string::npos) return sol::make_object(L, sol::lua_nil);
+    const int x = std::stoi(s.substr(0, comma));
+    const int z = std::stoi(s.substr(comma + 1));
+    if (x <= -1000 || z <= -1000) return sol::make_object(L, sol::lua_nil);
+    sol::table cell = L.create_table();
+    cell["x"] = x;
+    cell["z"] = z;
+    return sol::make_object(L, cell);
+}
+}  // namespace
+
 void Engine::bind_oo_types() {
     lua_->new_usertype<RimFaction>(
         "RimFaction", sol::no_constructor, "handle", &RimFaction::h, "name",
@@ -65,7 +82,47 @@ void Engine::bind_oo_types() {
         });
 
     lua_->new_usertype<RimPawn>(
-        "RimPawn", sol::no_constructor, "handle", &RimPawn::h, "name",
+        "RimPawn", sol::no_constructor, "handle", &RimPawn::h,
+        "def", sol::property([this](RimPawn& t) -> std::string {
+            sol::object o = host_call_h("thing.def", t.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "label", sol::property([this](RimPawn& t) -> std::string {
+            sol::object o = host_call_h("thing.label", t.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "is_pawn", sol::property([](RimPawn&) { return true; }),
+        "is_building", sol::property([](RimPawn&) { return false; }),
+        "hp", sol::property(
+                  [this](RimPawn& t) -> int {
+                      sol::object o = host_call_h("thing.hp", t.h);
+                      return o.is<double>() ? static_cast<int>(o.as<double>()) : 0;
+                  },
+                  [this](RimPawn& t, int v) { host_call_hv("thing.set_hp", t.h, "v", sol::make_object(*lua_, v)); }),
+        "max_hp", sol::property([this](RimPawn& t) -> int {
+            sol::object o = host_call_h("thing.max_hp", t.h);
+            return o.is<double>() ? static_cast<int>(o.as<double>()) : 0;
+        }),
+        "spawned", sol::property([this](RimPawn& t) -> bool {
+            sol::object o = host_call_h("thing.spawned", t.h);
+            return o.is<bool>() && o.as<bool>();
+        }),
+        "id", sol::property([this](RimPawn& t) -> int {
+            sol::object o = host_call_h("thing.info", t.h);
+            return o.is<sol::table>() ? o.as<sol::table>().get_or("id", 0) : 0;
+        }),
+        "label_short", sol::property([this](RimPawn& t) -> std::string {
+            sol::object o = host_call_h("thing.label_short", t.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "despawn", [this](RimPawn& t) { return host_call_h("thing.despawn", t.h); },
+        sol::meta_function::index, [this](RimPawn& /*t*/, sol::object key) -> sol::object {
+            if (thing_methods_.valid() && key.is<std::string>()) {
+                return thing_methods_[key.as<std::string>()];
+            }
+            return sol::make_object(*lua_, sol::lua_nil);
+        },
+        "name",
         sol::property([this](RimPawn& p) -> std::string {
             sol::object o = host_call_h("pawn.name", p.h);
             return o.is<std::string>() ? o.as<std::string>() : std::string{};
@@ -216,22 +273,7 @@ void Engine::bind_oo_types() {
             warn_deprecated("RimPawn:seek_medical_help", "RimPawn:seek_medical");
             return host_call_h("pawn.seek_medical", p.h);
         },
-        "position",
-        sol::property([this](RimPawn& p) -> sol::object {
-            sol::object o = host_call_h("pawn.pos", p.h);
-            if (!o.is<std::string>()) {
-                return sol::make_object(*lua_, sol::lua_nil);
-            }
-            std::string s = o.as<std::string>();
-            auto comma = s.find(',');
-            if (comma == std::string::npos) {
-                return sol::make_object(*lua_, sol::lua_nil);
-            }
-            sol::table cell = lua_->create_table();
-            cell["x"] = std::stoi(s.substr(0, comma));
-            cell["z"] = std::stoi(s.substr(comma + 1));
-            return sol::make_object(*lua_, cell);
-        }),
+        "position", sol::property([this](RimPawn& p) -> sol::object { return cell_from_text(*lua_, host_call_h("pawn.pos", p.h)); }),
         "is_moving",
         sol::property([this](RimPawn& p) -> bool {
             sol::object o = host_call_h("pawn.is_moving", p.h);
@@ -421,7 +463,76 @@ void Engine::bind_oo_types() {
                                     sol::object o = host_call_h("thing.label", t.h);
                                     return o.is<std::string>() ? o.as<std::string>() : std::string{};
                                 }),
-                                "destroy", [this](RimThing& t) { return host_call_h("thing.destroy", t.h); });
+                                "destroy", [this](RimThing& t) { return host_call_h("thing.destroy", t.h); },
+        "stack", sol::property(
+                     [this](RimThing& t) -> int {
+                         sol::object o = host_call_h("thing.stack", t.h);
+                         return o.is<double>() ? static_cast<int>(o.as<double>()) : 0;
+                     },
+                     [this](RimThing& t, int v) { host_call_hv("thing.set_stack", t.h, "v", sol::make_object(*lua_, v)); }),
+        "position", sol::property(
+                        [this](RimThing& t) -> sol::object { return cell_from_text(*lua_, host_call_h("thing.pos", t.h)); },
+                        [this](RimThing& t, sol::table cell) {
+                            sol::table a = lua_->create_table();
+                            a["h"] = t.h;
+                            a["x"] = cell.get_or("x", 0);
+                            a["z"] = cell.get_or("z", 0);
+                            host_call("thing.set_pos", a);
+                        }),
+        "map", sol::property([this](RimThing& t) -> sol::object {
+            sol::object o = host_call_h("thing.map", t.h);
+            const int mh = o.is<int>() ? o.as<int>() : 0;
+            return mh == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_map(mh));
+        }),
+        "faction", sol::property(
+                       [this](RimThing& t) -> sol::object {
+                           sol::object o = host_call_h("thing.faction", t.h);
+                           const int fh = o.is<int>() ? o.as<int>() : 0;
+                           return fh == 0 ? sol::make_object(*lua_, sol::lua_nil) : sol::make_object(*lua_, wrap_faction(fh));
+                       },
+                       [this](RimThing& t, RimFaction& f) {
+                           sol::table a = lua_->create_table();
+                           a["h"] = t.h;
+                           a["faction"] = f.h;
+                           host_call("thing.set_faction", a);
+                       }),
+        "is_pawn", sol::property([this](RimThing& t) -> bool {
+            sol::object o = host_call_h("thing.info", t.h);
+            return o.is<sol::table>() && o.as<sol::table>().get_or("is_pawn", false);
+        }),
+        "is_building", sol::property([this](RimThing& t) -> bool {
+            sol::object o = host_call_h("thing.info", t.h);
+            return o.is<sol::table>() && o.as<sol::table>().get_or("is_building", false);
+        }),
+        "hp", sol::property(
+                  [this](RimThing& t) -> int {
+                      sol::object o = host_call_h("thing.hp", t.h);
+                      return o.is<double>() ? static_cast<int>(o.as<double>()) : 0;
+                  },
+                  [this](RimThing& t, int v) { host_call_hv("thing.set_hp", t.h, "v", sol::make_object(*lua_, v)); }),
+        "max_hp", sol::property([this](RimThing& t) -> int {
+            sol::object o = host_call_h("thing.max_hp", t.h);
+            return o.is<double>() ? static_cast<int>(o.as<double>()) : 0;
+        }),
+        "spawned", sol::property([this](RimThing& t) -> bool {
+            sol::object o = host_call_h("thing.spawned", t.h);
+            return o.is<bool>() && o.as<bool>();
+        }),
+        "id", sol::property([this](RimThing& t) -> int {
+            sol::object o = host_call_h("thing.info", t.h);
+            return o.is<sol::table>() ? o.as<sol::table>().get_or("id", 0) : 0;
+        }),
+        "label_short", sol::property([this](RimThing& t) -> std::string {
+            sol::object o = host_call_h("thing.label_short", t.h);
+            return o.is<std::string>() ? o.as<std::string>() : std::string{};
+        }),
+        "despawn", [this](RimThing& t) { return host_call_h("thing.despawn", t.h); },
+        sol::meta_function::index, [this](RimThing& /*t*/, sol::object key) -> sol::object {
+            if (thing_methods_.valid() && key.is<std::string>()) {
+                return thing_methods_[key.as<std::string>()];
+            }
+            return sol::make_object(*lua_, sol::lua_nil);
+        });
 
     lua_->new_usertype<RimEntity>(
         "RimEntity", sol::no_constructor, "handle", &RimEntity::h, "name",
@@ -471,8 +582,80 @@ void Engine::bind_oo_types() {
 void Engine::bind_events_and_timer() {
     sol::table events = lua_->create_named_table("events");
     // Canonical event names contain a dot (pawn.died). The host installs the Harmony patch on first subscription.
-    events["on"] = [this](const std::string& name, sol::protected_function fn) {
-        add_event_handler(name, std::move(fn));
+    // events.on(name, fn) or events.on(name, filter, fn). The filter is a table checked before the handler runs:
+    // pawn, humanlike, colonist (the event's pawn, or its thing when that is a pawn), def (string or list), min_dealt,
+    // and any other key must equal the payload field of that name.
+    events["on"] = [this](const std::string& name, sol::object second, sol::optional<sol::protected_function> third) {
+        sol::protected_function fn;
+        sol::object filter_obj = sol::make_object(*lua_, sol::lua_nil);
+        if (second.is<sol::table>()) {
+            if (!third) {
+                throw sol::error("RK1001: events.on(name, filter, fn) needs a function as its third argument");
+            }
+            fn = *third;
+            filter_obj = second;
+        } else if (second.is<sol::protected_function>()) {
+            fn = second.as<sol::protected_function>();
+        } else {
+            throw sol::error("RK1001: events.on(name, fn) needs a function");
+        }
+        // Under rimkit mod test every registration is recorded, with how often its handler ran, so tests can be generated from it.
+        sol::object reg = sol::make_object(*lua_, sol::lua_nil);
+        if (test_mode_) {
+            sol::table r = lua_->create_table();
+            r["event"] = name;
+            r["calls"] = 0;
+            if (filter_obj.is<sol::table>()) {
+                r["filter"] = filter_obj;
+            }
+            sol::table all = (*lua_)["__rk_registered_events"];
+            all[all.size() + 1] = r;
+            reg = r;
+        }
+        if (!filter_obj.is<sol::table>() && !test_mode_) {
+            add_event_handler(name, fn);
+            return;
+        }
+        if (!event_filter_maker_.valid()) {
+            sol::load_result lr = lua_->load(R"(
+return function(filter, fn, reg)
+  local function subject(e) return e.pawn or e.thing end
+  local function is_pawn(s) return type(s) == "userdata" and s.is_pawn == true end
+  return function(e, ...)
+    local s = subject(e)
+    for k, v in pairs(filter) do
+      if k == "pawn" then
+        if (v == true) ~= is_pawn(s) then return end
+      elseif k == "humanlike" then
+        if not is_pawn(s) or (s.is_humanlike == true) ~= v then return end
+      elseif k == "colonist" then
+        if not is_pawn(s) or (s.is_colonist == true) ~= v then return end
+      elseif k == "def" then
+        local d = s and s.def
+        if type(v) == "table" then
+          local hit = false
+          for _, want in ipairs(v) do if want == d then hit = true break end end
+          if not hit then return end
+        elseif d ~= v then return end
+      elseif k == "min_dealt" then
+        if (e.dealt or 0) < v then return end
+      elseif e[k] ~= v then
+        return
+      end
+    end
+    if reg then reg.calls = reg.calls + 1 end
+    return fn(e, ...)
+  end
+end)");
+            sol::protected_function_result made = lr();
+            event_filter_maker_ = made.get<sol::protected_function>();
+        }
+        sol::object filter_table = filter_obj.is<sol::table>() ? filter_obj : sol::make_object(*lua_, lua_->create_table());
+        sol::protected_function_result wrapped = event_filter_maker_(filter_table, fn, reg);
+        if (!wrapped.valid()) {
+            throw sol::error("RK1001: events.on filter could not be built");
+        }
+        add_event_handler(name, wrapped.get<sol::protected_function>());
     };
     events["off"] = [this](const std::string& requested) {
         const std::string name = canonical_event_name(requested);

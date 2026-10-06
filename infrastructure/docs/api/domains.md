@@ -6,7 +6,7 @@ A kit is a curated, documented `game.<domain>` API for one part of the game. Thi
 
 | Domain | State | Notes |
 |--------|-------|-------|
-| `game.pawns` | Shipped (Experimental) | Skills, needs, traits, thoughts, relations, backstory, capacities, timetable, genes. Gear and policies are still older functions. [pawns](pawns.md) |
+| `game.pawns` | Shipped (Experimental) | Skills, needs, traits, thoughts, relations, backstory, capacities, timetable, genes. Gear and policies are plain handle functions. [pawns](pawns.md) |
 | `game.anomaly`, `game.anomalies` | Shipped (Experimental) | Entities, recruit, capture, monolith, studies, containment, codex, engagement. [anomaly](anomaly.md), [dlc](dlc.md) |
 | `game.things` | Shipped (Experimental) | Info, quality, stuff, forbidden, rotation, comps, damage, make and spawn. [things](things.md) |
 | `game.maps` | Shipped (Experimental) | Cells, terrain, roofs, fog, rooms, zones, designations, lords, reachability. [maps](maps.md) |
@@ -65,7 +65,7 @@ Every kit follows the same shape, so a new domain is predictable:
 | Host | One C# class per domain in `src/host/api/` registering `domain.verb_noun` operations |
 | Binding | A native function in `src/native/core/` |
 | Docs | A page in `infrastructure/docs/api/`, stubs in `src/editor/stubs/rimkit.lua`, regenerate the [reference](reference.md) |
-| Test | A check in `tests/smoke/Lua/main.lua` |
+| Test | A check in `tests/smoke/Lua/main.luau` |
 
 The rules behind this are in [the RimKit Standard](../standard/rks.md).
 

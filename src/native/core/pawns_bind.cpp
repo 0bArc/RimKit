@@ -215,6 +215,8 @@ void Engine::bind_pawns_kit() {
         return r.is<std::string>() ? r.as<std::string>() : key;
     };
     game["ui"] = ui;
+    // game.ui.say(key, ...): translate a Keyed string, then show it as a message. A text that is not a key shows as it is.
+    lua_->safe_script("game.ui.say = function(key, ...) return game.ui.message(game.ui.translate(key, ...)) end");
 
     // game.json.encode(value) and game.json.decode(text). Tables, strings, numbers and booleans only. Game objects encode as handles.
     sol::table json = lua_->create_table();

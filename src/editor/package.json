@@ -2,7 +2,7 @@
   "name": "rimkit",
   "displayName": "RimKit (RimWorld Lua)",
   "description": "Completions, def name completion from the running game, go to definition, tests, release checks, deprecation warnings with quick fixes, Lua API stubs and auto-ship for RimKit mods.",
-  "version": "0.10.0",
+  "version": "0.10.2",
   "publisher": "stratware",
   "engines": {
     "vscode": "^1.85.0"
@@ -13,6 +13,7 @@
   ],
   "activationEvents": [
     "onLanguage:lua",
+    "onLanguage:luau",
     "workspaceContains:meta.lua"
   ],
   "main": "./extension.js",
@@ -25,10 +26,6 @@
       {
         "command": "rimkit.sync",
         "title": "RimKit: Sync meta.lua"
-      },
-      {
-        "command": "rimkit.migrate",
-        "title": "RimKit: Migrate deprecated API names"
       },
       {
         "command": "rimkit.test",
@@ -49,6 +46,10 @@
       {
         "command": "rimkit.diag",
         "title": "RimKit: Make a diagnostics zip"
+      },
+      {
+        "command": "rimkit.setupLuau",
+        "title": "RimKit: Set up Luau types"
       },
       {
         "command": "rimkit.newMod",
@@ -79,19 +80,13 @@
           "description": "Def names exported by the dev tools (rimkit_defs.json). Empty looks in .rimkit/defs.json and the game's Config folder."
         }
       }
-    },
-    "languages": [
-      {
-        "id": "lua",
-        "extensions": [
-          ".lua"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ]
+    }
   },
   "scripts": {
-    "gen": "node tools/gen-unc-stubs.js",
-    "package": "node tools/gen-unc-stubs.js && npx @vscode/vsce package --no-dependencies"
-  }
+    "gen": "node tools/gen-unc-stubs.js && node tools/gen-luau-defs.js",
+    "package": "node tools/gen-unc-stubs.js && node tools/gen-luau-defs.js && npx @vscode/vsce package --no-dependencies"
+  },
+  "extensionDependencies": [
+    "JohnnyMorganz.luau-lsp"
+  ]
 }

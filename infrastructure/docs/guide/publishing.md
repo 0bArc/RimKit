@@ -5,7 +5,7 @@ Everything between "it works on my machine" and "strangers can install it" is a 
 | Step | Command | What it covers |
 |------|---------|----------------|
 | 1 | `rimkit mod check` | Defs, patches, textures, translation keys, declared permissions |
-| 2 | `rimkit mod test` | Your `Tests/*.lua` |
+| 2 | `rimkit mod test` | Your `Tests/*.luau` |
 | 3 | `rimkit mod assets --fix` | Preview image and mod icon |
 | 4 | `rimkit mod release-check` | Full release checklist |
 | 5 | `rimkit publish --user <steam> --note "..."` | Sync, stage, upload via SteamCMD |

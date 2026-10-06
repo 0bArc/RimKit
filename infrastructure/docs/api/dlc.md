@@ -19,7 +19,7 @@ end
 
 Ideology covers ideoligions, memes (add and remove, with the game's own conflict checks), precepts, roles, certainty, rituals, style categories and renaming. Royalty covers titles, honor, permits, psylink level, abilities, the Empire and throne rooms. Biotech covers xenotypes, gene definitions, mechanitors and their mechs, pregnancy, growth points, hemogen and gene packs. Anomaly covers the monolith, studies, containment, platforms, the codex, creepjoiners and how controlled pawns pick fights. Odyssey covers planet layers, gravship engines (fuel, launch range, cooldown, substructure, linked components), space maps and the gravship in flight. Launching, travel and orbital sites are not exposed yet, so it is still the least complete.
 
-The older `game.anomalies` object and `game.anomaly` recruit, capture and release functions are on the [Anomaly kit](anomaly.md) page and keep working.
+The `game.anomalies` object and the `game.anomaly` recruit, capture and release functions are on the [Anomaly kit](anomaly.md) page.
 
 ## Functions
 

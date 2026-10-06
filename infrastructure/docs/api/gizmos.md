@@ -15,8 +15,8 @@ game.gizmos.add("drop_all", { label = "Drop all", desc = "Drops everything this 
 
 -- A toggle stored in the save
 game.gizmos.add_toggle("auto_tend", { label = "Auto tend", target = "colonist" },
-  function(pawn) return game.save.fetch("my.mod", "game", "auto_tend_" .. game.things.info(pawn).id, nil, false) end,
-  function(pawn) local k = "auto_tend_" .. game.things.info(pawn).id
+  function(pawn) return game.save.fetch("my.mod", "game", "auto_tend_" .. pawn:info().id, nil, false) end,
+  function(pawn) local k = "auto_tend_" .. pawn:info().id
     game.save.put("my.mod", "game", k, not game.save.fetch("my.mod", "game", k, nil, false)) end)
 ```
 

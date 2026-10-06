@@ -6,7 +6,7 @@
 
 | Function | Returns | Notes |
 |----------|---------|-------|
-| `game.time.ticks()` | integer | Ticks since this game started. Older name `rim.find.tick` still works. |
+| `game.time.ticks()` | integer | Ticks since this game started. |
 | `game.time.now()` | table | Calendar fields for the current map, see below. Raises `RK3001` when no game is loaded. |
 | `game.time.speed()` | string | `Paused`, `Normal`, `Fast`, `Superfast` or `Ultrafast`. |
 | `game.time.set_speed(speed)` | string | Accepts a name (any case) or 0 to 4. Returns the speed that was set. A bad value raises `RK1001`. |

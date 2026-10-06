@@ -8,15 +8,40 @@ game.events.on("thing.damaged", function(e)
 end)
 ```
 
-`events.on` and `events.off` are also available as plain `events.on` and `events.off`. They are core shorthands and are not deprecated.
+Every event also has its own function, `game.events.on_pawn_damaged(fn, filter?)`, with the dot of the event name written as an underscore. Its handler gets the pawn (or the thing) first and the payload second: `function(pawn, e)`. The editor types both from that name, see [Luau](../guide/luau.md). The string form below passes only the payload table.
+
+`events.on` and `events.off` also work without the `game.` prefix.
 
 ## Functions
 
 | Function | Does |
 |----------|------|
 | `events.on(name, fn)` | Subscribes. A canonical name (it contains a dot) installs its patch on the first subscription |
+| `events.on(name, filter, fn)` | Subscribes, and runs `fn` only when the payload matches the filter table. See [Filters](#filters) |
 | `events.off(name)` | Removes every handler you registered for the name. The patch is removed when the last handler goes |
 | `events.list()` | Every event as `{ name, description, hot, installed }` |
+
+## Filters
+
+A filter is a table checked before your function runs, so the checks do not have to be written in every handler. All entries must match.
+
+| Key | Matches when |
+|-----|--------------|
+| `pawn = true` | The event's pawn (or its thing, when that is a pawn) is a pawn. |
+| `humanlike = true` | That pawn is humanlike, not an animal, mech or entity. |
+| `colonist = true` | That pawn is a colonist. `false` matches everyone else. |
+| `def = "Wall"` or `{ "Wall", "Door" }` | The thing or pawn has one of these defs. |
+| `min_dealt = 1` | The payload's `dealt` is at least this. |
+| any other key | The payload field of that name equals the value. |
+
+```lua
+-- Damage numbers over people, not over walls and animals
+game.events.on_pawn_damaged(function(pawn, e)
+  game.effects.text(pawn, tostring(math.floor(e.dealt)), pawn.is_colonist and "red" or "orange")
+end, { humanlike = true, min_dealt = 1 })
+```
+
+The filter runs in Lua after the game has built the payload, so it saves your own code, not the cost of the event. A hot event is still best listened to only while you need it.
 
 ## Payloads
 
@@ -49,6 +74,7 @@ end)
 | `thing.damaged` | `thing`, `damage`, `dealt` | yes | A thing took damage. |
 | `pawn.spawned` | `pawn`, `map` | no | A pawn was spawned after load. |
 | `pawn.died` | `pawn`, `damage`, `culprit` | no | A pawn is dying. |
+| `pawn.damaged` | `pawn`, `damage`, `dealt` | yes | A pawn took damage. Use a filter, for example { humanlike = true }. |
 | `pawn.resurrected` | `pawn` | no | A pawn was resurrected. |
 | `hediff.added` | `pawn`, `hediff`, `part` | no | A hediff was added to a pawn. |
 | `hediff.removed` | `pawn`, `hediff` | no | A hediff is about to be removed. |
@@ -139,10 +165,6 @@ Naming: `<domain>.<past tense verb>`. See [naming](naming.md).
 - The queue holds 8192 events. A frame delivers up to 256. Overflow is counted by the host.
 - `game.loaded` and `game.new` invalidate every handle created before them. Do not keep handles across them.
 - A Lua error in a handler is logged with the event name. Other handlers still run.
-
-## Older event names
-
-`pawn_spawned` and `pawn_died`, and the globals `on_pawn_spawned` and `on_pawn_died`, still work and are deprecated. Their handlers receive the pawn instead of a payload. Move to `pawn.spawned` and `pawn.died` ([migration](migration.md)).
 
 ## Need an event that is not here?
 

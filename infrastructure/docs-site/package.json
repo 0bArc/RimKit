@@ -12,6 +12,7 @@
   "dependencies": {
     "highlight.js": "^11.11.1",
     "marked": "^15.0.12",
+    "mermaid": "^11.17.2",
     "sanitize-html": "^2.18.0"
   }
 }

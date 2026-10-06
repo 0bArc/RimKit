@@ -99,7 +99,7 @@ if (fs.existsSync(refPath)) {
 }
 
 // The generated API pages are current: types, host operations and the CLI reference.
-for (const gen of ["gen-api-types.js", "gen-ops-doc.js", "gen-cli-doc.js"]) {
+for (const gen of ["gen-api-types.js", "gen-ops-doc.js", "gen-cli-doc.js", "gen-api-details.js"]) {
   try {
     require("child_process").execFileSync(process.execPath, [path.join("infrastructure", "tools", gen), "--check"], { stdio: "ignore" });
   } catch (e) {

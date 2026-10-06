@@ -20,7 +20,6 @@ game.maps = game.maps or {}
 game.paths = game.paths or {}
 game.pawns = game.pawns or {}
 game.selection = game.selection or {}
-game.things = game.things or {}
 game.time = game.time or {}
 game.timer = game.timer or {}
 game.ui = game.ui or {}
@@ -138,38 +137,6 @@ function game.pawns.tend(h, quality) end
 ---@param recipeDefName string
 ---@return boolean
 function game.pawns.queue_surgery(h, recipeDefName) end
-
-function game.things.def(...) end
-
-function game.things.label(...) end
-
-function game.things.label_short(...) end
-
-function game.things.destroy(...) end
-
-function game.things.despawn(...) end
-
-function game.things.pos(...) end
-
-function game.things.set_pos(...) end
-
-function game.things.hp(...) end
-
-function game.things.max_hp(...) end
-
-function game.things.set_hp(...) end
-
-function game.things.stack(...) end
-
-function game.things.set_stack(...) end
-
-function game.things.faction(...) end
-
-function game.things.set_faction(...) end
-
-function game.things.map(...) end
-
-function game.things.spawned(...) end
 
 ---@param h integer
 ---@return number

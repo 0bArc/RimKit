@@ -10,7 +10,7 @@ for _, v in ipairs(game.combat.verbs(colonist)) do
 end
 
 -- A flare at the colonist's feet
-local c = game.things.info(colonist)
+local c = colonist:info()
 game.combat.explode(game.maps.current(), c.x + 3, c.z, 2, { damage_def = "Flame", damage = 10 })
 ```
 

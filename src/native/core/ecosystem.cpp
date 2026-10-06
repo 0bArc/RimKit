@@ -36,7 +36,7 @@ long long newest_lua_time(const std::string& dir) {
     long long newest = 0;
     std::error_code ec;
     for (auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
-        if (!it->is_regular_file(ec) || it->path().extension() != ".lua") {
+        if (!it->is_regular_file(ec) || (it->path().extension() != ".lua" && it->path().extension() != ".luau")) {
             continue;
         }
         const long long t = static_cast<long long>(fs::last_write_time(it->path(), ec).time_since_epoch().count());
@@ -383,6 +383,8 @@ function T.logged(part)
 end
 
 function T.reset_mocks()
+  for _, reg in ipairs(__rk_registered_events) do reg.calls = 0 end
+  __rk_test_errors_reset()
   for i = #logged, 1, -1 do logged[i] = nil end
   for k in pairs(__rk_mock) do __rk_mock[k] = nil end
   for i = #__rk_mock_calls, 1, -1 do __rk_mock_calls[i] = nil end
@@ -420,7 +422,335 @@ function T.run()
   return failed
 end
 
+T._deep_equal, T._show, T._fail = deep_equal, show, fail
+
 game.test = T
+)LUA";
+
+const char* kTestSugarLua = R"LUA(
+local T = game.test
+local deep_equal, show, fail = T._deep_equal, T._show, T._fail
+
+-- ---- A friendlier test API: mock objects, game.emit, spies, and plain describe, it and expect.
+-- T.globals() puts these in the test files' scope: describe, it, before_each, expect, mock, spy, effects, and game.emit.
+local objects, next_handle = {}, 1000
+
+local function is_mock(v)
+  return type(v) == "userdata" and objects[v.handle] ~= nil
+end
+
+local pawn_answers = {
+  ["pawn.is_humanlike"] = function(o) return o.humanlike end,
+  ["pawn.is_colonist"] = function(o) return o.colonist end,
+  ["pawn.name"] = function(o) return o.name end,
+  ["pawn.pos"] = function(o) return o.position and (o.position.x .. "," .. o.position.z) or "" end,
+  ["pawn.map"] = function(o) return o.map end,
+  ["thing.def"] = function(o) return o.def end,
+  ["thing.label"] = function(o) return o.name end,
+  ["thing.hp"] = function(o) return o.hp end,
+  ["thing.max_hp"] = function(o) return o.max_hp end,
+  ["thing.stack"] = function(o) return o.stack end,
+  ["thing.pos"] = function(o) return o.position and (o.position.x .. "," .. o.position.z) or "" end,
+  ["thing.map"] = function(o) return o.map end,
+  ["thing.spawned"] = function(o) return true end,
+  ["thing.info"] = function(o) return { id = o.handle, def = o.def, label = o.name, hp = o.hp, max_hp = o.max_hp, is_pawn = o.kind == "pawn", is_building = false, spawned = true } end,
+}
+
+-- A mock answers for every mock object by handle. It is reinstalled after each test resets the mocks.
+local function install_answers()
+  for op, answer in pairs(pawn_answers) do
+    if __rk_mock[op] == nil then
+      T.mock(op, function(args)
+        local o = objects[args.h]
+        if o then return answer(o) end
+        return nil
+      end)
+    end
+  end
+end
+
+local mock = {}
+
+-- mock.pawn({ humanlike = true, colonist = false, position = { x = 10, z = 10 }, map = 1, name = "Mock" })
+function mock.pawn(opts)
+  opts = opts or {}
+  next_handle += 1
+  objects[next_handle] = {
+    kind = "pawn",
+    handle = next_handle,
+    humanlike = opts.humanlike ~= false,
+    colonist = opts.colonist == true,
+    name = opts.name or "Mock",
+    position = opts.position == nil and { x = 10, z = 10 } or opts.position,
+    map = opts.map or 1,
+    def = opts.def or "Human",
+    hp = opts.hp or 100,
+    max_hp = opts.max_hp or 100,
+    stack = 1,
+  }
+  install_answers()
+  return rim.wrap(next_handle)
+end
+
+-- mock.thing({ def = "Steel", hp = 100, stack = 75, position = { x = 5, z = 5 } })
+function mock.thing(opts)
+  opts = opts or {}
+  next_handle += 1
+  objects[next_handle] = {
+    kind = "thing",
+    handle = next_handle,
+    name = opts.name or opts.def or "Thing",
+    position = opts.position == nil and { x = 10, z = 10 } or opts.position,
+    map = opts.map or 1,
+    def = opts.def or "Steel",
+    hp = opts.hp or 100,
+    max_hp = opts.max_hp or 100,
+    stack = opts.stack or 1,
+  }
+  install_answers()
+  return rim.wrap_thing(next_handle)
+end
+
+local function ref(object)
+  local o = objects[object.handle]
+  return { ["$h"] = o.handle, ["$k"] = o.kind }
+end
+
+-- game.emit.pawn_damaged(pawn, 7.8) sends the event pawn.damaged with that pawn. A second argument that is a number fills the
+-- number the event is about (dealt for damaged, amount for the rest), and a table adds fields: game.emit.pawn_damaged(pawn, { dealt = 7 }).
+local numeric_field = { damaged = "dealt" }
+local emit_api = setmetatable({}, {
+  __index = function(_, key)
+    local domain, name
+    for _, multi in ipairs({ "mental_state", "world_object" }) do
+      if key:sub(1, #multi + 1) == multi .. "_" then domain, name = multi, key:sub(#multi + 2) end
+    end
+    if not domain then domain, name = key:match("^([a-z]+)_(.+)$") end
+    if not domain then error("RK1001: game.emit." .. key .. ": write it as <domain>_<event>, for example pawn_damaged", 2) end
+    local event = domain .. "." .. name
+    return function(subject, extra)
+      local payload = {}
+      if is_mock(subject) then
+        payload[objects[subject.handle].kind] = ref(subject)
+      elseif type(subject) == "table" then
+        extra = subject
+      end
+      if type(extra) == "number" then extra = { [numeric_field[name] or "amount"] = extra } end
+      if type(extra) == "table" then
+        for k, v in pairs(extra) do payload[k] = is_mock(v) and ref(v) or v end
+      end
+      if name == "damaged" and payload.dealt and payload.damage == nil then
+        payload.damage = { amount = payload.dealt, def = "Cut" }
+      end
+      __rk_test_emit(event, payload)
+    end
+  end,
+})
+
+-- Spies: spy.effects.text stands for the host op effects.text. expect(effects.text).to_have_been_called({ ... }) checks its calls.
+local spy = setmetatable({}, {
+  __index = function(_, domain)
+    return setmetatable({}, { __index = function(_, name) return { __spy = true, op = domain .. "." .. name } end })
+  end,
+})
+
+local function call_matches(call, match)
+  for key, want in pairs(match) do
+    if key == "target" then
+      local o = is_mock(want) and objects[want.handle]
+      if not o or not o.position or call.args.x ~= o.position.x or call.args.z ~= o.position.z then return false end
+    else
+      local got = call.args[key]
+      if type(want) == "table" then
+        if not deep_equal(got, want) then return false end
+      elseif got ~= want and tostring(got) ~= tostring(want) then
+        return false
+      end
+    end
+  end
+  return true
+end
+
+local function list_calls(calls)
+  if #calls == 0 then return "no calls" end
+  local rows = {}
+  for _, c in ipairs(calls) do rows[#rows + 1] = show(c.args) end
+  return table.concat(rows, "; ")
+end
+
+local SpyExpect = {}
+function SpyExpect.to_have_been_called(self, match)
+  local calls = T.calls(self.v.op)
+  if #calls == 0 then fail("expected " .. self.v.op .. " to be called, but it was not") end
+  if match == nil then return end
+  for _, c in ipairs(calls) do if call_matches(c, match) then return end end
+  fail("expected " .. self.v.op .. " to be called with " .. show(match) .. ", but it was called with: " .. list_calls(calls))
+end
+function SpyExpect.not_to_have_been_called(self, match)
+  local calls = T.calls(self.v.op)
+  if match == nil then
+    if #calls > 0 then fail("expected " .. self.v.op .. " not to be called, but it was: " .. list_calls(calls)) end
+    return
+  end
+  for _, c in ipairs(calls) do
+    if call_matches(c, match) then fail("expected " .. self.v.op .. " not to be called with " .. show(match) .. ", but it was") end
+  end
+end
+function SpyExpect.to_have_been_called_times(self, n)
+  local calls = T.calls(self.v.op)
+  if #calls ~= n then fail("expected " .. self.v.op .. " to be called " .. n .. " time(s), but it was called " .. #calls .. ": " .. list_calls(calls)) end
+end
+
+local function expect_any(v)
+  if type(v) == "table" and v.__spy then
+    local obj = { v = v }
+    for name, fn in pairs(SpyExpect) do
+      obj[name] = function(first, ...)
+        if first == obj then return fn(obj, ...) end
+        return fn(obj, first, ...)
+      end
+    end
+    return obj
+  end
+  return T.expect(v)
+end
+
+function T.errors() return __rk_test_errors() end
+function T.handler_calls(event)
+  local n = 0
+  for _, reg in ipairs(__rk_registered_events) do if reg.event == event then n += reg.calls end end
+  return n
+end
+
+function T.globals()
+  local g = _G
+  g.describe, g.it, g.before_each = T.describe, T.it, T.before_each
+  g.expect, g.mock, g.spy, g.effects = expect_any, mock, spy, spy.effects
+  game.emit = emit_api
+end
+
+-- ---- Generating tests from what a mod registers.
+local SUBJECT = {
+  pawn = "pawn", hediff = "pawn", job = "pawn", mental_state = "pawn", skill = "pawn", thought = "pawn", relation = "pawn",
+  interaction = "pawn", inspiration = "pawn", ability = "pawn", bill = "pawn", plant = "pawn", recipe = "pawn", construction = "pawn",
+  royalty = "pawn", ideo = "pawn", thing = "thing", explosion = "thing", power = "thing", designation = "thing", zone = "thing",
+}
+local MULTI = { "mental_state", "world_object" }
+
+local function split_event(event)
+  for _, multi in ipairs(MULTI) do
+    if event:sub(1, #multi + 1) == multi .. "." then return multi, event:sub(#multi + 2) end
+  end
+  return event:match("^([a-z_]+)%.(.+)$")
+end
+
+local function literal(v)
+  if type(v) == "string" then return string.format("%q", v) end
+  return tostring(v)
+end
+
+local function table_text(t, order)
+  local keys = {}
+  for k in pairs(t) do keys[#keys + 1] = k end
+  table.sort(keys)
+  if #keys == 0 then return "" end
+  local parts = {}
+  for _, k in ipairs(keys) do parts[#parts + 1] = k .. " = " .. literal(t[k]) end
+  return "{ " .. table.concat(parts, ", ") .. " }"
+end
+
+-- Plans one event registration: the subject options and extra fields that satisfy the filter, and what breaks each key.
+local function plan(reg)
+  local filter = reg.filter or {}
+  local ok_subject, ok_extra = {}, {}
+  local breaks = {}
+  local keys = {}
+  for k in pairs(filter) do keys[#keys + 1] = k end
+  table.sort(keys)
+  for _, k in ipairs(keys) do
+    local v = filter[k]
+    if k == "humanlike" or k == "colonist" then
+      ok_subject[k] = v
+      breaks[#breaks + 1] = { why = "a pawn that is " .. (v and "not " or "") .. k, subject = { [k] = not v }, extra = {} }
+    elseif k == "def" then
+      local first = type(v) == "table" and v[1] or v
+      ok_subject.def = first
+      breaks[#breaks + 1] = { why = "a different def", subject = { def = "SomethingElse" }, extra = {} }
+    elseif k == "min_dealt" then
+      ok_extra.dealt = v + 1
+      breaks[#breaks + 1] = { why = "damage below " .. v, subject = {}, extra = { dealt = math.max(0, v - 1) } }
+    elseif k ~= "pawn" and type(v) ~= "table" then
+      ok_extra[k] = v
+      local other = type(v) == "number" and v + 1 or type(v) == "boolean" and not v or "other"
+      breaks[#breaks + 1] = { why = k .. " other than " .. tostring(v), subject = {}, extra = { [k] = other } }
+    end
+  end
+  return ok_subject, ok_extra, breaks
+end
+
+function T.generate(mod)
+  local out = {}
+  local function add(s) out[#out + 1] = s end
+  add("-- Generated by rimkit mod gen-tests from what the mod registers. Edit it, or delete it and generate again.")
+  add("-- Run with: rimkit mod test")
+  add("")
+  add("describe(" .. string.format("%q", mod) .. ", function()")
+  add("  it(\"loads without errors\", function()")
+  add("    game.test.start()")
+  add("    expect(game.test.errors()).to_be(0)")
+  add("  end)")
+  local per_event, seen = {}, {}
+  for _, reg in ipairs(__rk_registered_events) do per_event[reg.event] = (per_event[reg.event] or 0) + 1 end
+  for _, reg in ipairs(__rk_registered_events) do
+    local domain, name = split_event(reg.event)
+    if domain then
+      local ok_subject, ok_extra, breaks = plan(reg)
+      local key = reg.event .. table_text(reg.filter or {})
+      if not seen[key] then
+        seen[key] = true
+        local kind = SUBJECT[domain]
+        local emit_call = "game.emit." .. domain .. "_" .. name
+        local function body(subject_opts, extra)
+          if kind then
+            add("    local subject = mock." .. kind .. "(" .. table_text(subject_opts) .. ")")
+            local extra_text = table_text(extra)
+            add("    " .. emit_call .. "(subject" .. (extra_text ~= "" and (", " .. extra_text) or "") .. ")")
+          else
+            add("    " .. emit_call .. "(" .. table_text(extra) .. ")")
+          end
+        end
+        add("")
+        add("  it(" .. string.format("%q", reg.event .. ": handles a matching event") .. ", function()")
+        body(ok_subject, ok_extra)
+        add("    expect(game.test.errors()).to_be(0)")
+        add("    expect(game.test.handler_calls(" .. string.format("%q", reg.event) .. ") >= 1).to_be(true)")
+        add("  end)")
+        if per_event[reg.event] == 1 then
+          for _, b in ipairs(breaks) do
+            local subject_opts, extra = {}, {}
+            for k, v in pairs(ok_subject) do subject_opts[k] = v end
+            for k, v in pairs(ok_extra) do extra[k] = v end
+            for k, v in pairs(b.subject) do subject_opts[k] = v end
+            for k, v in pairs(b.extra) do extra[k] = v end
+            add("")
+            add("  it(" .. string.format("%q", reg.event .. ": ignores " .. b.why) .. ", function()")
+            body(subject_opts, extra)
+            add("    expect(game.test.handler_calls(" .. string.format("%q", reg.event) .. ")).to_be(0)")
+            add("  end)")
+          end
+        end
+      end
+    end
+  end
+  add("end)")
+  return table.concat(out, string.char(10)) .. string.char(10)
+end
+
+-- Writes the generated file one line at a time through the log, for the command line tool to pick up.
+function T.print_generated(mod)
+  for line in T.generate(mod):gmatch("([^\n]*)\n") do rim.log("RKGEN:" .. line) end
+end
+
 )LUA";
 
 const char* kSaveLua = R"LUA(
@@ -624,11 +954,11 @@ int Engine::reload_mod(const std::string& package_id) {
     std::error_code ec;
     for (const std::string& lua_dir : lua_dirs)
     for (auto fit = fs::recursive_directory_iterator(lua_dir, ec); !ec && fit != fs::recursive_directory_iterator(); fit.increment(ec)) {
-        if (!fit->is_regular_file(ec) || fit->path().extension() != ".lua") {
+        if (!fit->is_regular_file(ec) || (fit->path().extension() != ".lua" && fit->path().extension() != ".luau")) {
             continue;
         }
         std::string rel = fs::relative(fit->path(), lua_dir, ec).generic_string();
-        rel = rel.substr(0, rel.size() - 4);
+        rel = rel.substr(0, rel.size() - fit->path().extension().string().size());
         for (char& c : rel) {
             if (c == '/') {
                 c = '.';
@@ -721,6 +1051,9 @@ void Engine::bind_ecosystem() {
 
     L["__rk_mock"] = L.create_table();
     L["__rk_mock_calls"] = L.create_table();
+    L["__rk_registered_events"] = L.create_table();
+    L["__rk_test_errors"] = [this]() { return test_errors_; };
+    L["__rk_test_errors_reset"] = [this]() { test_errors_ = 0; };
     auto need_test_mode = [this]() {
         if (!test_mode_) {
             throw sol::error("RK4001: game.test only works under rimkit mod test. In the game it would fake events and answers, so it refuses.");
@@ -853,6 +1186,9 @@ void Engine::bind_ecosystem() {
     sol::protected_function_result r1 = L.safe_script(kInteropLua, sol::script_pass_on_error);
     sol::protected_function_result r2 = L.safe_script(kDevLua, sol::script_pass_on_error);
     sol::protected_function_result r3 = L.safe_script(kTestLua, sol::script_pass_on_error);
+    if (r3.valid()) {
+        r3 = L.safe_script(kTestSugarLua, sol::script_pass_on_error);
+    }
     sol::protected_function_result r4 = L.safe_script(kSaveLua, sol::script_pass_on_error);
     for (sol::protected_function_result* r : {&r1, &r2, &r3, &r4}) {
         if (!r->valid()) {

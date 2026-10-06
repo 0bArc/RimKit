@@ -16,7 +16,7 @@ game.ai.think_remove("Humanlike", "JobGiver_WanderColony")
 {{functions}}
 
 === storyteller | Storyteller, incidents and quests ===
-`game.storyteller`, `game.incidents` and `game.quests` control the story the game tells: which storyteller runs, how hard it is, what happens, and which quests exist. The kits are Experimental in the [stability tiers](stability.md). `game.incidents.try_fire` and `list` (older) keep working next to the functions here.
+`game.storyteller`, `game.incidents` and `game.quests` control the story the game tells: which storyteller runs, how hard it is, what happens, and which quests exist. The kits are Experimental in the [stability tiers](stability.md). `game.incidents.try_fire` and `list` fire and list incidents.
 
 `game.storyteller.difficulty()` returns every numeric and boolean difficulty setting by its field name, and `set_difficulty` changes one. Incidents take `points`, `faction` and `forced` options and run on the map you pass (the current map by default).
 
@@ -52,7 +52,7 @@ print(game.stats.explain(colonist, "MoveSpeed").text)
 {{functions}}
 
 === world | World kit ===
-`game.world` reads and changes the world map: tiles and their climate, settlements and other world objects, caravans, world pawns, and the maps behind tiles. The kit is Experimental in the [stability tiers](stability.md). `game.world.current` (older) returns the world handle.
+`game.world` reads and changes the world map: tiles and their climate, settlements and other world objects, caravans, world pawns, and the maps behind tiles. The kit is Experimental in the [stability tiers](stability.md). `game.world.current` returns the world handle.
 
 Tiles are integers. World objects come back as `RimObject` values, which you pass to `object_info`, `remove_object` and `travel`.
 
@@ -78,7 +78,7 @@ for _, v in ipairs(game.combat.verbs(colonist)) do
 end
 
 -- A flare at the colonist's feet
-local c = game.things.info(colonist)
+local c = colonist:info()
 game.combat.explode(game.maps.current(), c.x + 3, c.z, 2, { damage_def = "Flame", damage = 10 })
 ```
 
@@ -91,7 +91,7 @@ Four kits cover building: `game.build` (blueprints, frames, instant building), `
 
 ```lua
 local map = game.maps.current()
-local c = game.things.info(colonist)
+local c = colonist:info()
 
 -- Plan a wall line
 for dx = 1, 5 do
@@ -132,7 +132,7 @@ end)
 
 ```lua
 local map = game.maps.current()
-local c = game.things.info(colonist)
+local c = colonist:info()
 game.generation.base_gen(map, "ancientRuins", c.x + 10, c.z + 10, c.x + 22, c.z + 20)
 ```
 
@@ -144,7 +144,7 @@ game.generation.base_gen(map, "ancientRuins", c.x + 10, c.z + 10, c.x + 22, c.z 
 ```lua
 local map = game.maps.current()
 -- A farm planner: where would potatoes grow?
-local c = game.things.info(colonist)
+local c = colonist:info()
 for dx = 0, 10 do
   local can = game.plants.can_grow(map, "Plant_Potato", c.x + dx, c.z + 6)
   if can.ok then game.plants.sow(map, "Plant_Potato", c.x + dx, c.z + 6) end
@@ -154,7 +154,7 @@ end
 {{functions}}
 
 === conditions | Game conditions and weather ===
-`game.conditions` starts, lists and ends game conditions such as eclipses, cold snaps and heat waves. `game.weather` (more than get and set) reports the sky, the season and the weather defs. The kits are Experimental in the [stability tiers](stability.md). `game.weather.current` and `set` (older) keep working.
+`game.conditions` starts, lists and ends game conditions such as eclipses, cold snaps and heat waves. `game.weather` (more than get and set) reports the sky, the season and the weather defs. The kits are Experimental in the [stability tiers](stability.md). `game.weather.current` and `set` read and change the weather.
 
 ```lua
 -- A short cold snap on the current map
@@ -165,7 +165,7 @@ print(game.conditions.temperature_offset())
 {{functions}}
 
 === save | Saving and persistence ===
-`game.save` stores data for mods inside the save file, per game, per map or per world, and controls autosaves. The kit is Experimental in the [stability tiers](stability.md). `game.data` (older) keeps working and shares the per-game store.
+`game.save` stores data for mods inside the save file, per game, per map or per world, and controls autosaves. The kit is Experimental in the [stability tiers](stability.md). `game.data` is a shorthand for the per-game store.
 
 `put` and `fetch` store any table, string, number or boolean through JSON, so functions and game objects cannot be stored: keep a thing's id or position and look it up again. The raw `get`, `set`, `remove` and `keys` store strings. Handlers of the `game.saving` event are the place to write data just before a save, and `game.loaded` is the place to read it.
 
@@ -187,7 +187,7 @@ end)
 game.save.put(PKG, "map", "visited", { count = 3 }, game.maps.current())
 ```
 
-Stored data lives in `RimKit.MapComponent_LuaData`, `RimKit.WorldComponent_LuaData` and the older `RimLuaKit.RimLuaModDataComponent`. Those names are written into saves and never change, see the [Standard](../standard/rks.md).
+Stored data lives in `RimKit.MapComponent_LuaData`, `RimKit.WorldComponent_LuaData` and `RimLuaKit.RimLuaModDataComponent`. Those names are written into saves and never change, see the [Standard](../standard/rks.md).
 
 {{functions}}
 
@@ -258,8 +258,8 @@ game.gizmos.add("drop_all", { label = "Drop all", desc = "Drops everything this 
 
 -- A toggle stored in the save
 game.gizmos.add_toggle("auto_tend", { label = "Auto tend", target = "colonist" },
-  function(pawn) return game.save.fetch("my.mod", "game", "auto_tend_" .. game.things.info(pawn).id, nil, false) end,
-  function(pawn) local k = "auto_tend_" .. game.things.info(pawn).id
+  function(pawn) return game.save.fetch("my.mod", "game", "auto_tend_" .. pawn:info().id, nil, false) end,
+  function(pawn) local k = "auto_tend_" .. pawn:info().id
     game.save.put("my.mod", "game", k, not game.save.fetch("my.mod", "game", k, nil, false)) end)
 ```
 
@@ -334,10 +334,12 @@ Animation: `play_animation` plays a vanilla animation def on a pawn where the ga
 
 Overlays stay until their `ticks` run out or you clear them, and return an id for `clear`.
 
+`text`, `fleck` and `effecter` also take a thing or pawn as the first argument, so you do not unpack its cell: `game.effects.text(pawn, "12", "red")`. `text` accepts the color names `red`, `orange`, `yellow`, `green`, `blue`, `white`, `gray`, `purple` and `cyan`, and the theme names such as `good` and `warning`, as well as hex.
+
 ```lua
 local map = game.maps.current()
 -- Show the reach of a turret
-local t = game.things.info(turret)
+local t = turret:info()
 game.effects.circle(map, t.x, t.z, 25, { color = "warning" })
 
 -- Highlight every cell of a stockpile for a few seconds
@@ -350,7 +352,7 @@ game.effects.text(map, t.x, t.z, "Nice!", "good")
 {{functions}}
 
 === input | Input ===
-`game.input` registers key bindings at runtime and reads keys, chords and the mouse. The kit is Experimental in the [stability tiers](stability.md). `game.input.binding_just_pressed` (older) reads a binding.
+`game.input` registers key bindings at runtime and reads keys, chords and the mouse. The kit is Experimental in the [stability tiers](stability.md). `game.input.binding_just_pressed` reads a binding.
 
 `register_key` creates a binding the player can rebind in the game's key options. Keys are Unity key names (`K`, `F9`, `LeftArrow`), `key_names()` lists them. For text, use `game.widgets.prompt`.
 
@@ -365,7 +367,7 @@ end)
 {{functions}}
 
 === audio | Audio ===
-`game.audio` defines sounds from files, plays them, controls music, volumes and sustained sounds. The kit is Experimental in the [stability tiers](stability.md). `game.audio.play` (older) plays a sound def by name.
+`game.audio` defines sounds from files, plays them, controls music, volumes and sustained sounds. The kit is Experimental in the [stability tiers](stability.md). `game.audio.play` plays a sound def by name.
 
 `define` takes clip paths inside a mod's `Sounds` folder, without the extension, and makes a sound def you play with `play` or `play_at`. A looping sound is defined in XML with `sustain` and started with `sustainer_start`.
 
@@ -511,7 +513,7 @@ Quest nodes, world gen steps, scenario parts, ritual outcomes and conditional th
 {{functions}}
 
 === defs | Defs: changing and writing ===
-`game.defs` reads, changes and writes game definitions. The kit is Advanced in the [stability tiers](stability.md). The older `defs.get`, `exists`, `list` and `label` keep working.
+`game.defs` reads, changes and writes game definitions. The kit is Advanced in the [stability tiers](stability.md).
 
 Runtime changes (`set`) edit the loaded def, record what the value was, and can be undone with `restore`. They last until the game restarts. Use them for balance mods and for tweaks that depend on settings.
 
@@ -595,7 +597,7 @@ end
 
 Ideology covers ideoligions, memes (add and remove, with the game's own conflict checks), precepts, roles, certainty, rituals, style categories and renaming. Royalty covers titles, honor, permits, psylink level, abilities, the Empire and throne rooms. Biotech covers xenotypes, gene definitions, mechanitors and their mechs, pregnancy, growth points, hemogen and gene packs. Anomaly covers the monolith, studies, containment, platforms, the codex, creepjoiners and how controlled pawns pick fights. Odyssey covers planet layers, gravship engines (fuel, launch range, cooldown, substructure, linked components), space maps and the gravship in flight. Launching, travel and orbital sites are not exposed yet, so it is still the least complete.
 
-The older `game.anomalies` object and `game.anomaly` recruit, capture and release functions are on the [Anomaly kit](anomaly.md) page and keep working.
+The `game.anomalies` object and the `game.anomaly` recruit, capture and release functions are on the [Anomaly kit](anomaly.md) page.
 
 {{functions}}
 

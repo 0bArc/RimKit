@@ -7,7 +7,6 @@
     { "from": "pawn", "to": "game.pawns", "names": ["make_controllable", "release_control", "is_controllable"] },
     { "from": "health", "to": "game.pawns", "names": ["has_hediff", "hediff_severity", "set_hediff_severity", "tend"] },
     { "from": "surgery", "to": "game.pawns", "names": ["queue_operation>queue_surgery"] },
-    { "from": "rim.thing", "to": "game.things", "names": ["def", "label", "label_short", "destroy", "despawn", "pos", "set_pos", "hp", "max_hp", "set_hp", "stack", "set_stack", "faction", "set_faction", "map", "spawned"] },
     { "from": "rim.map", "to": "game.maps", "names": ["nutrition", "total_human_edible_nutrition>nutrition", "width", "height", "pawns", "colonists", "prisoners", "things", "things_of_def", "spawn"] },
     { "from": "rim.faction", "to": "game.factions", "names": ["player", "list", "name", "of_def"] },
     { "from": "rim.defs", "to": "game.defs", "names": ["get", "exists", "list", "label"] },
@@ -51,6 +50,7 @@
     { "type": "RimMap", "from": "spawn_thing", "to": "spawn" }
   ],
   "manual": [
+    { "from": "rim.thing", "to": "thing properties and methods", "note": "game.things no longer has functions that take a thing. Read thing.hp, thing.position, thing.map and call thing:damage(5). See docs/api/things.md." },
     { "from": "rim.reflect", "to": "game.reflect", "note": "Different argument and result shapes. See docs/api/reflect.md." },
     { "from": "rim.cs", "to": "game.reflect", "note": "Same as rim.reflect." },
     { "from": "rim.harmony", "to": "game.hooks", "note": "Same table as rim.hooks." }

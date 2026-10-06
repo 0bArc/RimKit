@@ -39,7 +39,7 @@ return meta
 | `mod_version` | The mod's own semantic version (`"1.2.0"`). Shown in the mod list, checked by `release-check`, readable with `game.mods.version` |
 | `description` | Text in the mod list. Keep it plain |
 | `url` | Link shown in the mod list |
-| `api_level` | `1` opts in to strict mode: errors raise instead of returning `nil`, old API names are refused with `RK1002`, and only declared capabilities work. `rimkit mod create` sets it. See [stability](../api/stability.md) |
+| `api_level` | `1` opts in to strict mode: errors raise instead of returning `nil`, and only declared capabilities work. `rimkit mod create` sets it. See [stability](../api/stability.md) |
 | `capabilities` | What the Lua may do: `reflect`, `hooks`, `files`, `dev`. See [capabilities](capabilities.md) |
 | `perf_budget_us` | Microseconds per tick the mod may use on average before RimKit warns. Default 300. See [performance](performance.md) |
 | `depends` | Dependencies. Each needs `id`, `name` and a `steam` or `download` link, or the game warns |
@@ -73,7 +73,7 @@ rimkit mod create MyMod     new mod folder with a template
 rimkit mod sync [path]      meta.lua to About/About.xml
 rimkit mod ship [path]      sync, then copy into RimWorld Mods
 rimkit mod check [path]     validate meta.lua, Lua, Defs, patches, textures and translation keys
-rimkit mod test [path]      run Tests/*.lua against a mock host, no game needed
+rimkit mod test [path]      run Tests/*.luau against a mock host, no game needed
 rimkit mod assets [path]    check the Workshop preview and the mod icon (--fix makes placeholders)
 rimkit mod i18n ...         extract, missing, export and import translation strings
 rimkit mod release-check    the checklist before publishing

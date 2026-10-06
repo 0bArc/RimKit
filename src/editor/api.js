@@ -33,10 +33,16 @@ function describe(kit, fn) {
   return lines.join("\n");
 }
 
+// Things are objects: a things function that takes a thing is a method of RimThing (thing:damage(5)), not game.things.damage.
+function isThingMethod(kit, fn) {
+  return kit.domain === "things" && fn.subject !== false && (fn.params || []).length > 0 && /^thing$/.test(fn.params[0].name);
+}
+
 function kitCompletions(kits) {
   const items = [];
   for (const kit of kits) {
     for (const fn of kit.fns) {
+      if (isThingMethod(kit, fn)) continue;
       items.push({
         label: `game.${kit.domain}.${fn.name}`,
         detail: `${signature(kit, fn).replace(/^game\.\w+\./, "")}${fn.returns ? " -> " + fn.returns : ""}`,
@@ -60,6 +66,7 @@ function knownFunctions(stubsDir) {
   for (const f of files) {
     const text = fs.readFileSync(path.join(stubsDir, f), "utf8");
     for (const m of text.matchAll(/^function game\.(\w+)\.(\w+)\s*\(/gm)) known.add(`${m[1]}.${m[2]}`);
+    for (const m of text.matchAll(/^function RimThing:(\w+)\s*\(/gm)) known.add(`RimThing:${m[1]}`);
   }
   return known;
 }
@@ -102,4 +109,4 @@ function distance(a, b) {
   return dp[a.length][b.length];
 }
 
-module.exports = { loadKits, signature, snippet, describe, kitCompletions, knownFunctions, findUnknownCalls, suggest };
+module.exports = { isThingMethod, loadKits, signature, snippet, describe, kitCompletions, knownFunctions, findUnknownCalls, suggest };

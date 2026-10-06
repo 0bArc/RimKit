@@ -26,7 +26,8 @@ for (const m of fs.readFileSync(gameApi, "utf8").matchAll(/case "([a-z][a-z0-9_]
 
 const kits = JSON.parse(fs.readFileSync(path.join(root, "src/api/kits.json"), "utf8")).kits;
 const wraps = new Map();
-for (const k of kits) for (const f of k.fns) wraps.set(`${k.op}.${f.name}`, `game.${k.domain}.${f.name}`);
+const luaName = (k, f) => (k.domain === "things" && f.subject ? `thing:${f.name}` : `game.${k.domain}.${f.name}`);
+for (const k of kits) for (const f of k.fns) wraps.set(`${k.op}.${f.name}`, luaName(k, f));
 
 const byDomain = new Map();
 for (const [op, info] of [...ops].sort((a, b) => a[0].localeCompare(b[0]))) {

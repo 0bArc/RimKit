@@ -19,7 +19,7 @@ RimKit lets Lua control RimWorld through a C# host and Harmony. The API will gro
 
 ## 3. Naming (UNC)
 
-The Unified Naming Convention is defined in [naming](../api/naming.md). RKS requires conformance. A name that does not match UNC MUST NOT be registered, except as a deprecated alias.
+The Unified Naming Convention is defined in [naming](../api/naming.md). RKS requires conformance. A name that does not match UNC MUST NOT be registered.
 
 ## 4. Stability tiers
 
@@ -101,7 +101,6 @@ An automated lint checks, on every build:
 
 1. Every registered op id matches UNC and has a tier and `since`.
 2. Every op has a doc entry and a stub.
-3. Every deprecated alias maps to a registered canonical name.
 4. Argument keys follow section 7.
 5. The version is identical in all generated locations.
 

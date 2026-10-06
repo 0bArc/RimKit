@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "aliases.hpp"
+#include "lua_file.hpp"
 #include "tools.hpp"
 
 #define SOL_ALL_SAFETIES_ON 1
@@ -20,8 +21,6 @@ namespace fs = std::filesystem;
 static void usage() {
     std::cout
         << "rimkit - RimKit CLI\n\n"
-        << "  rimkit migrate [path] [--write] Rewrite deprecated API names to UNC names (dry run unless --write)\n"
-        << "  rimkit migrate --check [path]   Exit 1 when deprecated names remain\n"
         << "  rimkit init [name]              Init Lua mod in cwd (or ./name)\n"
         << "  rimkit build                    Build native core + C# host\n"
         << "  rimkit mod create <name> [dir]  Create Lua mod folder\n"
@@ -29,7 +28,8 @@ static void usage() {
         << "  rimkit mod defs [dir]           Only the Lua to XML step, for a folder with no meta.lua\n"
         << "  rimkit mod ship [path] [mods]   Sync + copy mod into RimWorld Mods/\n"
         << "  rimkit mod check [path]         Validate meta, Lua, Defs, patches, textures and translation keys\n"
-        << "  rimkit mod test [path]          Run Tests/*.lua against a mock host (no game needed)\n"
+        << "  rimkit mod test [path]          Run Tests/*.luau against a mock host (no game needed)\n"
+        << "  rimkit mod gen-tests [path]     Write Tests/generated_test.luau from the events the mod registers (--force to overwrite)\n"
         << "  rimkit mod assets [path] [--fix]  Check the Workshop preview and mod icon, make placeholders\n"
         << "  rimkit mod i18n <cmd> [path]    extract | missing <lang> | export <lang> | import <lang> <csv>\n"
         << "  rimkit mod release-check [path] Checklist before publishing: version, changelog, licence, credits, assets\n"
@@ -359,8 +359,8 @@ static int write_defs_from_lua(const fs::path& modDir) {
     }
 
     sol::state lua;
-    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::table, sol::lib::math);
-    sol::protected_function_result result = lua.safe_script_file(defsLua.string(), sol::script_pass_on_error);
+    rimlua::open_cli_libs(lua);
+    sol::protected_function_result result = rimlua::run_lua_file(lua, defsLua.string());
     if (!result.valid()) {
         sol::error e = result;
         std::cerr << "defs.lua error: " << e.what() << "\n";
@@ -562,7 +562,7 @@ static int write_lua_defs_files(const fs::path& modDir) {
             }
         }
         sol::state lua;
-        lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table, sol::lib::math);
+        rimlua::open_cli_libs(lua);
         std::ostringstream body;
         int count = 0;
         std::string failure;
@@ -604,7 +604,7 @@ static int write_lua_defs_files(const fs::path& modDir) {
             body << "  </" << kind << ">\n\n";
             ++count;
         };
-        sol::protected_function_result r = lua.safe_script_file(script.string(), sol::script_pass_on_error);
+        sol::protected_function_result r = rimlua::run_lua_file(lua, script.string());
         if (!r.valid()) {
             sol::error e = r;
             std::cerr << script.string() << ": " << e.what() << "\n";
@@ -659,8 +659,8 @@ static int write_lua_language_files(const fs::path& modDir) {
             }
         }
         sol::state lua;
-        lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table, sol::lib::math);
-        sol::protected_function_result r = lua.safe_script_file(script.string(), sol::script_pass_on_error);
+        rimlua::open_cli_libs(lua);
+        sol::protected_function_result r = rimlua::run_lua_file(lua, script.string());
         if (!r.valid()) {
             sol::error e = r;
             std::cerr << script.string() << ": " << e.what() << "\n";
@@ -713,7 +713,7 @@ static int sync_mod(const fs::path& modDir) {
     }
 
     sol::state lua;
-    lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::string, sol::lib::table, sol::lib::math);
+    rimlua::open_cli_libs(lua);
 
     sol::table metaTable = lua.create_table();
     sol::table host = lua.create_table();
@@ -721,7 +721,7 @@ static int sync_mod(const fs::path& modDir) {
     lua["host"] = host;
     lua["package"]["preload"]["host.metadata"] = [metaTable](sol::this_state) { return metaTable; };
 
-    sol::protected_function_result result = lua.safe_script_file(metaPath.string(), sol::script_pass_on_error);
+    sol::protected_function_result result = rimlua::run_lua_file(lua, metaPath.string());
     if (!result.valid()) {
         sol::error e = result;
         std::cerr << "meta.lua error: " << e.what() << "\n";
@@ -806,7 +806,7 @@ static int create_mod_at(const fs::path& out, const std::string& name) {
     }
     rkcli::scaffold_extras(out, name, package_id);
     {
-        std::ofstream f(out / "Lua" / "main.lua");
+        std::ofstream f(out / "Lua" / "main.luau");
         f << "-- " << name << "\n"
           << "-- Starts here. The game runs this file when a game is loaded.\n"
           << "-- Read the docs for every game.* function: infrastructure/docs/api, or hover over it in VS Code with the RimKit extension.\n\n"
@@ -990,7 +990,7 @@ static int cmd_mod_check(const fs::path& target) {
         lua_root = target;
     }
     for (auto it = fs::recursive_directory_iterator(lua_root); it != fs::recursive_directory_iterator(); ++it) {
-        if (it->is_regular_file() && it->path().extension() == ".lua" && it->path().filename() != "meta.lua") {
+        if (it->is_regular_file() && (it->path().extension() == ".lua" || it->path().extension() == ".luau") && it->path().filename() != "meta.lua") {
             failures += check_file(it->path());
         }
     }
@@ -1352,11 +1352,15 @@ static int cmd_mod(int argc, char** argv) {
         }
         dir = resolve_ship_dir(dir);
     };
-    if (sub == "test" || sub == "assets" || sub == "release-check" || sub == "publish") {
+    if (sub == "test" || sub == "gen-tests" || sub == "assets" || sub == "release-check" || sub == "publish") {
         fs::path dir;
         std::vector<std::string> rest;
         split(3, dir, rest);
         if (sub == "test") return rkcli::cmd_test(dir, rest);
+        if (sub == "gen-tests") {
+            rest.push_back("--generate");
+            return rkcli::cmd_test(dir, rest);
+        }
         if (sub == "assets") return rkcli::cmd_assets(dir, rest);
         if (sub == "release-check") return rkcli::cmd_release_check(dir);
         if (sync_mod(dir) != 0) return 1;

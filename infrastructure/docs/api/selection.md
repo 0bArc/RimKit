@@ -4,7 +4,7 @@
 
 | Function | What it does |
 |----------|--------------|
-| `game.selection.first()`, `things()` | The first selected thing, and all selected things (older functions). |
+| `game.selection.first()`, `things()` | The first selected thing, and all selected things. |
 | `game.selection.pawns()`, `zones()`, `count()` | Selected pawns, selected zones, how many objects are selected. |
 | `game.selection.select(thing)`, `add(thing)`, `clear()` | Change the selection. |
 | `game.selection.inspected()` | The single selected object: `{ kind = "thing", thing = ... }` or a zone. |

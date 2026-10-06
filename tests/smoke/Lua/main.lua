@@ -122,7 +122,7 @@ local function run_faction_thing_tests()
   local colonists = game.maps.colonists(map.handle)
   local c1 = colonists[1] and rim.wrap(colonists[1])
   if not c1 then return end
-  local at = game.things.info(c1)
+  local at = c1:info()
   local steel
   test("things.spawn_at makes a stack", function()
     -- a cell with nothing on it, so the new stack does not merge into an existing one
@@ -132,32 +132,32 @@ local function run_faction_thing_tests()
       if c and #game.maps.things_at(map, c.x, c.z) == 0 then sx, sz = c.x, c.z break end
     end
     steel = game.things.spawn_at("Steel", map, sx, sz, { count = 25 })
-    local i = game.things.info(steel)
+    local i = steel:info()
     if i.def == "Steel" and i.stack == 25 and i.spawned == true then return true end
     error(string.format("def=%s stack=%s spawned=%s at %d,%d", tostring(i.def), tostring(i.stack), tostring(i.spawned), sx, sz))
   end)
   if steel then
     test("things.forbidden set and read", function()
-      game.things.set_forbidden(steel, true)
-      local on = game.things.forbidden(steel)
-      game.things.set_forbidden(steel, false)
-      return on == true and game.things.forbidden(steel) == false
+      steel:set_forbidden(true)
+      local on = steel:forbidden()
+      steel:set_forbidden(false)
+      return on == true and steel:forbidden() == false
     end)
     test("things.damage and heal change hit points", function()
-      local max = game.things.info(steel).max_hp
-      local left = game.things.damage(steel, 1)
-      local healed = game.things.heal(steel)
+      local max = steel:info().max_hp
+      local left = steel:damage(1)
+      local healed = steel:heal()
       return left < max and healed == max
     end)
     test("things.has_comp and comps list", function()
-      return type(game.things.comps(steel)) == "table" and game.things.has_comp(steel, "Nonexistent") == false
+      return type(steel:comps()) == "table" and steel:has_comp("Nonexistent") == false
     end)
     test("things.quality is nil for steel and set_quality raises RK3003", function()
-      return game.things.quality(steel) == nil and expect_error("RK3003", function() game.things.set_quality(steel, "Good") end)
+      return steel:quality() == nil and expect_error("RK3003", function() steel:set_quality("Good") end)
     end)
     test("things.destroy_with removes the stack", function()
-      game.things.destroy_with(steel, "Vanish")
-      return game.things.spawned(steel) == false
+      steel:destroy_with("Vanish")
+      return steel.spawned == false
     end)
   end
   test("things.make rejects an unknown def", function()
@@ -165,9 +165,9 @@ local function run_faction_thing_tests()
   end)
   test("things.set_quality works on a weapon", function()
     local gun = game.things.spawn_at("Gun_Revolver", map, at.x + 2, at.z + 1)
-    local set = game.things.set_quality(gun, "Masterwork")
-    local read = game.things.quality(gun)
-    game.things.destroy_with(gun)
+    local set = gun:set_quality("Masterwork")
+    local read = gun:quality()
+    gun:destroy_with()
     return set == "Masterwork" and read == "Masterwork"
   end)
 end
@@ -179,7 +179,7 @@ local function run_phase1_tests()
   local c1 = colonists[1] and rim.wrap(colonists[1])
   local c2 = colonists[2] and rim.wrap(colonists[2])
   if not c1 then log.info("SMOKE SKIP phase 1 kits: no colonist") return end
-  local at = game.things.info(c1)
+  local at = c1:info()
   local x, z = at.x, at.z
 
   -- maps
@@ -358,12 +358,12 @@ local function run_phase1_tests()
   test("pawns.kinds and thing_set_defs", function() return #game.pawns.kinds() > 20 and #game.things.thing_set_defs() > 5 end)
   test("pawns.generate makes a pawn without spawning it", function()
     local p = game.pawns.generate({ kind = "Muffalo" })
-    return p ~= nil and game.things.info(p).is_pawn == true and game.things.info(p).spawned == false
+    return p ~= nil and p:info().is_pawn == true and p:info().spawned == false
   end)
   test("pawns.generate spawns a pawn on the map", function()
     local p = game.pawns.generate({ kind = "Muffalo", map = map, x = x + 2, z = z + 2, gender = "Female" })
-    local i = game.things.info(p)
-    game.things.destroy_with(p)
+    local i = p:info()
+    p:destroy_with()
     return i.spawned == true and i.def == "Muffalo"
   end)
   test("things.stuff_options, random_stuff, roll_quality", function()
@@ -382,11 +382,11 @@ local function run_phase1_tests()
     return #game.query.radius(map, x + 1, z + 3, 3, { def = "Steel" }) >= 1 and game.query.nearest(map, x, z, { def = "Steel" }) ~= nil
   end)
   test("things plus: owners and storage errors, style, is_building", function()
-    return expect_error("RK3003", function() game.things.owners(steel) end) and expect_error("RK3003", function() game.things.storage_priority(steel) end)
-      and game.things.style(steel) == nil and game.buildings.is_building(steel) == false
+    return expect_error("RK3003", function() steel:owners() end) and expect_error("RK3003", function() steel:storage_priority() end)
+      and steel:style() == nil and game.buildings.is_building(steel) == false
   end)
   test("jobs.can_reserve on a spawned thing", function() return type(game.jobs.can_reserve(c1, steel)) == "boolean" end)
-  game.things.destroy_with(steel)
+  steel:destroy_with()
   test("factions.make_temporary or a clear error", function()
     local ok, f = pcall(function() return game.factions.make_temporary("OutlanderCivil", "Smoke Test Folk") end)
     if ok and f then
@@ -409,7 +409,7 @@ local function run_phase2_tests()
   local colonists = game.maps.colonists(map.handle)
   local c1 = colonists[1] and rim.wrap(colonists[1])
   if not c1 then log.info("SMOKE SKIP phase 2 kits: no colonist") return end
-  local at = game.things.info(c1)
+  local at = c1:info()
   local x, z = at.x, at.z
 
   -- ai
@@ -530,7 +530,7 @@ local function run_phase2_tests()
     local b = game.build.instant(map, "Battery", x + 10, z + 6)
     local net = game.power.net(b)
     local set = game.power.set_battery(b, 0.5)
-    game.things.destroy_with(b)
+    b:destroy_with()
     return type(net.connected) == "boolean" and math.abs(set - 0.5) < 0.1
   end)
   test("bills on a butcher table", function()
@@ -542,14 +542,14 @@ local function run_phase2_tests()
     local suspended = game.bills.list(bench)[idx + 1].suspended
     game.bills.remove(bench, idx)
     local empty = #game.bills.list(bench) == 0
-    game.things.destroy_with(bench)
+    bench:destroy_with()
     return #recipes > 0 and #list == 1 and suspended == true and empty
   end)
   test("door.info and hold_open", function()
     local d = game.build.instant(map, "Door", x + 14, z + 6)
     local info = game.doors.info(d)
     local held = game.doors.hold_open(d, true)
-    game.things.destroy_with(d)
+    d:destroy_with()
     return type(info.open) == "boolean" and held == true
   end)
   test("doors.info rejects a non door", function() return expect_error("RK3003", function() game.doors.info(c1) end) end)
@@ -590,7 +590,7 @@ local function run_phase2_tests()
     local info = game.plants.info(p)
     game.plants.set_growth(p, 1)
     local yield = game.plants.harvest(p)
-    game.things.destroy_with(p)
+    p:destroy_with()
     return info.def == "Plant_Potato" and type(yield) == "number"
   end)
   test("plants.zones and set_zone_plant error", function()
@@ -669,7 +669,7 @@ local function run_phase3_tests()
   local colonists = game.maps.colonists(map.handle)
   local c1 = colonists[1] and rim.wrap(colonists[1])
   if not c1 then log.info("SMOKE SKIP phase 3 kits: no colonist") return end
-  local at = game.things.info(c1)
+  local at = c1:info()
   local x, z = at.x, at.z
 
   -- widgets
@@ -784,7 +784,7 @@ local function run_phase3_tests()
     local text = game.effects.text(map, x, z, "smoke")
     local shake = game.effects.screen_shake(0.1)
     local cleared = game.effects.clear()
-    game.things.destroy_with(steel)
+    steel:destroy_with()
     return #game.effects.fleck_defs() > 5 and #game.effects.effecter_defs() > 3 and type(a) == "number" and type(b) == "number" and type(c) == "number"
       and type(d) == "number" and text == true and shake == true and cleared >= 4
   end)
@@ -922,7 +922,7 @@ local function run_phase45_tests()
   local colonists = game.maps.colonists(map.handle)
   local c1 = colonists[1] and rim.wrap(colonists[1])
   if not c1 then log.info("SMOKE SKIP phase 4 and 5 kits: no colonist") return end
-  local at = game.things.info(c1)
+  local at = c1:info()
   local x, z = at.x, at.z
 
   -- ---- Phase 4: Lua classes
@@ -939,7 +939,7 @@ local function run_phase45_tests()
   test("a Lua comp on a building: spawn and tick callbacks run", function()
     local box = game.build.instant(map, "RimKit_SmokeBox", x + 3, z + 1)
     phase4.box = box
-    return box ~= nil and phase4.comp_spawn >= 1 and game.things.has_comp(box, "ThingComp_Lua")
+    return box ~= nil and phase4.comp_spawn >= 1 and box:has_comp("ThingComp_Lua")
   end)
   test("classes.data_set and data_get on the comp", function()
     local box = phase4.box
@@ -972,7 +972,7 @@ local function run_phase45_tests()
   end)
   test("a Lua building class: spawn runs and the class is a Lua proxy", function()
     local b = game.build.instant(map, "RimKit_SmokeLuaBuilding", x + 4, z + 1)
-    return b ~= nil and (phase4.building_spawn or 0) >= 1 and game.things.info(b).def == "RimKit_SmokeLuaBuilding"
+    return b ~= nil and (phase4.building_spawn or 0) >= 1 and b:info().def == "RimKit_SmokeLuaBuilding"
   end)
   test("a need defined from Lua with no XML reaches colonists", function()
     local info = game.needs.defs()
@@ -1222,8 +1222,8 @@ local function run_phase45_tests()
     end)
   end
 
-  game.things.destroy_with(steel)
-  if phase4.box then game.things.destroy_with(phase4.box) end
+  steel:destroy_with()
+  if phase4.box then phase4.box:destroy_with() end
 end
 
 -- Phase 6: interop, profiler, capabilities, dev tools, hot reload, save helpers, diagnostics.
@@ -1565,7 +1565,7 @@ local function run_sync_tests()
       local second = ent:release()
       return first == true and second == false and game.pawns.is_controllable(entity.handle) == false
     end)
-    game.things.destroy(entity.handle)
+    rim.wrap_thing(entity.handle):destroy()
   else
     log.info("SMOKE SKIP anomaly flow: no entity kind could be spawned")
   end

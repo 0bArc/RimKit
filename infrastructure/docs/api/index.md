@@ -15,7 +15,6 @@ Everything Lua mods call lives under one table: `game`. Names are lowercase `sna
 | Change method behavior | [Hooks](hooks.md) |
 | Which kit owns which ops | [Kits and domains](domains.md) |
 | Stability before 1.0 | [Stability](stability.md) |
-| Older names | [Migration](migration.md) and [legacy](legacy.md) |
 
 ## Sections in this tab
 

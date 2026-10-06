@@ -56,6 +56,8 @@ namespace RimKit
                 () => AccessTools.Method(typeof(Pawn), nameof(Pawn.SpawnSetup), new[] { typeof(Map), typeof(bool) }), nameof(EventPatches.PawnSpawned), false);
             Add("pawn.died", "A pawn is dying. Payload: pawn, damage, culprit.", false,
                 () => AccessTools.Method(typeof(Pawn), nameof(Pawn.Kill), new[] { typeof(DamageInfo?), typeof(Hediff) }), nameof(EventPatches.PawnDied), true);
+            Add("pawn.damaged", "A pawn took damage. Hot. Payload: pawn, damage, dealt. Use a filter, for example { humanlike = true }.", true,
+                () => AccessTools.Method(typeof(Pawn), nameof(Pawn.TakeDamage), new[] { typeof(DamageInfo) }), nameof(EventPatches.PawnDamaged), false);
             Add("pawn.resurrected", "A pawn was resurrected. Payload: pawn.", false,
                 () => AccessTools.Method(typeof(Pawn_HealthTracker), nameof(Pawn_HealthTracker.Notify_Resurrected), new[] { typeof(bool), typeof(float) }), nameof(EventPatches.PawnResurrected), false);
 
@@ -313,6 +315,17 @@ namespace RimKit
                 Field(sb, "pawn", __instance, true);
                 Field(sb, "damage", dinfo.HasValue ? (object)dinfo.Value : null);
                 Field(sb, "culprit", exactCulprit);
+            });
+        }
+
+        public static void PawnDamaged(Pawn __instance, DamageInfo dinfo, DamageWorker.DamageResult __result)
+        {
+            if (!Playing || __instance == null) return;
+            Emit("pawn.damaged", sb =>
+            {
+                Field(sb, "pawn", __instance, true);
+                Field(sb, "damage", dinfo);
+                Field(sb, "dealt", __result != null ? __result.totalDamageDealt : 0f);
             });
         }
 

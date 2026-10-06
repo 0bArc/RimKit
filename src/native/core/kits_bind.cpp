@@ -157,12 +157,17 @@ bool Engine::is_known_op(const std::string& op) const {
 void Engine::bind_json_kits() {
     const std::vector<KitDomain>& table = kit_table();
     sol::table game = (*lua_)["game"];
+    if (!thing_methods_.valid()) {
+        thing_methods_ = lua_->create_table();
+    }
     for (const KitDomain& d : table) {
         sol::object existing = game[d.domain];
         sol::table domain = existing.is<sol::table>() ? existing.as<sol::table>() : lua_->create_table();
         for (const KitFn& fn : d.fns) {
             const KitFn* spec = &fn;  // table is static, so the pointer stays valid
-            domain[fn.name] = [this, spec](sol::variadic_args va) {
+            // Things are objects: their subject functions are methods (thing:damage(5)), not game.things.damage(thing, 5).
+            sol::table& target = (d.domain == "things" && fn.subject) ? thing_methods_ : domain;
+            target[fn.name] = [this, spec](sol::variadic_args va) {
                 sol::table a = lua_->create_table();
                 size_t index = 0;
                 size_t arg = 0;
@@ -233,6 +238,61 @@ void Engine::bind_json_kits() {
         }
         game[d.domain] = domain;
     }
+
+    // game.effects also takes a thing or pawn as its anchor, and colour names: text(pawn, "12", "red").
+    // fleck(thing, def, opts) and effecter(thing, def) work the same way. The (map, x, z, ...) form keeps working.
+    lua_->safe_script(R"LUA(
+local effects = game.effects
+if type(effects) ~= "table" then return end
+local colors = { red = "#ff4d4d", orange = "#ffa040", yellow = "#ffd84d", green = "#5fd35f", blue = "#5aa0ff",
+  white = "#ffffff", black = "#000000", gray = "#999999", purple = "#b07cff", cyan = "#4de1e1" }
+local function anchored(a)
+  if type(a) ~= "userdata" then return false end
+  local ok, flag = pcall(function() return a.is_pawn end)
+  return ok and flag ~= nil
+end
+local function place(a)
+  local m, p = a.map, a.position
+  if m == nil or p == nil then return nil end
+  return m, p.x, p.z
+end
+local text, fleck, effecter = effects.text, effects.fleck, effects.effecter
+if text then
+  effects.text = function(a, ...)
+    if anchored(a) then
+      local m, x, z = place(a)
+      if not m then return false end
+      local s, c = ...
+      return text(m, x, z, s, c and colors[c] or c)
+    end
+    local x, z, s, c = ...
+    if type(s) == "string" and type(c) == "string" and colors[c] then c = colors[c] end
+    return text(a, x, z, s, c)
+  end
+end
+if fleck then
+  effects.fleck = function(a, ...)
+    if anchored(a) then
+      local def, opts = ...
+      local m, x, z = place(a)
+      if not m then return false end
+      return fleck(m, def, x, z, opts)
+    end
+    return fleck(a, ...)
+  end
+end
+if effecter then
+  effects.effecter = function(a, ...)
+    if anchored(a) then
+      local def = ...
+      local m, x, z = place(a)
+      if not m then return false end
+      return effecter(m, def, x, z)
+    end
+    return effecter(a, ...)
+  end
+end
+)LUA");
 }
 
 }  // namespace rimlua

@@ -349,7 +349,7 @@ Returned by `game.world.caravans`.
 
 Returned by `game.maps.edge_cell`, `game.maps.drop_spot`, `game.maps.cell_near`, `game.areas.cells`.
 
-Used by `game.effects.highlight_cells`, `RimRoomInfo.cell_list`, `RimPawn.position`.
+Used by `game.effects.highlight_cells`, `RimRoomInfo.cell_list`, `RimThing.position`, `RimPawn.position`.
 
 ### RimClassInfo
 
@@ -677,6 +677,9 @@ Returned by `game.royalty.entropy`.
 | `to_contain` | `fun(value:` | any) |
 | `to_have_length` | `fun(n:` | integer) |
 | `to_error` | `fun(part?:` | string) |
+| `to_have_been_called` | `fun(match?:` | table) Passes when the spied op was called, and one call has these argument values. target = a mock pawn or thing matches its cell |
+| `not_to_have_been_called` | `fun(match?:` | table) Passes when the spied op was never called (with these values) |
+| `to_have_been_called_times` | `fun(n:` | integer) |
 
 ### RimExplosionOptions
 
@@ -1268,7 +1271,7 @@ Used by `game.things.make`, `game.things.spawn_at`.
 
 Returned by `game.world.map_at`, `game.world.generate_map`.
 
-Used by `RimSpaceMapInfo.map`, `RimThingQuery.map`, `RimPawnQuery.map`, `RimGenerateOptions.map`, `RimCameraPosition.map`, `RimThingInfo.map`, `RimToolCell.map`, `RimTileInfo.map`, `RimPawn.map`.
+Used by `RimSpaceMapInfo.map`, `RimThingQuery.map`, `RimPawnQuery.map`, `RimGenerateOptions.map`, `RimCameraPosition.map`, `RimThingInfo.map`, `RimToolCell.map`, `RimTileInfo.map`, `RimThing.map`, `RimPawn.map`.
 
 ### RimMapInfo
 
@@ -1625,7 +1628,7 @@ Used by `game.patch.build`, `game.patch.write`.
 | `relations` | `RimRelation[]|nil` | Direct relations with other pawns |
 | `capacities` | `RimCapacity[]|nil` | Capacity levels such as Moving and Consciousness |
 
-Returned by `game.biotech.mechs`, `game.anomaly.creepjoiners`, `game.factions.leader`, `game.factions.members`, `game.maps.pawns_of_faction`, `game.query.pawns`, `game.pawns.generate`, `game.selection.pawns`, `game.pawns.partner`, `game.things.owners`, `game.world.pawns`.
+Returned by `game.biotech.mechs`, `game.anomaly.creepjoiners`, `game.factions.leader`, `game.factions.members`, `game.maps.pawns_of_faction`, `game.query.pawns`, `game.pawns.generate`, `game.selection.pawns`, `game.pawns.partner`, `thing:owners`, `game.world.pawns`.
 
 Used by `game.biotech.control_mech`, `game.biotech.start_pregnancy`, `game.pawns.set_assignments`, `game.jobs.tend`, `game.jobs.rescue`, `game.pawns.interact`, `game.pawns.opinion_reasons`, `game.pawns.marry`, `game.pawns.break_up`, `game.pawns.set_master`, `game.pawns.train`, `game.pawns.tame`, ....
 
@@ -2235,8 +2238,19 @@ Returned by `game.graphics.texture_info`.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `handle` | `integer` | Integer handle of the thing |
+| `id` | `integer` | Unique id of the thing |
 | `def` | `string` | Def name of the thing |
 | `label` | `string` | Name shown to the player |
+| `label_short` | `string` | Short name |
+| `hp` | `integer` | Hit points. Assign to change them. |
+| `max_hp` | `integer` | Maximum hit points |
+| `stack` | `integer` | Stack size. Assign to change it. |
+| `spawned` | `boolean` | Whether it is on a map |
+| `is_pawn` | `boolean` | Whether it is a pawn |
+| `is_building` | `boolean` | Whether it is a building |
+| `position` | `RimCell|nil` | The cell it is on, nil when it is not on a map. Assign a cell to move it. |
+| `map` | `RimMap|nil` | The map it is on |
+| `faction` | `RimFaction|nil` | The faction that owns it. Assign a faction to change it. |
 
 Returned by `game.pawns.bed`, `game.maps.things_at`, `game.query.things`, `game.query.radius`, `game.query.nearest`, `game.things.thing_set`, `game.combat.fires`, `game.combat.launch`, `game.build.blueprint`, `game.build.instant`, `game.things.make`, `game.things.spawn_at`, ....
 
@@ -2264,7 +2278,7 @@ Used by `game.odyssey.engine_info`, `game.odyssey.components`, `game.pawns.equip
 | `forbidden?` | `boolean` | Whether it is forbidden |
 | `faction?` | [RimFaction](#rimfaction) | The faction that owns it |
 
-Returned by `game.things.info`.
+Returned by `thing:info`.
 
 ### RimThingQuery
 
