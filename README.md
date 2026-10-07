@@ -51,7 +51,7 @@ Load order is Harmony, then RimKit, then your mod. Close RimWorld before shippin
 | Libraries | `rimkit.signal` and `rimkit.promise` |
 | Tooling | `rimkit` CLI, mock-host tests with `mod gen-tests`, hot reload, a VS Code extension with types |
 
-What is not possible yet is in [what is missing](infrastructure/docs/missing.md).
+What is not possible yet is in [what is missing](infrastructure/docs/missing.md). See [contributing](CONTRIBUTING.md) for the official ways to report bugs, request capabilities, improve docs, add examples and submit code.
 
 ## Docs
 
