@@ -1,8 +1,8 @@
 -- Tame Anomalies
 -- Recruit anomaly entities into a commandable army, capture them on holding platforms, release them again.
 --
---   F6               recruit the selected entity
---   F7               release every entity this mod recruited
+--   [               recruit the selected entity
+--   ]               release every entity this mod recruited
 --   right click      with a colonist selected: recruit, knock out, capture, or release an entity
 --
 -- An entity is "ours" while game.pawns.is_controllable is true. The host keeps that state in the save

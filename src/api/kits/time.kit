@@ -16,10 +16,16 @@ is_night?: boolean Whether it is night
 ticks_per_hour: integer Ticks in one hour
 ticks_per_day: integer Ticks in one day
 
+@class RimTimeStep
+before: integer Game tick before the step
+after: integer Game tick after the step
+ran: integer How many ticks were run
+
 @kit domain=time op=time subject=none title="Time" page=time
 now() -> RimTimeNow | Calendar fields for the current map. Raises RK3001 when no game is loaded.
 speed() -> string | Current game speed: Paused, Normal, Fast, Superfast or Ultrafast.
 set_speed(speed: string|integer) -> string | Sets the speed. Accepts a name (any case) or 0 to 4. Returns the speed that was set.
+step(ticks: integer) -> RimTimeStep | Runs game ticks now, up to 20000 per call, with the queued events and the mods' tick callbacks after each tick. The game keeps its speed and pause state. Made for tests and headless runs.
 paused() -> boolean | Whether the game is paused.
 set_paused(paused: boolean) -> boolean | Pauses or unpauses. Returns the state after the call.
 date_text(ticks?: integer) -> string | Readable date such as "5th of Aprimay, 5500". Without an argument it uses now.

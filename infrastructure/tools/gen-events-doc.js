@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.join(__dirname, "../..");
-const files = ["src/host/EventCatalog.cs", "src/host/EventCatalogMore.cs"];
+const files = ["src/host/EventCatalog.cs", "src/host/EventCatalogMore.cs", "src/host/EventCatalogWork.cs"];
 const rows = [];
 for (const f of files) {
   const text = fs.readFileSync(path.join(root, f), "utf8");

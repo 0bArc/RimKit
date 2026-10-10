@@ -76,6 +76,8 @@ RIMLUA_API void rimlua_ui_invoke(int callback_id);
 RIMLUA_API const char* rimlua_ui_call(int callback_id, const char* arg_json);
 /* Returns pointer to static UTF-8 blob "label\\tid\\n..." from Lua ui.on_map_float_menu. Empty string if none. */
 RIMLUA_API const char* rimlua_collect_map_float_menu(int clicked_handle, int hauler_handle);
+/* Runs Lua text for the host and returns the result as text ("error: ..." on failure). Valid until the next call. Used by Helm. */
+RIMLUA_API const char* rimlua_eval(const char* code);
 
 #ifdef __cplusplus
 }

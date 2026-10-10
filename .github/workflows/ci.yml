@@ -22,6 +22,8 @@ jobs:
         run: node infrastructure/tools/gen-kit-pages.js --check
       - name: Event table is generated
         run: node infrastructure/tools/gen-events-doc.js --check
+      - name: Change log is generated
+        run: node infrastructure/tools/gen-changes.js --check
       - name: Op conformance
         run: node infrastructure/tools/check-ops.js
       - name: Editor extension
@@ -53,21 +55,39 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          cl /nologo /EHsc tests\native\budget_test.cpp /Fe:budget_test.exe
+          cl /nologo /std:c++17 /EHsc tests\native\budget_test.cpp /Fe:budget_test.exe
           budget_test.exe build\native\Release\rimlua_core.dll tests\native\budget_noisy.lua tests\native\budget_quiet.lua
-          cl /nologo /EHsc tests\native\kits_test.cpp /Fe:kits_test.exe
+          cl /nologo /std:c++17 /EHsc tests\native\kits_test.cpp /Fe:kits_test.exe
           kits_test.exe build\native\Release\rimlua_core.dll tests\native\kits_expect.lua tests\native\kits_args.lua tests\native\eco_test.lua
-          cl /nologo /EHsc tests\native\aliastest.cpp /Fe:aliastest.exe
-          aliastest.exe build\native\Release\rimlua_core.dll tests\native\aliastest.lua      - name: Mod tests (examples, guide mods, dev tools)
+          cl /nologo /std:c++17 /EHsc tests\native\aliastest.cpp /Fe:aliastest.exe
+          aliastest.exe build\native\Release\rimlua_core.dll tests\native\aliastest.lua
+      - name: Mod tests (examples, guide mods, dev tools, reload and in-game runner fixtures)
         shell: bash
         run: |
-          for d in src/examples/*/ guide/*/final/*/ mod/; do
+          for d in src/examples/*/ guide/*/final/*/ tests/fixtures/*/ mod/; do
             if [ -d "$d/Tests" ]; then
               echo "== $d"
               build/native/Release/rimkit.exe mod test "$d" || exit 1
-              if [ "$d" != "mod/" ]; then build/native/Release/rimkit.exe mod check "$d" || exit 1; fi
+              if [ "$d" != "mod/" ] && [[ "$d" != tests/fixtures/* ]]; then build/native/Release/rimkit.exe mod check "$d" || exit 1; fi
             fi
           done
+      - name: The damage example meets level 2 of the RimKit Standard
+        shell: bash
+        run: build/native/Release/rimkit.exe mod conform src/examples/damage --level 2
+
+  helm:
+    name: Helm builds on its own and passes its tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build only the helm folder
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cd helm
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -S . -B build
+          cmake --build build
+          build\bin\helm_tests.exe
 
   host:
     name: Host build, unit tests and release check (self-hosted)

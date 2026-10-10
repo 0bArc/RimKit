@@ -48,3 +48,7 @@ Do not look for a bypass. Ask for a named, narrow API: [request a feature](reque
 - Only install Lua mods you would install any other mod from.
 - A clean scan is a safety net, not a guarantee of good behavior. Mods can still change the game in ways you dislike.
 - RimKit shows its authenticity proof in the mod options. A mismatch means the RimKit files were modified.
+
+## Helm, the control channel
+
+[Helm](helm.md) can operate a running game from outside. It is off unless a launcher sets `HELM_ENDPOINT` and `HELM_TOKEN`, it needs pAuth to authorize RimKit and the Helm library to be on the allowlist, it uses a named pipe that only your user can open, and every connection needs the run's random token. It is a host feature, not a Lua capability: mods cannot start it, reach it or use it to get around the sandbox. Every command is logged.

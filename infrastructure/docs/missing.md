@@ -17,10 +17,10 @@ What RimKit can do, what is built and what is still open, in build order. The go
 | [Phase 3](#phase-3-presentation) | Presentation | 10 |  |  |
 | [Phase 4](#phase-4-extensibility) | Extensibility | 12 |  |  |
 | [Phase 5](#phase-5-dlc-kits) | DLC kits | 5 | 1 |  |
-| [Phase 6](#phase-6-ecosystem) | Ecosystem | 9 | 1 |  |
+| [Phase 6](#phase-6-ecosystem) | Ecosystem | 13 |  |  |
 | [Workshop readiness](#workshop-readiness) | Workshop readiness | 14 |  |  |
 | **1.0 gate** | Freeze the API | | | 1 |
-| **Total** | | **94** | **2** | **1** |
+| **Total** | | **98** | **1** | **1** |
 
 ## Still open
 
@@ -29,14 +29,13 @@ Rows that are partly done or not started. The next-step list with checks is in [
 | ID | Item | State | What is left |
 |----|------|-------|--------------|
 | P5-05 | Odyssey | Partly | `game.odyssey`: Planet layers, gravship engines with fuel, range, cooldown, substructure and components, space maps, gravship in flight. Launching, travel and orbital sites are not exposed. [dlc](api/dlc.md) |
-| P6-08 | Test harness for authors | Partly | `rimkit mod test`, `game.test`: Headless test runner with a mock host: mocks, recorded calls, events, ticks, captured logs, Lua classes and tweaks. Not built: scripted scenarios against a scenario save. [testing](guide/testing.md) |
 | G-01 | Freeze the API | Open | Promote ready Experimental kits to Stable, set `api_level = 1`, freeze the names. See [stability](api/stability.md) |
 
 ## What works today
 
 | Area | State |
 |------|-------|
-| Reacting to the game | 88 named events with payloads, with optional filters |
+| Reacting to the game | 116 named events with payloads, with optional filters |
 | Changing game behavior | Hooks: prefix, postfix, finalizer, call replacement, overloads, results, arguments, state, priority |
 | Reaching any game object | Typed reflection, gated and audited |
 | Game state kits | Things, maps, time, factions, pawns (data, health, gear, social, mind), jobs, selection and camera, queries, AI, storyteller, incidents, quests, research, stats, world, combat, construction, power, bills, economy, raids, generation, scenarios, plants, conditions, weather, saving |
@@ -45,8 +44,8 @@ Rows that are partly done or not started. The next-step list with checks is in [
 | Presentation | Widget windows, gizmos, main, inspect and column tabs, designators, areas, graphics, materials, effects, input, audio, alerts, HUD, letters with choices, settings pages |
 | Content | Any XML Def, XML patch, texture, sound and translation ships next to the Lua and is loaded by the game as normal |
 | Mod plumbing | Settings pages, per game, map and world saved data, runtime key bindings, Lua jobs, movement, JSON, mod interop, capabilities, hot reload, profiler, strict mode (`meta.api_level = 1`) |
-| Tooling | CLI (create, sync, ship, check, test, assets, i18n, release-check, publish, diag), editor extension (completions, def names, go to definition, wizard), kit table generator, op lint, release tool, CI workflow, in-game smoke suite, host unit tests |
-| Rules | Naming convention, stability tiers, error codes, the RimKit Standard |
+| Tooling | CLI (create, sync, ship, check, test, test --in-game, conform, assets, i18n, release-check, publish, diag), editor extension (completions, def names, go to definition, wizard), kit table generator, op lint, release tool, CI workflow, in-game smoke suite, in-game test runner, host unit tests |
+| Rules | Naming convention, stability tiers, error codes, the RimKit Standard (draft 2: events, hot reload contract, mod conformance levels, compatibility promise) |
 
 ## What kind of mod can be built
 
@@ -92,11 +91,11 @@ Reading the table: roughly half the categories need either a kit (Phases 1 and 2
 
 **Goal.** Make growth safe. Nothing here adds a feature, all of it prevents a regression.
 
-All 18 items are built. Checks that run without the game: native tests (`aliastest`, `budget_test`, `kits_test`, `hookbench`), 37 host unit tests, and the lint, docs, version, kit and editor checks. Checks that need the game run in the smoke suite.
+All 18 items are built. Checks that run without the game: native tests (`aliastest`, `budget_test`, `kits_test`, `hookbench`), 45 host unit tests (including every catalog event checked against the game assemblies), the reload and in-game runner fixtures, and the lint, docs, version, kit and editor checks. Checks that need the game run in the smoke suite.
 
 | ID | Item | State | What it does now |
 |----|------|-------|------------------|
-| P0-01 | C# unit tests | Built | `tests/host`: `tests/host` (xunit, net48): JSON reader, scanner, `Opts`, `Jb`, `JsonLite`, handle table. 34 tests. Registry and hook bridge need live game types and are covered by the smoke suite. |
+| P0-01 | C# unit tests | Built | `tests/host`: `tests/host` (xunit, net48): JSON reader, scanner, `Opts`, `Jb`, `JsonLite`, handle table, and the event catalog against the installed game assemblies. 45 tests. Registry and hook bridge need live game types and are covered by the smoke suite. |
 | P0-02 | CI | Built | CI workflow: `.github/workflows/ci.yml`: lint, kit table, editor, docs, version and hook-target checks, extension packaging, native build and tests, and a self-hosted job for the host build, unit tests and release check. It runs when pushed. |
 | P0-03 | One version source | Built | `src/api/VERSION`: `src/api/VERSION` and `API_LEVEL` feed native, host, extension and docs. |
 | P0-04 | Op conformance lint | Built | `check-ops.js`: `check-ops.js`: names, tiers, `since`, duplicates, every kit function resolves to a host op with a description and return type, every registered op has a Lua surface. |
@@ -158,7 +157,7 @@ Every kit is built from `src/api/kits/*.kit`, has host ops, stubs, docs and in-g
 | P2-10 | `game.plants` and agriculture | Built | `game.plants`: Growth, sowing, harvest, fertility, growing zones. [plants](api/plants.md) |
 | P2-11 | `game.weather`, `game.conditions` | Built | `game.conditions`, `game.weather`: Conditions, sky, season, weather defs, temperature offsets. [conditions](api/conditions.md) |
 | P2-12 | Persistence | Built | `game.save`, `game.json`: Per game, map and world data with JSON values, data versions, autosave, manual saves. [save](api/save.md) |
-| P2-13 | More events | Built | Events: 49 new events, 77 in the catalog. [events](api/events.md) |
+| P2-13 | More events | Built | Events: 77 in the catalog after the first pass, 116 after the second: work (crafted, mined, construction started, deconstructed, repaired, hauled, dropped, work completed), pawn left colony and escaped, healed, immunity gained, thought lost, social fight, learning saturated, fire started and ended, world generated, caravan arrived, site visited, goods delivered, silver changed, research milestone, room changed, faction relation and leader changed, gizmo clicked, key pressed. [events](api/events.md) |
 | P2-14 | `game.stats` reads | Built | `game.stats`: Value and explanation of any stat. [research](api/research.md) |
 
 Done when: a custom storyteller, a trade assistant, a farm planner and a smarter hauling AI can be written in Lua without reflection.
@@ -251,20 +250,23 @@ Built and checked: registration, the DLC guard (`RK3003` when inactive) and the 
 
 **Goal.** A platform other people build on.
 
-Built and checked: the in-game smoke suite (434 of 434 in the game), native tests (the framework, mocks, interop and a capability check), 37 host unit tests, the editor and docs checks, and the CLI commands run by hand against a scratch mod. The in-game parts (the dev tools window, the capabilities hub tab, hot reload, the mod failure letter) are covered by the smoke suite except the dev tools window, the hub tab and the mod failure letter, which need a human look.
+Built and checked: the in-game smoke suite (434 of 434 in the game, before the second event pass), native tests (the framework, mocks, interop and a capability check), 45 host unit tests, the reload fixture (13 tests) and the in-game runner fixture (15 tests), the editor and docs checks, and the CLI commands run by hand against a scratch mod. The in-game parts (the dev tools window, the capabilities hub tab, hot reload, the mod failure letter) are covered by the smoke suite except the dev tools window, the hub tab and the mod failure letter, which need a human look.
 
 | ID | Item | State | What it does now |
 |----|------|-------|------------------|
 | P6-01 | Mod interoperability | Built | `game.interop`, `game.mods.order`: Publish functions with semantic versions, ask with `^`, `~`, `>=` requirements, `when` for any load order, safe `call`. [interop](api/interop.md) |
-| P6-02 | Hot reload | Built | `game.dev.watch`, `game.dev.reload`: Reload a mod's Lua, per mod: events, hooks, timers, tick and widget callbacks are replaced. Gizmos, alerts, tabs, columns, designators, status lines and settings pages the old version registered are removed first, and the new version adds its own. [dev](api/dev.md) |
+| P6-02 | Hot reload | Built | `game.dev.watch`, `game.dev.reload`: Reload a mod's Lua, per mod: events (and their game patches), hooks, timers, tick and widget callbacks, stat modifiers, windows, debug actions, published APIs and test suites are replaced. Gizmos, alerts, tabs, columns, designators, status lines and settings pages the old version registered are removed first, and the new version adds its own. A reload asked for inside a tick callback waits for the next tick. [hot reload](guide/hot-reload.md) |
 | P6-03 | In-game tools | Built | Dev tools window (F11), `game.dev`: Console, hook cost, event recorder, profiler, debug actions, mods and permissions. A Reflect tab browses any game object: pick a root, open members that hold objects, read values live (needs the `developer_reflect` setting). [performance](guide/performance.md) |
 | P6-04 | Profiler | Built | `game.profiler`, `perf_budget_us`: Time per mod for ticks, events, hooks, timers, UI and load, a budget with a warning and the `mod.over_budget` event. [performance](guide/performance.md) |
 | P6-05 | Capability model | Built | `meta.capabilities`: `reflect`, `hooks`, `files`, `dev`: declared in `meta.lua`, shown in the hub, enforced with `RK4001`, checked by `rimkit mod check`. Mods that do not declare keep full access for now. [capabilities](guide/capabilities.md) |
 | P6-06 | Editor extension | Built | Editor extension: Def name completion from the game, go to definition for API names, test, check, release check, assets and diagnostics commands, a new mod wizard with five templates. |
 | P6-07 | Docs site | Built | Docs: Search plugin, seven tutorials, a cookbook with one recipe for every mod idea (a check keeps it that way), pages for testing, publishing, capabilities, save safety and performance. [tutorials](guide/tutorials.md), [cookbook](guide/cookbook.md) |
-| P6-08 | Test harness for authors | Partly | `rimkit mod test`, `game.test`: Headless test runner with a mock host: mocks, recorded calls, events, ticks, captured logs, Lua classes and tweaks. Not built: scripted scenarios against a scenario save. [testing](guide/testing.md) |
+| P6-08 | Test harness for authors | Built | `rimkit mod test`, `game.test`: Headless test runner with a mock host: mocks, recorded calls, events, ticks, captured logs, Lua classes and tweaks, hot reload (`reload`, `subscriptions`). Scenarios in the real game are P6-11. [testing](guide/testing.md) |
 | P6-09 | Sample mod pack | Built | Sample mod pack: Ten example mods in `src/examples` and the two video guide mods, each with headless tests that CI runs. The Defs of three of them follow the smoke test mods but have not been played. [examples](../../src/examples/README.md) |
 | P6-10 | Telemetry-free diagnostics | Built | `rimkit diag`, `game.dev.bundle`: Zip of the log, mod list and profiler numbers, no network. [performance](guide/performance.md) |
+| P6-11 | Tests in the real game | Built | `game.itest`, `rimkit mod test --in-game`: Suites in `Tests/Game` with waits for ticks, conditions and events, spawned things removed afterwards, a JSON report, and a launcher that gives the game its own save data folder and mod list. The runner is tested headless against a fake clock, and the `damage` example's 3 in-game tests passed through the launcher in RimWorld 1.6.4871. [testing](guide/testing.md#testing-in-the-game) |
+| P6-12 | Hot reload contract | Built | Reload guarantees in the Standard (section 12), checked by `tests/fixtures/reload`: no doubled handlers, timers, tick callbacks, actions or APIs, no patch count growth, reload inside a callback waits, `events.off` only removes the caller's handlers, repeating timers are safe. [hot reload](guide/hot-reload.md) |
+| P6-13 | Standard conformance | Built | `rimkit mod conform`: Levels 0 to 3 (declared, tested, verified in the game) with a line for `Workshop.md`. Standard draft 2. [standard](standard/rks.md) |
 
 ### Workshop readiness
 
@@ -297,24 +299,17 @@ The CLI commands below were run by hand against a scratch mod. `rimkit publish` 
 
 ## Reference
 
-### Events still missing
+### Events still without a catalog row
 
-The catalog has 88 events. Most of the groups below are covered by an event that already exists (for example `thing.damaged` for injuries, `job.ended` for interrupted jobs, `quest.ended` for failed and expired quests). These are the ones still without one. Each is one catalog row plus a patch (P2-13).
+The catalog has 116 events. These are the ones that cannot be a single catalog row, with the reason and what to use today.
 
-| Group | Events |
-|-------|--------|
-| Pawn lifecycle | Left colony, escaped |
-| Work and jobs | Work completed, item crafted, mining, construction started, deconstructed, repaired, hauled, dropped |
-| Health | Healed, immunity gained |
-| Mind and social | Thought lost, social fight |
-| Skills | Passion changed, learning saturated |
-| Combat | Fire started and out |
-| World and map | World generated, caravan arrived, site visited |
-| Economy | Goods delivered, silver changed, price changed |
-| Research | Progress milestones |
-| Buildings | Room changed |
-| Factions | Relation changed, leader changed |
-| UI | Gizmo clicked, key pressed |
+| Wanted | Why there is no event | Use |
+|--------|-----------------------|-----|
+| Passion changed | The game writes the passion field in place, there is no method to patch | Read `game.pawns` skills when you need them, or poll on `time.hour_changed` |
+| Price changed | A price is computed from stats every time it is read, nothing changes at one moment | `trade.completed`, `silver.changed` and reads from `game.economy` |
+| Hauled and delivered | The game counts a haul when the pawn picks the thing up | `thing.hauled` for the pickup, `thing.dropped` for the drop |
+
+Every other group from the old list now has an event: pawn left colony and escaped, work completed, crafted, mined, construction started, deconstructed, repaired, hauled and dropped, healed, immunity gained, thought lost, social fight, learning saturated, fire started and ended, world generated, caravan arrived, site visited, goods delivered, silver changed, research milestone, room changed, relation and leader changed, gizmo clicked and key pressed. A new event is one catalog row plus a patch body, and the host test checks it against the game (P2-13).
 
 ### Def type coverage
 
@@ -347,9 +342,9 @@ Every Def type can already be shipped as XML, because RimKit does not touch XML 
 | Entity detection is a heuristic | Look-alike mods can be misdetected |
 | The smoke test runner needs the game and a Steam relaunch workaround | Cannot run on a build server (P6-08) |
 | `mod/Auth/allowlist.json` is regenerated by hand after a rebuild | A forgotten regeneration blocks Lua (P0-13) |
-| F6 and F7 clash with vanilla keys | Tame Anomalies defaults overlap Research and Quests |
 | Hook context is built from JSON for every call | Hot hooks cost more than needed (P0-07) |
 | Hooks run on whichever thread runs the method | Heavy hooks on worker threads serialize behind one lock |
+| Events on methods that call engine internals (`time.*`, `letter.received`, `trade.completed`, `key.pressed`, `silver.changed`, `world.generated`) cannot be patched by the host unit test | Their target is checked by name, and Harmony accepting the patch is checked in the game by the smoke suite |
 
 ### Out of scope
 

@@ -392,6 +392,13 @@
 ---@field path string Folder of the mod
 ---@field assemblies string[] Names of its loaded assemblies
 
+---@class RimTestEnv
+---@field mods string[] Package ids of the mods whose game tests to run
+---@field report? string File the JSON report goes to
+---@field filter? string Only tests whose suite and name contain this text
+---@field source? string The mod's source folder, when the shipped copy does not carry Tests/Game
+---@field quit boolean Whether to close the game when the run is done
+
 ---@class RimFactionInfo
 ---@field name string Name of the faction
 ---@field def string Faction def name
@@ -1124,6 +1131,11 @@
 ---@field is_night? boolean Whether it is night
 ---@field ticks_per_hour integer Ticks in one hour
 ---@field ticks_per_day integer Ticks in one day
+
+---@class RimTimeStep
+---@field before integer Game tick before the step
+---@field after integer Game tick after the step
+---@field ran integer How many ticks were run
 
 --- One node of a widget tree. type is column, row, label, button, checkbox, slider, text, dropdown, list, table, tabs, scroll, progress, image, space or separator.
 ---@class RimWidgetNode
@@ -2148,6 +2160,31 @@ function game.dev.export_defs(path) end
 ---@param path? string
 ---@return string
 function game.dev.bundle(profile, path) end
+
+--- Sends an event to the Helm clients that subscribed to it. Raises RK3003 when no Helm session is running.
+---@param event string
+---@param json string
+---@return boolean
+function game.dev.helm_publish(event, json) end
+
+--- Whether this game is being operated through Helm.
+---@return boolean
+function game.dev.helm_active() end
+
+--- The in-game test run that rimkit mod test --in-game asked for, or nil when the game was started normally.
+---@return RimTestEnv?
+function game.dev.test_env() end
+
+--- Writes a test report. A relative path is inside the RimKitTests folder next to the game's config folder. The only absolute path allowed is the one the launcher passed. Returns the path.
+---@param path string
+---@param text string
+---@return string
+function game.dev.write_report(path, text) end
+
+--- Closes the game with an exit code. Only works when rimkit mod test --in-game started the game.
+---@param code? integer
+---@return boolean
+function game.dev.quit(code) end
 
 game.save = game.save or {}
 
@@ -4208,6 +4245,11 @@ function game.time.speed() end
 ---@return string
 function game.time.set_speed(speed) end
 
+--- Runs game ticks now, up to 20000 per call, with the queued events and the mods' tick callbacks after each tick. The game keeps its speed and pause state. Made for tests and headless runs.
+---@param ticks integer
+---@return RimTimeStep
+function game.time.step(ticks) end
+
 --- Whether the game is paused.
 ---@return boolean
 function game.time.paused() end
@@ -4739,6 +4781,11 @@ function game.save.now(name) end
 --- Saved games on disk.
 ---@return RimSaveFile[]
 function game.save.files() end
+
+--- Loads a saved game by name, like the Load button. The maps and the world are replaced and the game goes through its loading screen, so wait for the tick to come back (info.playing) before the next call. Mods keep running.
+---@param name string
+---@return boolean
+function game.save.load(name) end
 
 ---@class RimThing
 local RimThing = {}

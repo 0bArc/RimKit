@@ -1,0 +1,70 @@
+{
+  "profile": "profiles/rimworld.hlm",
+  "headless": true,
+  "set": {
+    "reflect": "True"
+  },
+  "steps": [
+    {
+      "name": "the game is up",
+      "info": true,
+      "expect": {
+        "path": "playing",
+        "equals": true
+      }
+    },
+    {
+      "name": "load the saved colony",
+      "call": "save.load",
+      "args": {
+        "name": "helm_civilization"
+      },
+      "expect": {
+        "path": "v",
+        "equals": true
+      }
+    },
+    {
+      "name": "wait for the save to finish loading",
+      "wait": {
+        "tick": 9600,
+        "timeout_ms": 240000
+      },
+      "timeout_ms": 250000
+    },
+    {
+      "name": "build the mansion: walls, doors, floors, roof, beds, table, lamps, a storage room with shelves",
+      "eval": "local m = game.maps.current() local x0, z0, w, h = 130, 118, 17, 13 local fails = {} local function try(f, ...) local ok, e = pcall(f, ...) if not ok then fails[#fails + 1] = tostring(e):sub(1, 50) end return ok end local function wall(x, z) try(game.build.instant, m, \"Wall\", x, z, { stuff = \"WoodLog\" }) end local function door(x, z) try(game.build.instant, m, \"Door\", x, z, { stuff = \"WoodLog\" }) end local function floor(x, z, d) if not try(game.maps.set_terrain, m, x, z, d) then pcall(game.maps.set_terrain, m, x, z, \"WoodPlankFloor\") end end for x = x0, x0 + w - 1 do   for z = z0, z0 + h - 1 do     local edge = x == x0 or x == x0 + w - 1 or z == z0 or z == z0 + h - 1     local inner = (x == x0 + 6 or x == x0 + 11) and not edge     if edge or inner then       if (x == x0 + 8 and z == z0) or (inner and z == z0 + 4) then door(x, z) else wall(x, z) end     else       floor(x, z, x < x0 + 6 and \"WoodPlankFloor\" or \"TileSandstone\")     end   end end for x = x0, x0 + w - 1 do for z = z0, z0 + h - 1 do pcall(game.maps.set_roof, m, x, z, \"RoofConstructed\") end end for _, b in ipairs({ { 132, 121 }, { 134, 121 }, { 132, 125 }, { 134, 125 }, { 132, 128 }, { 134, 128 } }) do try(game.build.instant, m, \"Bed\", b[1], b[2], { rotation = 0 }) end try(game.build.instant, m, \"Table2x2c\", 137, 123, { stuff = \"WoodLog\" }) for _, c in ipairs({ { 136, 123, 1 }, { 139, 123, 3 }, { 137, 122, 0 }, { 138, 125, 2 } }) do try(game.build.instant, m, \"DiningChair\", c[1], c[2], { stuff = \"WoodLog\", rotation = c[3] }) end for _, l in ipairs({ { 137, 120 }, { 137, 128 }, { 133, 123 }, { 143, 123 } }) do try(game.build.instant, m, \"TorchLamp\", l[1], l[2]) end local shelves = 0 for i = 0, 3 do   for j = 0, 1 do     local ok, s = pcall(game.build.instant, m, \"Shelf\", 142 + i, 121 + j * 4, { stuff = \"WoodLog\", rotation = 0 })     if ok then shelves = shelves + 1 pcall(function() s:set_storage_priority(\"Critical\") end) else fails[#fails + 1] = \"Shelf \" .. tostring(s):sub(1, 40) end   end end return \"mansion built, shelves=\" .. shelves .. \", problems=\" .. #fails .. \" \" .. table.concat(fails, \" | \") ",
+      "expect": {
+        "contains": "mansion built"
+      }
+    },
+    {
+      "name": "let the colonists settle",
+      "step": 600,
+      "expect": {
+        "path": "v.ran",
+        "equals": 600
+      }
+    },
+    {
+      "name": "the mansion has rooms",
+      "eval": "local m = game.maps.current() local rooms = {} for _, r in ipairs(game.maps.rooms(m)) do if r.cells >= 8 and r.cells < 150 then rooms[#rooms + 1] = r.role .. \":\" .. r.cells end end return \"rooms=\" .. table.concat(rooms, \",\") ",
+      "expect": {
+        "contains": "rooms="
+      }
+    },
+    {
+      "name": "save over the same save file",
+      "call": "save.now",
+      "args": {
+        "name": "helm_civilization"
+      },
+      "expect": {
+        "path": "v",
+        "equals": "helm_civilization"
+      }
+    }
+  ],
+  "shutdown": true
+}

@@ -157,6 +157,26 @@ namespace RimKit
             return hostMatch && nativeMatch;
         }
 
+        /// <summary>
+        /// Helm opens a control channel into the game, so its library is held to the same rule as RimKit's own binaries: its hash must be
+        /// in Auth/allowlist.json under "helm". A swapped or modified library is refused before it is loaded.
+        /// </summary>
+        public static bool VerifyHelmLibrary(string path, out string why)
+        {
+            why = "";
+            string sha = HashFile(path);
+            if (sha == "missing") { why = "the Helm library is missing: " + path; return false; }
+            string list = FindAllowlistPath();
+            if (string.IsNullOrEmpty(list) || !File.Exists(list)) { why = "Auth/allowlist.json is missing"; return false; }
+            if (!JsonContainsSha(File.ReadAllText(list), "helm", sha))
+            {
+                why = "the Helm library (sha " + Short(sha) + ") is not in the allowlist. Build it into the RimKit package and run rimkit update --release.";
+                return false;
+            }
+
+            return true;
+        }
+
         // Workshop builds often run as stratware.rimkit_steam. Also match PackageIdPlayerFacing
         // and fall back to the mod folder that contains this RimLuaHost.dll.
         private static ModContentPack FindRimKitPack()

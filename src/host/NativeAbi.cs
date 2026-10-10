@@ -148,6 +148,10 @@ namespace RimKit
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern IntPtr rimlua_collect_map_float_menu(int clickedHandle, int haulerHandle);
 
+        /// <summary>Runs Lua text for the Helm adapter. The result is text, "error: ..." on failure. Valid until the next call.</summary>
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "rimlua_eval")]
+        public static extern IntPtr rimlua_eval_raw([MarshalAs(UnmanagedType.LPStr)] string code);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void LogFn(IntPtr msg);
 

@@ -5,14 +5,14 @@
   <KeyBindingDef>
     <defName>RimLua_TameAnomalyClaim</defName>
     <category>Game</category>
-    <defaultKeyCodeA>F6</defaultKeyCodeA>
+    <defaultKeyCodeA>LeftBracket</defaultKeyCodeA>
     <label>Tame Anomalies: recruit selected</label>
   </KeyBindingDef>
 
   <KeyBindingDef>
     <defName>RimLua_TameAnomalyRelease</defName>
     <category>Game</category>
-    <defaultKeyCodeA>F7</defaultKeyCodeA>
+    <defaultKeyCodeA>RightBracket</defaultKeyCodeA>
     <label>Tame Anomalies: release recruited</label>
   </KeyBindingDef>
 

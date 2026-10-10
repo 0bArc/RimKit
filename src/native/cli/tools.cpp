@@ -1,6 +1,7 @@
 // rimkit mod test, diag, publish and the meta file reader.
 #include "tools.hpp"
 #include "lua_file.hpp"
+#include "json_lite.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -333,7 +334,173 @@ fs::path find_core(const std::vector<std::string>& args) {
 
 }  // namespace
 
+namespace {
+
+std::string env_or(const char* name, const std::string& fallback) {
+    char buf[1024];
+    const DWORD n = GetEnvironmentVariableA(name, buf, sizeof(buf));
+    return (n > 0 && n < sizeof(buf)) ? std::string(buf, n) : fallback;
+}
+
+std::string option_value(const std::vector<std::string>& args, const std::string& name, const std::string& fallback = std::string()) {
+    for (size_t i = 0; i + 1 < args.size(); ++i) {
+        if (args[i] == name) return args[i + 1];
+    }
+    return fallback;
+}
+
+std::string lower(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+}  // namespace
+
+// rimkit mod test --in-game: starts RimWorld on its own save data folder, runs the mod's Tests/Game scripts inside the game and
+// reads the JSON report they write. It never touches the ModsConfig.xml, settings or saves of the person running it: -savedatafolder
+// points the game at a throwaway folder with its own mod list. The mod under test must already be somewhere the game finds mods
+// (the game's Mods folder, a junction to your source folder, or the Workshop). The command does not copy anything into the game folder.
+static int cmd_test_in_game(const fs::path& mod_dir, const std::vector<std::string>& args) {
+    std::cout << std::unitbuf;
+    ModMeta meta;
+    std::string err;
+    if (!load_meta(mod_dir, meta, err) || meta.package_id.empty()) {
+        std::cerr << "Cannot read meta.lua in " << mod_dir.string() << (err.empty() ? "" : ": " + err) << "\n";
+        return 2;
+    }
+    const fs::path game_tests = mod_dir / "Tests" / "Game";
+    if (!fs::is_directory(game_tests)) {
+        std::cerr << "No Tests/Game folder in " << mod_dir.string() << ".\n"
+                  << "Put scripts that call game.itest.suite(...) there, see docs/guide/testing.md (Testing in the game).\n";
+        return 2;
+    }
+    fs::path game_dir = option_value(args, "--game", env_or("RIMWORLD_DIR", ""));
+    if (game_dir.empty()) game_dir = "C:/Program Files (x86)/Steam/steamapps/common/RimWorld";
+    const fs::path exe = game_dir / "RimWorldWin64.exe";
+    if (!fs::exists(exe)) {
+        std::cerr << "RimWorldWin64.exe not found in " << game_dir.string() << ". Pass --game <folder> or set RIMWORLD_DIR.\n";
+        return 2;
+    }
+
+    const int timeout_s = std::atoi(option_value(args, "--timeout", "300").c_str());
+    const std::string filter = option_value(args, "--filter");
+    const bool keep_open = std::find(args.begin(), args.end(), "--keep-open") != args.end();
+    const bool headless = std::find(args.begin(), args.end(), "--headless") != args.end();
+
+    // Own save data folder with its own mod list: harmony, RimKit and the mod under test, plus whatever --with names.
+    const fs::path data = fs::temp_directory_path() / ("rimkit_ingame_" + timestamp());
+    fs::create_directories(data / "Config");
+    std::vector<std::string> active = {"ludeon.rimworld", "brrainz.harmony", "stratware.rimkit"};
+    for (const std::string& dep : meta.depends) active.push_back(lower(dep));
+    const std::string with = option_value(args, "--with");
+    for (size_t pos = 0; pos < with.size();) {
+        size_t comma = with.find(',', pos);
+        if (comma == std::string::npos) comma = with.size();
+        if (comma > pos) active.push_back(lower(with.substr(pos, comma - pos)));
+        pos = comma + 1;
+    }
+    active.push_back(lower(meta.package_id));
+    std::vector<std::string> unique;
+    for (const std::string& id : active) {
+        if (std::find(unique.begin(), unique.end(), id) == unique.end()) unique.push_back(id);
+    }
+    {
+        std::ofstream cfg(data / "Config" / "ModsConfig.xml", std::ios::binary);
+        cfg << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ModsConfigData>\n  <version>1.6</version>\n  <activeMods>\n";
+        for (const std::string& id : unique) cfg << "    <li>" << id << "</li>\n";
+        cfg << "  </activeMods>\n  <knownExpansions />\n</ModsConfigData>\n";
+    }
+
+    const fs::path report = data / "report.json";
+    SetEnvironmentVariableA("RIMKIT_TEST_MODS", meta.package_id.c_str());
+    SetEnvironmentVariableA("RIMKIT_TEST_REPORT", report.string().c_str());
+    SetEnvironmentVariableA("RIMKIT_TEST_SOURCE", fs::absolute(mod_dir).string().c_str());
+    SetEnvironmentVariableA("RIMKIT_TEST_FILTER", filter.empty() ? nullptr : filter.c_str());
+    SetEnvironmentVariableA("RIMKIT_TEST_QUIT", keep_open ? "0" : "1");
+
+    std::string cmdline = "\"" + exe.string() + "\" -quicktest -savedatafolder=\"" + data.string() + "\"";
+    // No window and no GPU. Helm uses the same flags for the same reason.
+    if (headless) cmdline += " -batchmode -nographics -logFile \"" + (data / "Player.log").string() + "\"";
+    std::cout << "rimkit test --in-game: " << meta.name << " (" << meta.package_id << ")\n"
+              << "  game        " << exe.string() << "\n"
+              << "  save data   " << data.string() << " (throwaway, your own settings and saves are not used)\n"
+              << "  mod list    " << unique.size() << " mods, the game must be able to find " << meta.package_id << "\n"
+              << "  timeout     " << timeout_s << " s\n";
+
+    STARTUPINFOA si{};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi{};
+    std::vector<char> mutable_cmd(cmdline.begin(), cmdline.end());
+    mutable_cmd.push_back('\0');
+    if (!CreateProcessA(nullptr, mutable_cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, game_dir.string().c_str(), &si, &pi)) {
+        std::cerr << "Could not start the game (error " << GetLastError() << ").\n";
+        return 2;
+    }
+
+    const auto started = std::chrono::steady_clock::now();
+    bool have_report = false;
+    bool exited = false;
+    while (true) {
+        std::error_code ec;
+        if (fs::exists(report, ec) && fs::file_size(report, ec) > 0) {
+            have_report = true;
+            break;
+        }
+        if (WaitForSingleObject(pi.hProcess, 1000) == WAIT_OBJECT_0) {
+            exited = true;
+            // The game may have written the report just before it closed.
+            have_report = fs::exists(report, ec) && fs::file_size(report, ec) > 0;
+            break;
+        }
+        if (std::chrono::steady_clock::now() - started > std::chrono::seconds(timeout_s)) {
+            break;
+        }
+    }
+    if (!exited && !keep_open) {
+        // The run asked the game to quit; give it a moment, then close it.
+        if (WaitForSingleObject(pi.hProcess, 20000) != WAIT_OBJECT_0) TerminateProcess(pi.hProcess, 1);
+    }
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+
+    if (!have_report) {
+        std::cerr << (exited ? "The game closed" : "Timed out") << " without a test report.\n"
+                  << "Look at the game log (Player.log) for lines that start with RKTEST or [RimKit]. Common causes: the game could not find the mod "
+                  << meta.package_id << " (put it in the game's Mods folder, or a junction to it), or a mod in the list failed to load.\n";
+        return 2;
+    }
+    std::ifstream in(report, std::ios::binary);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    rimlua::json::Value root;
+    if (!rimlua::json::parse(ss.str(), root) || !root.is_object()) {
+        std::cerr << "The report is not valid JSON: " << report.string() << "\n";
+        return 2;
+    }
+    const rimlua::json::Value* rows = root.find("tests");
+    if (rows && rows->is_array()) {
+        for (const rimlua::json::Value& row : rows->items) {
+            const std::string status = row.get_string("status");
+            const char* tag = status == "pass" ? "ok  " : status == "skip" ? "skip" : "FAIL";
+            std::cout << "  " << tag << "  " << row.get_string("suite") << " > " << row.get_string("name");
+            const std::string message = row.get_string("message");
+            if (!message.empty()) std::cout << " :: " << message;
+            std::cout << "\n";
+        }
+    }
+    const long long pass = root.get_int("pass"), fail = root.get_int("fail"), skip = root.get_int("skip");
+    std::cout << "pass=" << pass << " fail=" << fail << " skip=" << skip << "\n";
+    std::error_code ec;
+    fs::copy_file(report, fs::current_path() / "rimkit_ingame_report.json", fs::copy_options::overwrite_existing, ec);
+    if (!ec) std::cout << "report: " << (fs::current_path() / "rimkit_ingame_report.json").string() << "\n";
+    fs::remove_all(data, ec);
+    return fail == 0 ? 0 : 1;
+}
+
 int cmd_test(const fs::path& mod_dir, const std::vector<std::string>& args) {
+    if (std::find(args.begin(), args.end(), "--in-game") != args.end()) {
+        return cmd_test_in_game(mod_dir, args);
+    }
     std::cout << std::unitbuf;
     g_test = TestState();
     g_test.verbose = std::find(args.begin(), args.end(), "--verbose") != args.end();

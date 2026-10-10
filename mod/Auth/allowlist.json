@@ -5,9 +5,14 @@
     "353daafec180bb8e7bbe4da78f2a7cdc78067392e3a4e79dc8e7af295f2371e6"
   ],
   "rimkit_host": [
-    "fa4fabee37b7defa00f2498b17bca685de389476a8de746f48f9d29d70b7f782"
+    "d22f33d516334649da385a97d4cb3f2887a7b0e88c5928eb2452c31ae17e4d4b"
   ],
   "rimkit_native": [
-    "d2e69b5b3fa681de028d09578ad23570920740a2bea51aab78b9476ccfc65351"
-  ]
+    "2a5c94d7889cd3ae4d2960d5f3a16bbc674c3b9336180b0bc9ef523269e0f7d9"
+  ],
+  "helm": {
+    "windows": [
+      "3c216a758d6db2a1f40515e2c0e68d298a517fdb4d2ac3d2a2eb1b39689d6515"
+    ]
+  }
 }

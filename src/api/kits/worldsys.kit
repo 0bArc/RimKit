@@ -188,3 +188,4 @@ autosave_interval() -> number | Days between autosaves.
 set_autosave_interval(days: number) -> number | Sets the autosave interval, 0.125 to 14 days.
 now(name?: string) -> string | Saves the game under a name and returns the name.
 files() -> RimSaveFile[] | Saved games on disk.
+load(name: string) -> boolean | Loads a saved game by name, like the Load button. The maps and the world are replaced and the game goes through its loading screen, so wait for the tick to come back (info.playing) before the next call. Mods keep running.

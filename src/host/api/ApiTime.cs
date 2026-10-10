@@ -18,6 +18,29 @@ namespace RimKit
             ApiRegistry.Register("time.paused", Paused, "gameplay", "0.5.0");
             ApiRegistry.Register("time.set_paused", SetPaused, "gameplay", "0.5.0");
             ApiRegistry.Register("time.date_text", DateText, "gameplay", "0.5.0");
+            ApiRegistry.Register("time.step", Step, "advanced", "0.11.0");
+        }
+
+        private const int MaxStepPerCall = 20000;
+
+        // Runs game ticks now instead of waiting for the clock: one DoSingleTick, the queued events, and the mods' tick callbacks per tick.
+        // The game keeps its speed and pause state. Made for tests and headless runs.
+        private static string Step(Dictionary<string, string> args) => StepTicks(Int(args, "ticks"));
+
+        public static string StepTicks(int ticks)
+        {
+            if (ticks < 1 || ticks > MaxStepPerCall) return Fail("RK1001", "ticks must be 1 to " + MaxStepPerCall + " per call");
+            if (Current.ProgramState != ProgramState.Playing || Find.TickManager == null) return Fail("RK3001", "no game is running");
+            TickManager tm = Find.TickManager;
+            int before = tm.TicksGame;
+            for (int i = 0; i < ticks; i++)
+            {
+                tm.DoSingleTick();
+                LuaEventQueue.Drain();
+                NativeAbi.rimlua_call_on_tick();
+            }
+
+            return Jb.Obj().I("before", before).I("after", tm.TicksGame).I("ran", ticks).Ok();
         }
 
         private static Map CurrentMap() => Find.CurrentMap ?? Find.AnyPlayerHomeMap;

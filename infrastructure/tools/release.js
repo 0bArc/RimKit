@@ -36,6 +36,9 @@ function findHarmony() {
   return candidates.find((c) => fs.existsSync(c)) || null;
 }
 
+// The Helm control library, one file per platform. It is optional: a package without it simply has no Helm.
+const helmFiles = { windows: "helm.dll", linux: "libhelm.so", macos: "libhelm.dylib" };
+
 const hostPath = path.join(modDir, "Assemblies", "RimLuaHost.dll");
 const nativePath = path.join(modDir, "Native", "rimlua_core.dll");
 const allowPath = path.join(modDir, "Auth", "allowlist.json");
@@ -51,12 +54,21 @@ if (!flag("--verify")) {
   if (harmonyPath) harmony = [sha(harmonyPath)];
   else if (fs.existsSync(allowPath)) harmony = JSON.parse(fs.readFileSync(allowPath, "utf8")).harmony || [];
   if (!harmony.length) fail("no Harmony hash: pass --harmony <path to 0Harmony.dll>");
+  // Helm (the control library) is hashed per platform. A platform whose file is not here keeps the hash it had, so building on
+  // Windows does not forget the Linux entry. "helm" stays the last key: AuthGate reads the text after it.
+  const previous = fs.existsSync(allowPath) ? JSON.parse(fs.readFileSync(allowPath, "utf8")) : {};
+  const helm = Object.assign({}, previous.helm && !Array.isArray(previous.helm) ? previous.helm : {});
+  for (const [platform, file] of Object.entries(helmFiles)) {
+    const p = path.join(modDir, "Native", file);
+    if (fs.existsSync(p)) helm[platform] = [sha(p)];
+  }
   const doc = {
     version: 1,
     note: "Accepted SHA256 digests for a Stratware release. Rebuild/ship updates this file.",
     harmony,
     rimkit_host: [host],
     rimkit_native: [native],
+    helm,
   };
   if (!problems) {
     fs.mkdirSync(path.dirname(allowPath), { recursive: true });
@@ -74,6 +86,10 @@ function verifyTree(dir, label) {
   if (!(list.rimkit_host || []).includes(sha(h))) fail(label + ": host hash is not in the allowlist");
   if (!(list.rimkit_native || []).includes(sha(n))) fail(label + ": native hash is not in the allowlist");
   if (!(list.harmony || []).length) fail(label + ": allowlist has no Harmony hash");
+  for (const [platform, file] of Object.entries(helmFiles)) {
+    const p = path.join(dir, "Native", file);
+    if (fs.existsSync(p) && !((list.helm || {})[platform] || []).includes(sha(p))) fail(label + ": " + file + " hash is not in the allowlist");
+  }
   const about = path.join(dir, "About", "About.xml");
   if (!fs.existsSync(about) || !/<packageId>stratware\.rimkit<\/packageId>/.test(fs.readFileSync(about, "utf8")))
     fail(label + ": About.xml packageId must be stratware.rimkit");

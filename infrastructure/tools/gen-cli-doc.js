@@ -38,6 +38,17 @@ text.push("| `meta.lua` | `About/About.xml`, `About/RimKit.json` (capabilities, 
 text.push("| `Defs/*.lua` | `Defs/*.xml` next to each file, see [Defs in Lua](defs-xml.md#defs-in-lua) |");
 text.push("| `Languages/*/Keyed/*.lua` | `Languages/*/Keyed/*.xml`, see [Strings in Lua](defs-xml.md#strings-in-lua) |");
 text.push("");
+text.push("## Maintaining RimKit itself");
+text.push("");
+text.push("`rimkit update` is for people who work on this repository. It needs Node.js and runs the tools in `infrastructure/tools`:");
+text.push("");
+text.push("| Command | What it does |");
+text.push("|---------|--------------|");
+text.push("| `rimkit update` | Fixes the version in every file from `src/api/VERSION`, rebuilds the kit table, regenerates the docs, stubs and change log, and runs the lints |");
+text.push("| `rimkit update --check` | The same, but only checks. Exits 1 when something is out of date and writes nothing. Use it in CI |");
+text.push("| `rimkit update --release` | Also writes `mod/Auth/allowlist.json` from the built files and verifies it (`release.js`). Run `rimkit build` first, the hashes must be of the built files |");
+text.push("| `rimkit update --release --deploy <folder>` | Also copies `mod/` to the folder and verifies the copy. It never guesses a folder: nothing is copied into the game unless you name it |");
+text.push("");
 text.push("## Environment");
 text.push("");
 text.push("| Variable | Used for |");

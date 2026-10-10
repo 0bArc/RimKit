@@ -39,3 +39,10 @@ infrastructure/docs-site/node_modules/
 # Generated About can stay tracked; ignore accidental dumps
 *.log
 Player.log
+rimkit_ingame_report.json
+
+# Helm build output
+helm/build/
+*helm
+.firecrawl
+*profiles

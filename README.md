@@ -45,13 +45,13 @@ Load order is Harmony, then RimKit, then your mod. Close RimWorld before shippin
 | | |
 |-|-|
 | Kits | `game.pawns`, `game.things`, `game.maps` and about a hundred more, typed and documented |
-| Events | 88 named events with typed payloads, filters, and one `on_<event>` function each |
+| Events | 116 named events with typed payloads, filters, and one `on_<event>` function each |
 | Hooks | Prefix, postfix, finalizer and call replacement on any game method |
 | Reflection | Read or call anything in Verse, RimWorld and UnityEngine. Off by default and audited |
 | Libraries | `rimkit.signal` and `rimkit.promise` |
-| Tooling | `rimkit` CLI, mock-host tests with `mod gen-tests`, hot reload, a VS Code extension with types |
+| Tooling | `rimkit` CLI, mock-host tests with `mod gen-tests`, tests in the real game (`mod test --in-game`), hot reload, `mod conform` for the RimKit Standard, a VS Code extension with types |
 
-What is not possible yet is in [what is missing](infrastructure/docs/missing.md). See [contributing](CONTRIBUTING.md) for the official ways to report bugs, request capabilities, improve docs, add examples and submit code.
+What changed and how each change was checked is in [CHANGES.md](CHANGES.md). What is not possible yet is in [what is missing](infrastructure/docs/missing.md). See [contributing](CONTRIBUTING.md) for the official ways to report bugs, request capabilities, improve docs, add examples and submit code.
 
 ## Docs
 

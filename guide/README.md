@@ -11,9 +11,9 @@ Do episode 1 first. Episode 2 assumes the viewer knows the `create`, `ship` and 
 
 ## Before you record
 
-1. **RimKit 0.10.0 or newer.** The episodes use `game.tweaks`, `game.interop` and `game.test`. Check the game log for `[RimKit] version 0.10.0`. The older Workshop copy lacks them: build the repo and enable the dev copy.
+1. **RimKit 0.11.0 or newer.** The episodes use `game.tweaks`, `game.interop` and `game.test`. Check the game log for `[RimKit] version 0.11.0`. The older Workshop copy lacks them: build the repo and enable the dev copy.
 2. **`rimkit.exe`** is in `bin\` of the repo. Run it as `.\bin\rimkit.exe` from the repo folder, or put `bin` on your PATH and say `rimkit`.
-3. **VS Code with the RimKit extension.** Install `src\editor\rimkit-0.10.0.vsix`, plus a Lua extension such as LuaLS, and accept the prompt to add the RimKit definitions. Type `game.t` in a Lua file and you should see completions.
+3. **VS Code with the RimKit extension.** Install `src\editor\rimkit-0.11.0.vsix`, plus a Lua extension such as LuaLS, and accept the prompt to add the RimKit definitions. Type `game.t` in a Lua file and you should see completions.
 4. **RimWorld with Harmony and RimKit enabled.** Turn on Development mode if you want the F11 dev tools window.
 5. **A clean working folder** for the viewer's mod, for example `C:\Videos\mods`.
 6. **Screen setup:** large fonts, terminal and editor on one side, the game on the other, windowed or borderless.

@@ -37,5 +37,7 @@ int cmd_i18n(const fs::path& mod_dir, const std::vector<std::string>& args);
 // Defs, patches, textures and translation keys. Returns the number of errors. Warnings print but do not count.
 int content_check(const fs::path& mod_dir, bool quiet);
 int cmd_release_check(const fs::path& mod_dir);
+// Checks a mod against the RimKit Standard (docs/standard/rks.md, section 13) and prints the level it reaches, 0 to 3.
+int cmd_conform(const fs::path& mod_dir, const std::vector<std::string>& args);
 
 }  // namespace rkcli

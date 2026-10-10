@@ -806,3 +806,277 @@ function game.events.on_selection_cleared(fn, filter) end
 ---@param fn fun(e: WindowOpenedEvent)
 ---@param filter? table
 function game.events.on_window_opened(fn, filter) end
+
+---@class PawnLeftColonyEvent
+---@field pawn RimPawn
+---@field to any
+
+--- Runs fn when pawn.left_colony happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: PawnLeftColonyEvent)
+---@param filter? table
+function game.events.on_pawn_left_colony(fn, filter) end
+
+---@class PawnEscapedEvent
+---@field pawn RimPawn
+---@field initiator any
+
+--- Runs fn when pawn.escaped happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: PawnEscapedEvent)
+---@param filter? table
+function game.events.on_pawn_escaped(fn, filter) end
+
+---@class WorkCompletedEvent
+---@field pawn RimPawn
+---@field job RimObject
+---@field work_type any
+
+--- Runs fn when work.completed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: WorkCompletedEvent)
+---@param filter? table
+function game.events.on_work_completed(fn, filter) end
+
+---@class ItemCraftedEvent
+---@field thing RimThing
+---@field recipe any
+---@field pawn RimPawn
+
+--- Runs fn when item.crafted happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ItemCraftedEvent)
+---@param filter? table
+function game.events.on_item_crafted(fn, filter) end
+
+---@class MiningCompletedEvent
+---@field def string
+---@field x any
+---@field z any
+---@field pawn RimPawn
+
+--- Runs fn when mining.completed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: MiningCompletedEvent)
+---@param filter? table
+function game.events.on_mining_completed(fn, filter) end
+
+---@class ConstructionStartedEvent
+---@field frame any
+---@field def string
+---@field pawn RimPawn
+
+--- Runs fn when construction.started happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ConstructionStartedEvent)
+---@param filter? table
+function game.events.on_construction_started(fn, filter) end
+
+---@class BuildingDeconstructedEvent
+---@field pawn RimPawn
+---@field thing RimThing
+---@field def string
+---@field x any
+---@field z any
+
+--- Runs fn when building.deconstructed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: BuildingDeconstructedEvent)
+---@param filter? table
+function game.events.on_building_deconstructed(fn, filter) end
+
+---@class ThingRepairedEvent
+---@field pawn RimPawn
+---@field thing RimThing
+---@field def string
+
+--- Runs fn when thing.repaired happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ThingRepairedEvent)
+---@param filter? table
+function game.events.on_thing_repaired(fn, filter) end
+
+---@class ThingHauledEvent
+---@field pawn RimPawn
+---@field thing RimThing
+---@field def string
+
+--- Runs fn when thing.hauled happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ThingHauledEvent)
+---@param filter? table
+function game.events.on_thing_hauled(fn, filter) end
+
+---@class ThingDroppedEvent
+---@field pawn RimPawn
+---@field thing RimThing
+---@field def string
+---@field x any
+---@field z any
+
+--- Runs fn when thing.dropped happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ThingDroppedEvent)
+---@param filter? table
+function game.events.on_thing_dropped(fn, filter) end
+
+---@class HediffHealedEvent
+---@field pawn RimPawn
+---@field hediff RimObject
+
+--- Runs fn when hediff.healed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: HediffHealedEvent)
+---@param filter? table
+function game.events.on_hediff_healed(fn, filter) end
+
+---@class ImmunityGainedEvent
+---@field pawn RimPawn
+---@field disease any
+
+--- Runs fn when immunity.gained happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ImmunityGainedEvent)
+---@param filter? table
+function game.events.on_immunity_gained(fn, filter) end
+
+---@class ThoughtLostEvent
+---@field pawn RimPawn
+---@field thought any
+
+--- Runs fn when thought.lost happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: ThoughtLostEvent)
+---@param filter? table
+function game.events.on_thought_lost(fn, filter) end
+
+---@class SocialFightStartedEvent
+---@field pawn RimPawn
+---@field other RimPawn
+
+--- Runs fn when social_fight.started happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: SocialFightStartedEvent)
+---@param filter? table
+function game.events.on_social_fight_started(fn, filter) end
+
+---@class SkillLearningSaturatedEvent
+---@field pawn RimPawn
+---@field skill any
+
+--- Runs fn when skill.learning_saturated happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(pawn: RimPawn, e: SkillLearningSaturatedEvent)
+---@param filter? table
+function game.events.on_skill_learning_saturated(fn, filter) end
+
+---@class FireStartedEvent
+---@field fire any
+---@field map RimMap
+---@field x any
+---@field z any
+
+--- Runs fn when fire.started happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: FireStartedEvent)
+---@param filter? table
+function game.events.on_fire_started(fn, filter) end
+
+---@class FireEndedEvent
+---@field fire any
+---@field map RimMap
+---@field x any
+---@field z any
+
+--- Runs fn when fire.ended happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: FireEndedEvent)
+---@param filter? table
+function game.events.on_fire_ended(fn, filter) end
+
+---@class WorldGeneratedEvent
+---@field seed any
+
+--- Runs fn when world.generated happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: WorldGeneratedEvent)
+---@param filter? table
+function game.events.on_world_generated(fn, filter) end
+
+---@class CaravanArrivedEvent
+---@field caravan any
+---@field tile any
+
+--- Runs fn when caravan.arrived happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: CaravanArrivedEvent)
+---@param filter? table
+function game.events.on_caravan_arrived(fn, filter) end
+
+---@class SiteVisitedEvent
+---@field caravan any
+---@field site any
+---@field def string
+
+--- Runs fn when site.visited happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: SiteVisitedEvent)
+---@param filter? table
+function game.events.on_site_visited(fn, filter) end
+
+---@class GoodsDeliveredEvent
+---@field thing RimThing
+---@field map RimMap
+---@field x any
+---@field z any
+
+--- Runs fn when goods.delivered happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(thing: RimThing, e: GoodsDeliveredEvent)
+---@param filter? table
+function game.events.on_goods_delivered(fn, filter) end
+
+---@class SilverChangedEvent
+---@field silver any
+---@field delta any
+
+--- Runs fn when silver.changed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: SilverChangedEvent)
+---@param filter? table
+function game.events.on_silver_changed(fn, filter) end
+
+---@class ResearchMilestoneEvent
+---@field project any
+---@field percent any
+
+--- Runs fn when research.milestone happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: ResearchMilestoneEvent)
+---@param filter? table
+function game.events.on_research_milestone(fn, filter) end
+
+---@class RoomChangedEvent
+---@field map RimMap
+
+--- Runs fn when room.changed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: RoomChangedEvent)
+---@param filter? table
+function game.events.on_room_changed(fn, filter) end
+
+---@class FactionRelationChangedEvent
+---@field faction RimFaction
+---@field other RimPawn
+---@field previous any
+---@field kind string
+
+--- Runs fn when faction.relation_changed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: FactionRelationChangedEvent)
+---@param filter? table
+function game.events.on_faction_relation_changed(fn, filter) end
+
+---@class FactionLeaderChangedEvent
+---@field faction RimFaction
+---@field leader any
+
+--- Runs fn when faction.leader_changed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: FactionLeaderChangedEvent)
+---@param filter? table
+function game.events.on_faction_leader_changed(fn, filter) end
+
+---@class GizmoClickedEvent
+---@field label string
+---@field class any
+
+--- Runs fn when gizmo.clicked happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: GizmoClickedEvent)
+---@param filter? table
+function game.events.on_gizmo_clicked(fn, filter) end
+
+---@class KeyPressedEvent
+---@field key any
+---@field shift any
+---@field control any
+---@field alt any
+
+--- Runs fn when key.pressed happens. The optional filter is described in docs/api/events.md.
+---@param fn fun(e: KeyPressedEvent)
+---@param filter? table
+function game.events.on_key_pressed(fn, filter) end

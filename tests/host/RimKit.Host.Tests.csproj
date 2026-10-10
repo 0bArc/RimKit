@@ -26,11 +26,17 @@
     <Compile Include="..\..\src\host\HookCodec.cs" Link="host\HookCodec.cs" />
     <Compile Include="..\..\src\host\api\ApiHelpers.cs" Link="host\ApiHelpers.cs" />
     <Compile Include="..\..\src\host\api\ApiOpts.cs" Link="host\ApiOpts.cs" />
+    <Compile Include="..\..\src\host\EventCatalog.cs" Link="host\EventCatalog.cs" />
+    <Compile Include="..\..\src\host\EventCatalogMore.cs" Link="host\EventCatalogMore.cs" />
+    <Compile Include="..\..\src\host\EventCatalogWork.cs" Link="host\EventCatalogWork.cs" />
+    <Compile Include="..\..\src\host\EventBridge.cs" Link="host\EventBridge.cs" />
+    <Compile Include="..\..\src\host\NativeAbi.cs" Link="host\NativeAbi.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp"><HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath><Private>False</Private></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(RimWorldDir)\RimWorldWin64_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath><Private>False</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(HarmonyPath)</HintPath><Private>False</Private></Reference>
   </ItemGroup>
 </Project>

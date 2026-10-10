@@ -622,13 +622,14 @@ game.timer.after(600, function()
 end)
 ```
 
-`mode`, `export_defs` and `bundle` are kit functions below. The others are written in Lua:
+`mode`, `export_defs`, `bundle`, `test_env`, `write_report` and `quit` are kit functions below. The last three belong to the in-game test launcher. The others are written in Lua:
 
 | Function | What it does |
 |----------|--------------|
 | `game.dev.action(name, fn, description?)`, `actions()`, `run(name)` | Debug actions |
 | `game.dev.eval(code)` | Runs a Lua expression or statement and returns `ok, text`. Needs Development mode and the `dev` capability |
-| `game.dev.watch(on)`, `game.dev.reload(package_id)` | Hot reload |
+| `game.dev.watch(on)`, `game.dev.reload(package_id)` | Hot reload, see [hot reload](../guide/hot-reload.md) |
+| `game.itest.suite(name)`, `load(package_id)`, `run(opts)`, `abort()`, `running()`, `progress()`, `report()`, `suites()` | Tests that run inside the real game, see [testing in the game](../guide/testing.md#testing-in-the-game) |
 | `game.dev.record_start(filter?)`, `record_stop()`, `record_log()`, `record_clear()`, `recording()` | Event recorder. A filter keeps the events whose name contains it and installs only those. Without one every event is installed, which costs a patch each |
 | `game.dev.open_tools()` | Opens the dev tools window |
 | `game.dev.current_mod()`, `game.dev.show(value)` | The running mod's package id, a value as text |

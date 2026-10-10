@@ -7,8 +7,8 @@
 
 <div class="stats">
 <div class="stat"><span class="stat__num">105</span><span class="stat__label">kits (pawns, things, maps, factions and more)</span></div>
-<div class="stat"><span class="stat__num">568</span><span class="stat__label">typed API functions</span></div>
-<div class="stat"><span class="stat__num">88</span><span class="stat__label">named game events</span></div>
+<div class="stat"><span class="stat__num">571</span><span class="stat__label">typed API functions</span></div>
+<div class="stat"><span class="stat__num">116</span><span class="stat__label">named game events</span></div>
 <div class="stat"><span class="stat__num">434</span><span class="stat__label">in-game checks passing on Luau</span></div>
 </div>
 
@@ -70,7 +70,7 @@ The full picture, with how a mod is found, checked and loaded, is in [how RimKit
 <a class="card" href="guide/quickstart.md"><span class="card__tag">Ten minutes</span><span class="card__title">Quickstart</span><span class="card__text">Create, test and ship your first mod.</span></a>
 <a class="card" href="guide/tutorials.md"><span class="card__tag">Learn</span><span class="card__title">Tutorials</span><span class="card__text">Seven step by step mods, from a message to a custom need.</span></a>
 <a class="card" href="guide/cookbook.md"><span class="card__tag">Recipes</span><span class="card__title">Cookbook</span><span class="card__text">One working recipe for every mod idea.</span></a>
-<a class="card" href="api/events.md"><span class="card__tag">React</span><span class="card__title">Events</span><span class="card__text">88 named events with filters and typed payloads.</span></a>
+<a class="card" href="api/events.md"><span class="card__tag">React</span><span class="card__title">Events</span><span class="card__text">116 named events with filters and typed payloads.</span></a>
 <a class="card" href="api/pawns.md"><span class="card__tag">Colony</span><span class="card__title">Pawns kit</span><span class="card__text">Skills, traits, needs, thoughts, health and gear.</span></a>
 <a class="card" href="guide/troubleshooting.md"><span class="card__tag">Stuck</span><span class="card__title">Troubleshooting</span><span class="card__text">What a log line means and what to do about it.</span></a>
 </div>

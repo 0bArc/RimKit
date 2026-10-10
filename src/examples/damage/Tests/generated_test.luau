@@ -7,6 +7,14 @@ describe("damage", function()
     expect(game.test.errors()).to_be(0)
   end)
 
+  it("survives a hot reload", function()
+    game.test.start()
+    local before_pawn_damaged = game.test.subscriptions("pawn.damaged")
+    for _ = 1, 3 do expect(game.test.reload()).to_be(true) end
+    expect(game.test.errors()).to_be(0)
+    expect(game.test.subscriptions("pawn.damaged")).to_be(before_pawn_damaged)
+  end)
+
   it("pawn.damaged: handles a matching event", function()
     local subject = mock.pawn({ humanlike = true })
     game.emit.pawn_damaged(subject, { dealt = 2 })

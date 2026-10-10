@@ -1,0 +1,65 @@
+{
+  "profile": "profiles/rimworld.hlm",
+  "headless": true,
+  "set": {
+    "reflect": "True"
+  },
+  "steps": [
+    {
+      "name": "the game is up",
+      "info": true,
+      "expect": {
+        "path": "playing",
+        "equals": true
+      }
+    },
+    {
+      "name": "build a 7x7 wooden house: floor, walls, a door, a roof",
+      "eval": "local m = game.maps.current() local x0, z0, size = 120, 120, 7 local log = {} for x = x0, x0 + size - 1 do   for z = z0, z0 + size - 1 do     local edge = (x == x0 or x == x0 + size - 1 or z == z0 or z == z0 + size - 1)     local door = (z == z0 and x == x0 + 3)     if door then       game.build.instant(m, \"Door\", x, z, { stuff = \"WoodLog\" })     elseif edge then       game.build.instant(m, \"Wall\", x, z, { stuff = \"WoodLog\" })     else       game.maps.set_terrain(m, x, z, \"WoodPlankFloor\")     end     if not edge or door then end   end end for x = x0, x0 + size - 1 do for z = z0, z0 + size - 1 do game.maps.set_roof(m, x, z, \"RoofConstructed\") end end return \"built\" ",
+      "expect": {
+        "equals": "\"built\""
+      }
+    },
+    {
+      "name": "furnish it, add three colonists, food and wood",
+      "eval": "local m = game.maps.current() local out = {} local function put(def, x, z, stuff, rot)   local ok, err = pcall(game.build.instant, m, def, x, z, { stuff = stuff, rotation = rot or 0 })   out[#out + 1] = def .. \"@\" .. x .. \",\" .. z .. \"=\" .. (ok and \"ok\" or tostring(err):sub(1, 60)) end put(\"Bed\", 122, 124, nil, 0) put(\"Bed\", 124, 124, nil, 0) put(\"Table2x2c\", 122, 122, \"WoodLog\") put(\"DiningChair\", 121, 122, \"WoodLog\", 1) put(\"DiningChair\", 124, 122, \"WoodLog\", 3) put(\"TorchLamp\", 123, 125, nil) for i = 1, 3 do   local p = game.pawns.generate({ kind = \"Colonist\", faction = \"player\", map = m, x = 121 + i, z = 121 })   out[#out + 1] = \"colonist \" .. p.name end pcall(game.things.spawn_at, \"MealSimple\", m, 125, 121, { count = 30 }) pcall(game.things.spawn_at, \"WoodLog\", m, 125, 123, { count = 100 }) return table.concat(out, \"; \") ",
+      "expect": {
+        "contains": "colonist"
+      }
+    },
+    {
+      "name": "let about two game hours pass",
+      "step": 5000,
+      "expect": {
+        "path": "v.ran",
+        "equals": 5000
+      }
+    },
+    {
+      "name": "the house counts as a room and the colonists are alive",
+      "eval": "local m=game.maps.current(); local rooms={}; for _,r in ipairs(game.maps.rooms(m)) do if r.cells==25 then rooms[#rooms+1]=r.role end end; local n=0; for _,p in ipairs(game.query.pawns({map=m, faction='player'})) do n=n+1 end; return 'colonists='..n..' house='..table.concat(rooms,',')",
+      "expect": {
+        "contains": "house=Barracks"
+      }
+    },
+    {
+      "name": "save the game",
+      "call": "save.now",
+      "args": {
+        "name": "helm_civilization"
+      },
+      "expect": {
+        "path": "v",
+        "equals": "helm_civilization"
+      }
+    },
+    {
+      "name": "the save file exists",
+      "call": "save.files",
+      "expect": {
+        "contains": "helm_civilization"
+      }
+    }
+  ],
+  "shutdown": true
+}

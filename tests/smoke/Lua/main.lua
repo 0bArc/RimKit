@@ -1322,6 +1322,24 @@ local function run_phase6_tests()
     return expect_error("RK3001", function() game.dev.reload("no.such.mod") end)
   end)
 
+  -- The in-game test runner's host side. A normal start has no test environment, so nothing may quit the game or write outside RimKitTests.
+  test("dev.test_env is nil in a normal game", function() return game.dev.test_env() == nil end)
+  test("dev.quit refuses when no launcher started the game", function()
+    return expect_error("RK4001", function() game.dev.quit(0) end)
+  end)
+  test("dev.write_report refuses a path outside RimKitTests", function()
+    return expect_error("RK4001", function() game.dev.write_report("C:/Windows/rimkit_smoke_should_not_exist.json", "{}") end)
+  end)
+  test("dev.write_report writes inside RimKitTests", function()
+    local path = game.dev.write_report("smoke/report.json", "{\"ok\":true}")
+    return type(path) == "string" and path:find("RimKitTests", 1, true) ~= nil
+  end)
+  test("events.count counts handlers", function()
+    local before = game.events.count("pawn.downed")
+    game.events.on("pawn.downed", function() end)
+    return game.events.count("pawn.downed") == before + 1
+  end)
+
   test("save.migrate runs steps once and stamp records the version", function()
     local ran = {}
     local pkg = "rimkit.smoke.migrate"

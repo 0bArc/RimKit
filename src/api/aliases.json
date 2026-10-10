@@ -32,8 +32,8 @@
     { "from": "rim.hooks", "to": "game.hooks", "deprecate": false, "names": ["check_target", "check_events"] },
     { "from": "rim", "to": "game", "names": ["on_load>events.on_load", "on_tick>events.on_tick", "log>log.info", "message>ui.message"] },
     { "from": "player", "to": "game", "names": ["send_message>ui.message"] },
-    { "from": "events", "to": "game.events", "deprecate": false, "names": ["on", "off", "list"] },
-    { "from": "log", "to": "game.log", "deprecate": false, "names": ["info", "error"] },
+    { "from": "events", "to": "game.events", "deprecate": false, "names": ["on", "off", "list", "count"] },
+    { "from": "log", "to": "game.log", "deprecate": false, "names": ["info", "warn", "error"] },
     { "from": "timer", "to": "game.timer", "deprecate": false, "names": ["after"] },
     { "from": "game", "to": "game", "deprecate": false, "names": ["tick>time.ticks", "current_map>maps.current", "player_faction>factions.player"] }
   ],

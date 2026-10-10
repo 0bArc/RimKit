@@ -134,4 +134,9 @@ RIMLUA_API const char* rimlua_collect_map_float_menu(int clicked_handle, int hau
     return rimlua::Engine::instance().collect_map_float_menu(clicked_handle, hauler_handle);
 }
 
+RIMLUA_API const char* rimlua_eval(const char* code) {
+    RIMLUA_LOCK();
+    return rimlua::Engine::instance().eval_for_host(code);
+}
+
 }  // extern "C"

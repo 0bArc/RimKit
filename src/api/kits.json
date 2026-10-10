@@ -154,8 +154,13 @@
   "designator.remove",
   "dev.bundle",
   "dev.export_defs",
+  "dev.helm_active",
+  "dev.helm_publish",
   "dev.mode",
+  "dev.quit",
+  "dev.test_env",
   "dev.unregister_mod",
+  "dev.write_report",
   "dlc.active",
   "dlc.status",
   "door.hold_open",
@@ -609,6 +614,7 @@
   "save.game_version",
   "save.get",
   "save.keys",
+  "save.load",
   "save.now",
   "save.remove",
   "save.set",
@@ -701,6 +707,7 @@
   "time.set_paused",
   "time.set_speed",
   "time.speed",
+  "time.step",
   "trap.info",
   "ui.close_panel",
   "ui.float_menu",
@@ -3002,6 +3009,78 @@
      ],
      "returns": "string",
      "doc": "Writes a diagnostics folder (log, mod list, versions, profiler numbers). Nothing is sent anywhere. Returns the folder."
+    },
+    {
+     "name": "helm_publish",
+     "subject": false,
+     "keys": [
+      "event",
+      "json"
+     ],
+     "params": [
+      {
+       "name": "event",
+       "type": "string"
+      },
+      {
+       "name": "json",
+       "type": "string"
+      }
+     ],
+     "returns": "boolean",
+     "doc": "Sends an event to the Helm clients that subscribed to it. Raises RK3003 when no Helm session is running."
+    },
+    {
+     "name": "helm_active",
+     "subject": false,
+     "keys": [],
+     "params": [],
+     "returns": "boolean",
+     "doc": "Whether this game is being operated through Helm."
+    },
+    {
+     "name": "test_env",
+     "subject": false,
+     "keys": [],
+     "params": [],
+     "returns": "RimTestEnv?",
+     "doc": "The in-game test run that rimkit mod test --in-game asked for, or nil when the game was started normally."
+    },
+    {
+     "name": "write_report",
+     "subject": false,
+     "keys": [
+      "path",
+      "text"
+     ],
+     "params": [
+      {
+       "name": "path",
+       "type": "string"
+      },
+      {
+       "name": "text",
+       "type": "string"
+      }
+     ],
+     "returns": "string",
+     "doc": "Writes a test report. A relative path is inside the RimKitTests folder next to the game's config folder. The only absolute path allowed is the one the launcher passed. Returns the path."
+    },
+    {
+     "name": "quit",
+     "subject": false,
+     "keys": [
+      "code?"
+     ],
+     "params": [
+      {
+       "name": "code",
+       "type": "integer",
+       "optional": true
+      }
+     ],
+     "returns": "boolean",
+     "doc": "Closes the game with an exit code. Only works when rimkit mod test --in-game started the game."
     }
    ]
   },
@@ -10038,6 +10117,21 @@
      "doc": "Sets the speed. Accepts a name (any case) or 0 to 4. Returns the speed that was set."
     },
     {
+     "name": "step",
+     "subject": false,
+     "keys": [
+      "ticks"
+     ],
+     "params": [
+      {
+       "name": "ticks",
+       "type": "integer"
+      }
+     ],
+     "returns": "RimTimeStep",
+     "doc": "Runs game ticks now, up to 20000 per call, with the queued events and the mods' tick callbacks after each tick. The game keeps its speed and pause state. Made for tests and headless runs."
+    },
+    {
      "name": "paused",
      "subject": false,
      "keys": [],
@@ -11779,6 +11873,21 @@
      "params": [],
      "returns": "RimSaveFile[]",
      "doc": "Saved games on disk."
+    },
+    {
+     "name": "load",
+     "subject": false,
+     "keys": [
+      "name"
+     ],
+     "params": [
+      {
+       "name": "name",
+       "type": "string"
+      }
+     ],
+     "returns": "boolean",
+     "doc": "Loads a saved game by name, like the Load button. The maps and the world are replaced and the game goes through its loading screen, so wait for the tick to come back (info.playing) before the next call. Mods keep running."
     }
    ]
   }

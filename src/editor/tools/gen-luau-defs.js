@@ -306,7 +306,7 @@ for (const n of ["RimPawnRef", "RimThingRef", "RimMapRef", "RimFactionRef"]) kno
 
 const events = [];
 const seenEvents = new Set();
-for (const f of ["src/host/EventCatalog.cs", "src/host/EventCatalogMore.cs"]) {
+for (const f of ["src/host/EventCatalog.cs", "src/host/EventCatalogMore.cs", "src/host/EventCatalogWork.cs"]) {
   const file = path.join(repo, f);
   if (!fs.existsSync(file)) continue;
   for (const m of read(file).matchAll(/\bAdd\(\s*"([a-z_.]+)",\s*"((?:[^"\\]|\\.)*)",\s*(true|false)/g)) {

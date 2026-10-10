@@ -112,6 +112,8 @@ public:
     void prof_add(const std::string& mod, int kind, double us);
     void load_mod_info(const std::string& package_id, const std::string& lua_dir);
     int reload_mod(const std::string& package_id);
+    /** Reload now when no callback is running, otherwise at the start of the next tick. Returns 1 when the mod has no Lua folder. */
+    int request_reload(const std::string& package_id);
     void watch_tick();
     void set_test_mode(bool on) { test_mode_ = on; if (!on) mock_active_ = false; }
     bool test_mode() const { return test_mode_; }
@@ -124,6 +126,9 @@ public:
     void ui_invoke(int callback_id);
     // Calls a registered Lua function with a JSON argument and returns its result as JSON (empty when nil or on error).
     const char* ui_call(int callback_id, const char* arg_json);
+    /** Runs Lua text for the host (the Helm adapter): an expression is tried first, then a statement. Returns the result as text,
+     *  or "error: ..." when it failed. Valid until the next call. The text runs in the same sandbox as mods, as no mod. */
+    const char* eval_for_host(const char* code);
     /** UTF-8 "label\\tid\\n..." for map right-click options from Lua. Valid until next call. */
     const char* collect_map_float_menu(int clicked_handle, int hauler_handle);
 
@@ -234,6 +239,7 @@ private:
     std::vector<sol::protected_function> map_float_menu_handlers_;
     std::string float_menu_blob_cache_;
     std::string ui_call_cache_;
+    std::string eval_cache_;
     std::unordered_map<int, int> ui_error_counts_;
     std::vector<TimerEntry> timers_;
     // Ecosystem state.
@@ -267,6 +273,14 @@ private:
     bool dev_watch_ = false;
     int watch_counter_ = 0;
     bool in_reload_ = false;
+    int iterating_ = 0;  // loops over the tick and load callback lists that are running; a reload inside one would erase what is being walked
+    std::vector<std::string> pending_reloads_;
+    // Marks a loop over on_load_, on_tick_ or timers_ so a reload requested from inside it waits.
+    struct IterationGuard {
+        int& n;
+        explicit IterationGuard(int& counter) : n(counter) { ++n; }
+        ~IterationGuard() { --n; }
+    };
     std::vector<std::string> allowed_lua_roots_;
     int next_hook_id_ = 1;
     int next_ui_id_ = 1;

@@ -5,11 +5,11 @@ Every function under `game`. Names follow the [naming convention](naming.md).
 
 Arguments named `pawn`, `thing`, `map` accept the wrapped object (`RimPawn`, `RimThing`, `RimMap`) or its integer handle. Functions that act on a pawn take it as the first argument.
 
-Coverage: 473 of 756 functions are called by the smoke or native tests and are marked **Tested**.
+Coverage: 477 of 775 functions are called by the smoke or native tests and are marked **Tested**.
 
 The rest of the surface: [types](types.md) (every table shape a function returns or takes), [events](events.md), [tweaks](tweaks.md), [Lua classes](classes.md), [host operations](ops.md) (what each function sends to the game) and the [CLI reference](../guide/cli.md).
 
-Domains: [ai](#ai), [alerts](#alerts), [Anomaly (DLC)](#anomaly-dlc), [areas](#areas), [Audio](#audio), [bills](#bills), [biotech](#biotech), [build](#build), [Buildings](#buildings), [Camera](#camera), [classes](#classes), [combat](#combat), [conditions](#conditions), [Config](#config), [Control](#control), [Defs](#defs), [designators](#designators), [dev](#dev), [dlc](#dlc), [doors](#doors), [economy](#economy), [effects](#effects), [Events](#events), [Factions](#factions), [generation](#generation), [gizmos](#gizmos), [graphics](#graphics), [Hooks (Harmony)](#hooks-harmony), [hud](#hud), [ideology](#ideology), [Incidents](#incidents), [Input](#input), [interop](#interop), [Inventory](#inventory), [Jobs](#jobs), [json](#json), [Logging](#logging), [Maps](#maps), [materials](#materials), [mods](#mods), [needs](#needs), [odyssey](#odyssey), [options](#options), [patch](#patch), [Paths and movement](#paths-and-movement), [Pawns](#pawns), [plants](#plants), [power](#power), [profiler](#profiler), [Queries](#queries), [quests](#quests), [raids](#raids), [research](#research), [royalty](#royalty), [save](#save), [Saved data](#saved-data), [scenarios](#scenarios), [Selection](#selection), [stats](#stats), [storyteller](#storyteller), [tabs](#tabs), [test](#test), [Things](#things), [Time](#time), [Timers](#timers), [traps](#traps), [Typed reflection (Advanced)](#typed-reflection-advanced), [UI](#ui), [Utilities](#utilities), [Version](#version), [Weather](#weather), [widgets](#widgets), [Work](#work), [World](#world).
+Domains: [ai](#ai), [alerts](#alerts), [Anomaly (DLC)](#anomaly-dlc), [areas](#areas), [Audio](#audio), [bills](#bills), [biotech](#biotech), [build](#build), [Buildings](#buildings), [Camera](#camera), [classes](#classes), [combat](#combat), [conditions](#conditions), [Config](#config), [Control](#control), [Defs](#defs), [designators](#designators), [dev](#dev), [dlc](#dlc), [doors](#doors), [economy](#economy), [effects](#effects), [Events](#events), [Factions](#factions), [generation](#generation), [gizmos](#gizmos), [graphics](#graphics), [Hooks (Harmony)](#hooks-harmony), [hud](#hud), [ideology](#ideology), [Incidents](#incidents), [Input](#input), [interop](#interop), [Inventory](#inventory), [itest](#itest), [Jobs](#jobs), [json](#json), [Logging](#logging), [Maps](#maps), [materials](#materials), [mods](#mods), [needs](#needs), [odyssey](#odyssey), [options](#options), [patch](#patch), [Paths and movement](#paths-and-movement), [Pawns](#pawns), [plants](#plants), [power](#power), [profiler](#profiler), [Queries](#queries), [quests](#quests), [raids](#raids), [research](#research), [royalty](#royalty), [save](#save), [Saved data](#saved-data), [scenarios](#scenarios), [Selection](#selection), [stats](#stats), [storyteller](#storyteller), [tabs](#tabs), [test](#test), [Things](#things), [Time](#time), [Timers](#timers), [traps](#traps), [Typed reflection (Advanced)](#typed-reflection-advanced), [UI](#ui), [Utilities](#utilities), [Version](#version), [Weather](#weather), [widgets](#widgets), [Work](#work), [World](#world).
 
 ## ai
 
@@ -258,8 +258,11 @@ Kit page: [selection and camera](selection.md).
 | `game.dev.current_mod` | | `string` | Package id of the mod whose Lua is running. |
 | `game.dev.eval` |`code` | `boolean` ok, `string` text | Evaluates a Lua expression or statement. Needs Development mode and the "dev" capability. Returns ok and the result as text. |
 | `game.dev.export_defs` |`path` | `string` | Writes every def name by def type to a JSON file for the editor's name completion. Returns the path. Tested. |
+| `game.dev.helm_active` | | `boolean` | Whether this game is being operated through Helm. |
+| `game.dev.helm_publish` |`event, json` | `boolean` | Sends an event to the Helm clients that subscribed to it. Raises RK3003 when no Helm session is running. |
 | `game.dev.mode` | | `boolean` | Whether Development mode is on. Tested. |
 | `game.dev.open_tools` | | `boolean` | Opens the dev tools window (Development mode only). |
+| `game.dev.quit` |`code` | `boolean` | Closes the game with an exit code. Only works when rimkit mod test --in-game started the game. Tested. |
 | `game.dev.record_clear` | | `boolean` | Tested. |
 | `game.dev.record_log` | | `table[]` | Tested. |
 | `game.dev.record_start` |`filter` | `boolean` | Starts recording every named event with its tick. filter keeps only events whose name contains it. Tested. |
@@ -268,7 +271,9 @@ Kit page: [selection and camera](selection.md).
 | `game.dev.reload` |`package_id` | `boolean` | Reloads a mod's Lua now. Needs the "dev" capability. Tested. |
 | `game.dev.run` |`name` | `boolean` ok, `string?` error | Tested. |
 | `game.dev.show` |`value` | `string` |  |
+| `game.dev.test_env` | | `RimTestEnv?` | The in-game test run that rimkit mod test --in-game asked for, or nil when the game was started normally. Tested. |
 | `game.dev.watch` |`on` | `boolean` | Reload a mod's Lua when its files change. |
+| `game.dev.write_report` |`path, text` | `string` | Writes a test report. A relative path is inside the RimKitTests folder next to the game's config folder. The only absolute path allowed is the one the launcher passed. Returns the path. Tested. |
 
 ## dlc
 
@@ -319,6 +324,7 @@ Named events: [events](events.md).
 
 | Function | Parameters | Returns | Notes |
 |----------|------------|---------|-------|
+| `game.events.count` |`name, mod` | `integer` | How many handlers listen to an event, or how many of one mod's when a package id is given. Tested. |
 | `game.events.list` | | `RimEventInfo[]` | Tested. |
 | `game.events.off` |`name` |  | Tested. |
 | `game.events.on` |`name, fn` |  | Canonical names ("pawn.died") receive one payload table and install their Harmony patch on first use. Legacy names ("pawn_died") receive a RimPawn. Tested. |
@@ -496,6 +502,19 @@ Guide: [hooks](hooks.md). Advanced tier.
 | `game.inventory.count_def` |`pawn, def` | `integer` | How many of a thing def the pawn carries. Tested. |
 | `game.inventory.drop_carried` |`pawn` | `boolean` | Drops what the pawn is carrying. |
 
+## itest
+
+| Function | Parameters | Returns | Notes |
+|----------|------------|---------|-------|
+| `game.itest.abort` | | `boolean` | Stops the active run without a report. |
+| `game.itest.load` |`package_id` | `integer` | Loads the tests in <mod>/Tests/Game. Needs Development mode. Returns the number of files. |
+| `game.itest.progress` | | `{` done: integer, total: integer }? |  |
+| `game.itest.report` | | `table?` | The report of the newest finished run: pass, fail, skip and a row per test. |
+| `game.itest.run` |`opts` | `boolean` |  |
+| `game.itest.running` | | `boolean` |  |
+| `game.itest.suite` |`name, body` | `RimTestSuite` | Declares a suite of tests that run in the real game. Use it in Tests/Game/*.luau. `body?`: RimTestSuite) |
+| `game.itest.suites` | | `{` name: string, mod: string, tests: integer }[] |  |
+
 ## Jobs
 
 Kit page: [jobs](jobs.md).
@@ -535,6 +554,7 @@ Kit page: [jobs](jobs.md).
 |----------|------------|---------|-------|
 | `game.log.error` |`msg` |  |  |
 | `game.log.info` |`msg` |  |  |
+| `game.log.warn` |`msg` |  |  |
 
 ## Maps
 
@@ -912,6 +932,7 @@ Kit page: [queries](query.md).
 | `game.save.game_version` | | `RimGameVersions` | The running game version and the version that wrote the loaded save. Tested. |
 | `game.save.get` |`package_id, scope, key, h` | `string?` | Raw string stored by a mod. Scope is game, map or world. Prefer fetch. Tested. |
 | `game.save.keys` |`package_id, scope, h` | `string[]` | The keys a mod stored in a scope. Tested. |
+| `game.save.load` |`name` | `boolean` | Loads a saved game by name, like the Load button. The maps and the world are replaced and the game goes through its loading screen, so wait for the tick to come back (info.playing) before the next call. Mods keep running. |
 | `game.save.migrate` |`package_id, steps` | `integer` version | Runs the migration steps after the data version stored in the save, in order. steps[2] upgrades version 1 to 2. Tested. |
 | `game.save.now` |`name` | `string` | Saves the game under a name and returns the name. |
 | `game.save.purge` |`package_id` | `integer` | Removes everything a mod stored in the game and world scopes. Returns how many keys. Tested. |
@@ -1010,9 +1031,11 @@ Kit page: [selection and camera](selection.md).
 | `game.test.logged` |`part` | `boolean` |  |
 | `game.test.logs` | | `string[]` | Messages the mod logged or showed during the current test. |
 | `game.test.mock` |`op, answer` |  | Replaces what the host answers for an op. A function gets the argument table, any other value is returned as is. Tested. |
+| `game.test.reload` |`package_id` | `boolean` | Runs the mod's Lua again, as game.dev.reload does in the game. Returns true when it loaded without errors. Without a package id it reloads the only mod under test. |
 | `game.test.reset_mocks` | |  |  |
 | `game.test.run` | | `integer` failures |  |
 | `game.test.start` | |  | Runs the mod's on_load handlers. |
+| `game.test.subscriptions` |`event` | `integer` | How many Lua handlers hold the host patch behind an event. After a reload it must not grow. |
 | `game.test.tick` |`n` |  |  |
 | `game.test.tweak` |`name` | `function?` | The function a mod gave to game.tweaks.on. |
 
@@ -1042,6 +1065,7 @@ Kit page: [time](time.md).
 | `game.time.set_paused` |`paused` | `boolean` | Pauses or unpauses. Returns the state after the call. |
 | `game.time.set_speed` |`speed` | `string` | Sets the speed. Accepts a name (any case) or 0 to 4. Returns the speed that was set. Tested. |
 | `game.time.speed` | | `string` | Current game speed: Paused, Normal, Fast, Superfast or Ultrafast. Tested. |
+| `game.time.step` |`ticks` | `RimTimeStep` | Runs game ticks now, up to 20000 per call, with the queued events and the mods' tick callbacks after each tick. The game keeps its speed and pause state. Made for tests and headless runs. |
 | `game.time.ticks` | | `integer` | Tested. |
 
 ## Timers

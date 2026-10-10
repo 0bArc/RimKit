@@ -21,13 +21,14 @@ game.timer.after(600, function()
 end)
 ```
 
-`mode`, `export_defs` and `bundle` are kit functions below. The others are written in Lua:
+`mode`, `export_defs`, `bundle`, `test_env`, `write_report` and `quit` are kit functions below. The last three belong to the in-game test launcher. The others are written in Lua:
 
 | Function | What it does |
 |----------|--------------|
 | `game.dev.action(name, fn, description?)`, `actions()`, `run(name)` | Debug actions |
 | `game.dev.eval(code)` | Runs a Lua expression or statement and returns `ok, text`. Needs Development mode and the `dev` capability |
-| `game.dev.watch(on)`, `game.dev.reload(package_id)` | Hot reload |
+| `game.dev.watch(on)`, `game.dev.reload(package_id)` | Hot reload, see [hot reload](../guide/hot-reload.md) |
+| `game.itest.suite(name)`, `load(package_id)`, `run(opts)`, `abort()`, `running()`, `progress()`, `report()`, `suites()` | Tests that run inside the real game, see [testing in the game](../guide/testing.md#testing-in-the-game) |
 | `game.dev.record_start(filter?)`, `record_stop()`, `record_log()`, `record_clear()`, `recording()` | Event recorder. A filter keeps the events whose name contains it and installs only those. Without one every event is installed, which costs a patch each |
 | `game.dev.open_tools()` | Opens the dev tools window |
 | `game.dev.current_mod()`, `game.dev.show(value)` | The running mod's package id, a value as text |
@@ -40,3 +41,8 @@ end)
 | `game.dev.mode` |  | `boolean` | Whether Development mode is on. |
 | `game.dev.export_defs` | `path?` | `string` | Writes every def name by def type to a JSON file for the editor's name completion. Returns the path. |
 | `game.dev.bundle` | `profile?, path?` | `string` | Writes a diagnostics folder (log, mod list, versions, profiler numbers). Nothing is sent anywhere. Returns the folder. |
+| `game.dev.helm_publish` | `event, json` | `boolean` | Sends an event to the Helm clients that subscribed to it. Raises RK3003 when no Helm session is running. |
+| `game.dev.helm_active` |  | `boolean` | Whether this game is being operated through Helm. |
+| `game.dev.test_env` |  | `RimTestEnv?` | The in-game test run that rimkit mod test --in-game asked for, or nil when the game was started normally. |
+| `game.dev.write_report` | `path, text` | `string` | Writes a test report. A relative path is inside the RimKitTests folder next to the game's config folder. The only absolute path allowed is the one the launcher passed. Returns the path. |
+| `game.dev.quit` | `code?` | `boolean` | Closes the game with an exit code. Only works when rimkit mod test --in-game started the game. |

@@ -8,7 +8,7 @@
   </supportedVersions>
   <packageId>stratware.tameanomalies</packageId>
   <modVersion>0.2.0</modVersion>
-  <description>Recruit anomaly entities into a commandable army (F6, or right-click with a colonist), capture them on holding platforms, and release them (F7). Needs the Anomaly DLC and RimKit.</description>
+  <description>Recruit anomaly entities into a commandable army ([ key, or right-click with a colonist), capture them on holding platforms, and release them (] key). Needs the Anomaly DLC and RimKit.</description>
   <modDependencies>
     <li>
       <packageId>brrainz.harmony</packageId>

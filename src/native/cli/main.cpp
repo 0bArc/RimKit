@@ -23,16 +23,18 @@ static void usage() {
         << "rimkit - RimKit CLI\n\n"
         << "  rimkit init [name]              Init Lua mod in cwd (or ./name)\n"
         << "  rimkit build                    Build native core + C# host\n"
+        << "  rimkit update [--check] [--release] [--deploy dir]  Regenerate and verify generated files; --release rewrites the allowlist (RimKit repository)\n"
         << "  rimkit mod create <name> [dir]  Create Lua mod folder\n"
         << "  rimkit mod sync [path]          meta.lua -> About/About.xml, Defs/*.lua and Languages/**/*.lua -> XML\n"
         << "  rimkit mod defs [dir]           Only the Lua to XML step, for a folder with no meta.lua\n"
         << "  rimkit mod ship [path] [mods]   Sync + copy mod into RimWorld Mods/\n"
         << "  rimkit mod check [path]         Validate meta, Lua, Defs, patches, textures and translation keys\n"
-        << "  rimkit mod test [path]          Run Tests/*.luau against a mock host (no game needed)\n"
+        << "  rimkit mod test [path]          Run Tests/*.luau against a mock host (no game needed), or --in-game to run Tests/Game in a real game\n"
         << "  rimkit mod gen-tests [path]     Write Tests/generated_test.luau from the events the mod registers (--force to overwrite)\n"
         << "  rimkit mod assets [path] [--fix]  Check the Workshop preview and mod icon, make placeholders\n"
         << "  rimkit mod i18n <cmd> [path]    extract | missing <lang> | export <lang> | import <lang> <csv>\n"
         << "  rimkit mod release-check [path] Checklist before publishing: version, changelog, licence, credits, assets\n"
+        << "  rimkit mod conform [path]       Check the mod against the RimKit Standard and print its level, 0 to 3 (--level, --report)\n"
         << "  rimkit publish [path]           Upload to the Steam Workshop (--note, --user, --steamcmd, --dry-run)\n"
         << "  rimkit diag [--fresh]           Zip the log, mod list and profiler numbers for a bug report (no network)\n"
         << "  rimkit help\n";
@@ -1040,6 +1042,13 @@ static fs::path find_harmony_dll() {
 }
 
 static int regenerate_allowlist(const fs::path& root) {
+    // release.js is the one place that knows every hash (host, native, Harmony and the per-platform Helm library).
+    // This function is only the fallback for a machine without Node.js.
+    const fs::path release_js = root / "infrastructure" / "tools" / "release.js";
+    if (fs::exists(release_js) && std::system("node --version >nul 2>&1") == 0) {
+        const std::string cmd = "node \"" + release_js.string() + "\"";
+        return std::system(cmd.c_str()) == 0 ? 0 : 1;
+    }
     fs::path pkg = kit_package_dir(root);
     fs::path host = pkg / "Assemblies" / "RimLuaHost.dll";
     fs::path native = pkg / "Native" / "rimlua_core.dll";
@@ -1135,6 +1144,98 @@ static int cmd_build() {
         return rc;
     }
     return regenerate_allowlist(root);
+}
+
+// rimkit update: brings every generated file and, with --release, the release files up to date. It is for the people who work on
+// RimKit itself, and runs the node tools in infrastructure/tools from the repository root. Nothing is copied into the game
+// unless --deploy <folder> is given.
+//   rimkit update                    version sync, kit table, generated docs and stubs, lints
+//   rimkit update --check            the same, but only checks (exit 1 when something is out of date), writes nothing
+//   rimkit update --release          also writes mod/Auth/allowlist.json from the built files (release.js) and verifies it
+//   rimkit update --release --deploy <folder>   also copies mod/ to the folder and verifies the copy
+static int cmd_update(int argc, char** argv) {
+    const fs::path root = kit_root_from_exe();
+    const fs::path tools = root / "infrastructure" / "tools";
+    if (!fs::exists(tools / "release.js")) {
+        std::cerr << "rimkit update works inside the RimKit repository (infrastructure/tools/release.js not found under " << root.string() << ").\n";
+        return 2;
+    }
+    if (std::system("node --version >nul 2>&1") != 0) {
+        std::cerr << "rimkit update needs Node.js on the PATH.\n";
+        return 2;
+    }
+    bool check = false, release = false;
+    std::string deploy;
+    for (int i = 2; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "--check") check = true;
+        else if (a == "--release") release = true;
+        else if (a == "--deploy" && i + 1 < argc) deploy = argv[++i];
+        else {
+            std::cerr << "Unknown option " << a << ". See: rimkit help\n";
+            return 2;
+        }
+    }
+    if (!deploy.empty() && !release) {
+        std::cerr << "--deploy needs --release, a deployed copy must match its allowlist.\n";
+        return 2;
+    }
+
+    struct Step {
+        const char* script;
+        const char* write_flags;   // arguments when updating
+        const char* check_flags;   // arguments when only checking, nullptr when the tool has no check mode
+    };
+    const Step steps[] = {
+        {"check-version.js", "--fix", ""},
+        {"build-kits.js", "", "--check"},
+        {"gen-lua-classes.js", "", "--check"},
+        {"gen-tweaks.js", "", "--check"},
+        {"gen-kit-pages.js", "", "--check"},
+        {"gen-events-doc.js", "", "--check"},
+        {"gen-changes.js", "", "--check"},
+        {"gen-api-reference.js", "", nullptr},
+        {"gen-ops-doc.js", "", nullptr},
+        {"gen-cli-doc.js", "", "--check"},
+        {"gen-api-details.js", "", nullptr},
+        {"gen-api-types.js", "", nullptr},
+        {"gen-hook-targets.js", "", "--check"},
+        {"check-ops.js", "", ""},
+        {"check-editor.js", "", ""},
+        {"check-docs.js", "", ""},
+    };
+    int failed = 0;
+    for (const Step& s : steps) {
+        const char* flags = check ? s.check_flags : s.write_flags;
+        if (!flags) continue;   // no check mode: the tool only writes, and the lints below catch what it would change
+        const std::string cmd = "node \"" + (tools / s.script).string() + "\" " + flags;
+        std::cout << "update: " << s.script << (*flags ? std::string(" ") + flags : std::string()) << "\n";
+        if (std::system(cmd.c_str()) != 0) {
+            std::cerr << "update: " << s.script << " failed\n";
+            ++failed;
+        }
+    }
+    {
+        const std::string luau = std::string("node \"") + (root / "src" / "editor" / "tools" / "gen-luau-defs.js").string() + "\"" + (check ? " --check" : "");
+        std::cout << "update: gen-luau-defs.js" << (check ? " --check" : "") << "\n";
+        if (std::system(luau.c_str()) != 0) {
+            std::cerr << "update: gen-luau-defs.js failed\n";
+            ++failed;
+        }
+    }
+    if (release || check) {
+        // --check always verifies the release files that exist. --release rewrites the allowlist first.
+        std::string cmd = "node \"" + (tools / "release.js").string() + "\"";
+        if (check || !release) cmd += " --verify";
+        if (!deploy.empty()) cmd += " --deploy \"" + deploy + "\"";
+        std::cout << "update: release.js" << (check || !release ? " --verify" : "") << "\n";
+        if (std::system(cmd.c_str()) != 0) {
+            std::cerr << "update: release.js failed. Build the native core and the host first (rimkit build), the hashes must be of the built files.\n";
+            ++failed;
+        }
+    }
+    std::cout << "update: " << (failed == 0 ? "everything is up to date" : std::to_string(failed) + " step(s) failed") << "\n";
+    return failed == 0 ? 0 : 1;
 }
 
 static int cmd_init(int argc, char** argv) {
@@ -1352,7 +1453,7 @@ static int cmd_mod(int argc, char** argv) {
         }
         dir = resolve_ship_dir(dir);
     };
-    if (sub == "test" || sub == "gen-tests" || sub == "assets" || sub == "release-check" || sub == "publish") {
+    if (sub == "test" || sub == "gen-tests" || sub == "assets" || sub == "release-check" || sub == "conform" || sub == "publish") {
         fs::path dir;
         std::vector<std::string> rest;
         split(3, dir, rest);
@@ -1363,6 +1464,7 @@ static int cmd_mod(int argc, char** argv) {
         }
         if (sub == "assets") return rkcli::cmd_assets(dir, rest);
         if (sub == "release-check") return rkcli::cmd_release_check(dir);
+        if (sub == "conform") return rkcli::cmd_conform(dir, rest);
         if (sync_mod(dir) != 0) return 1;
         return rkcli::cmd_publish(dir, rest);
     }
@@ -1394,6 +1496,9 @@ int main(int argc, char** argv) {
     }
     if (cmd == "init") {
         return cmd_init(argc, argv);
+    }
+    if (cmd == "update") {
+        return cmd_update(argc, argv);
     }
     if (cmd == "build") {
         return cmd_build();

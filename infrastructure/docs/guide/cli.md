@@ -9,16 +9,18 @@
 |---------|--------------|
 | `rimkit init [name]` | Init Lua mod in cwd (or ./name) |
 | `rimkit build` | Build native core + C# host |
+| `rimkit update [--check] [--release] [--deploy dir]` | Regenerate and verify generated files; --release rewrites the allowlist (RimKit repository) |
 | `rimkit mod create <name> [dir]` | Create Lua mod folder |
 | `rimkit mod sync [path]` | meta.lua -> About/About.xml, Defs/*.lua and Languages/**/*.lua -> XML |
 | `rimkit mod defs [dir]` | Only the Lua to XML step, for a folder with no meta.lua |
 | `rimkit mod ship [path] [mods]` | Sync + copy mod into RimWorld Mods/ |
 | `rimkit mod check [path]` | Validate meta, Lua, Defs, patches, textures and translation keys |
-| `rimkit mod test [path]` | Run Tests/*.luau against a mock host (no game needed) |
+| `rimkit mod test [path]` | Run Tests/*.luau against a mock host (no game needed), or --in-game to run Tests/Game in a real game |
 | `rimkit mod gen-tests [path]` | Write Tests/generated_test.luau from the events the mod registers (--force to overwrite) |
 | `rimkit mod assets [path] [--fix]` | Check the Workshop preview and mod icon, make placeholders |
 | `rimkit mod i18n <cmd> [path]` | extract \| missing <lang> \| export <lang> \| import <lang> <csv> |
 | `rimkit mod release-check [path]` | Checklist before publishing: version, changelog, licence, credits, assets |
+| `rimkit mod conform [path]` | Check the mod against the RimKit Standard and print its level, 0 to 3 (--level, --report) |
 | `rimkit publish [path]` | Upload to the Steam Workshop (--note, --user, --steamcmd, --dry-run) |
 | `rimkit diag [--fresh]` | Zip the log, mod list and profiler numbers for a bug report (no network) |
 | `rimkit help` | Print this list |
@@ -32,6 +34,17 @@
 | `meta.lua` | `About/About.xml`, `About/RimKit.json` (capabilities, API level, budget) and `LoadFolders.xml` for `version_folders` |
 | `Defs/*.lua` | `Defs/*.xml` next to each file, see [Defs in Lua](defs-xml.md#defs-in-lua) |
 | `Languages/*/Keyed/*.lua` | `Languages/*/Keyed/*.xml`, see [Strings in Lua](defs-xml.md#strings-in-lua) |
+
+## Maintaining RimKit itself
+
+`rimkit update` is for people who work on this repository. It needs Node.js and runs the tools in `infrastructure/tools`:
+
+| Command | What it does |
+|---------|--------------|
+| `rimkit update` | Fixes the version in every file from `src/api/VERSION`, rebuilds the kit table, regenerates the docs, stubs and change log, and runs the lints |
+| `rimkit update --check` | The same, but only checks. Exits 1 when something is out of date and writes nothing. Use it in CI |
+| `rimkit update --release` | Also writes `mod/Auth/allowlist.json` from the built files and verifies it (`release.js`). Run `rimkit build` first, the hashes must be of the built files |
+| `rimkit update --release --deploy <folder>` | Also copies `mod/` to the folder and verifies the copy. It never guesses a folder: nothing is copied into the game unless you name it |
 
 ## Environment
 

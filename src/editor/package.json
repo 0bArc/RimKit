@@ -2,7 +2,7 @@
   "name": "rimkit",
   "displayName": "RimKit (RimWorld Lua)",
   "description": "Completions, def name completion from the running game, go to definition, tests, release checks, deprecation warnings with quick fixes, Lua API stubs and auto-ship for RimKit mods.",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "publisher": "stratware",
   "engines": {
     "vscode": "^1.85.0"

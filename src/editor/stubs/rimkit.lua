@@ -210,6 +210,12 @@ events = {}
 function events.on(name, fn) end
 ---@param name string
 function events.off(name) end
+
+--- How many handlers listen to an event, or how many of one mod's when a package id is given.
+---@param name string
+---@param mod? string
+---@return integer
+function events.count(name, mod) end
 --[[@experimental]]
 ---@return RimEventInfo[]
 function events.list() end
@@ -217,6 +223,8 @@ function events.list() end
 log = {}
 ---@param msg string
 function log.info(msg) end
+---@param msg string
+function log.warn(msg) end
 ---@param msg string
 function log.error(msg) end
 
@@ -233,7 +241,7 @@ game.anomalies = {}
 
 --[[@stable]]
 ---@class RimKitModule
----@field version string RimKit version, for example 0.10.0
+---@field version string RimKit version, for example 0.11.0
 ---@field api_level integer API level of the running RimKit
 ---@field stable table Names of the stable functions
 ---@field experimental table Names of the experimental functions
@@ -1124,6 +1132,82 @@ function game.test.capture() end
 
 ---@return integer failures
 function game.test.run() end
+
+--- Runs the mod's Lua again, as game.dev.reload does in the game. Returns true when it loaded without errors. Without a package id it reloads the only mod under test.
+---@param package_id? string
+---@return boolean
+function game.test.reload(package_id) end
+
+--- How many Lua handlers hold the host patch behind an event. After a reload it must not grow.
+---@param event string
+---@return integer
+function game.test.subscriptions(event) end
+
+-- Tests that run inside the real game (Tests/Game/*.luau), started with rimkit mod test --in-game or game.itest.run.
+---@class RimTestContext
+---@field expect fun(value: any): RimExpect
+---@field log fun(text: any)
+---@field ticks fun(): integer
+---@field cleanup fun(fn: function)
+---@field skip fun(reason?: string)
+---@field fail fun(message: string)
+---@field map fun(): RimMap
+---@field center fun(): integer, integer
+---@field spawn fun(def: string, x: integer, z: integer, opts?: table): RimThing
+---@field spawn_pawn fun(opts?: { kind?: string, faction?: string, gender?: string, age?: number, x?: integer, z?: integer }): RimPawn
+---@field wait_ticks fun(n?: integer)
+---@field wait_until fun(pred: fun(): boolean, timeout_ticks?: integer, message?: string)
+---@field watch fun(event: string, filter?: table): table[]
+---@field wait_event fun(event: string, filter?: table, timeout_ticks?: integer): table
+---@field set_speed fun(name: string)
+
+---@class RimTestSuite
+---@field test fun(name: string, fn: fun(t: RimTestContext), opts?: { max_frames?: integer })
+---@field skip fun(name: string, reason?: string)
+---@field before_each fun(fn: fun(t: RimTestContext))
+---@field after_each fun(fn: fun(t: RimTestContext))
+
+---@class RimTestRun
+---@field mods? string[] Package ids whose tests to run. Without it every loaded suite runs
+---@field filter? string Only tests whose suite and name contain this text
+---@field report? string File for the JSON report
+---@field quit? boolean Close the game when done (only when the launcher started it)
+---@field max_frames? integer Frames a single test may take, 18000 by default
+---@field on_done? fun(report: table)
+
+game.itest = game.itest or {}
+
+--- Declares a suite of tests that run in the real game. Use it in Tests/Game/*.luau.
+---@param name string
+---@param body? fun(suite: RimTestSuite)
+---@return RimTestSuite
+function game.itest.suite(name, body) end
+
+--- Loads the tests in <mod>/Tests/Game. Needs Development mode. Returns the number of files.
+---@param package_id string
+---@return integer
+function game.itest.load(package_id) end
+
+---@param opts? RimTestRun
+---@return boolean
+function game.itest.run(opts) end
+
+--- Stops the active run without a report.
+---@return boolean
+function game.itest.abort() end
+
+---@return boolean
+function game.itest.running() end
+
+---@return { done: integer, total: integer }?
+function game.itest.progress() end
+
+--- The report of the newest finished run: pass, fail, skip and a row per test.
+---@return table?
+function game.itest.report() end
+
+---@return { name: string, mod: string, tests: integer }[]
+function game.itest.suites() end
 
 -- Defs written in Lua (Defs/*.lua). rimkit mod sync turns the calls into Def XML, see docs/guide/defs-xml.md.
 ---@param kind string The Def type, for example "ThingDef"

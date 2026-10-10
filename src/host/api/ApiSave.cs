@@ -26,6 +26,7 @@ namespace RimKit
             R("save.set_autosave_interval", SetAutosaveInterval);
             R("save.now", SaveNow);
             R("save.files", SaveFiles);
+            ApiRegistry.Register("save.load", a => LoadSave(a), "advanced", "0.11.0");
             R("save.forget_thing", ForgetThing);
         }
 
@@ -197,6 +198,23 @@ namespace RimKit
             if (!name.All(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_')) return Fail("RK1001", "name may only contain letters, digits, dash and underscore");
             GameDataSaveLoader.SaveGame(name);
             return OkStr(name);
+        }
+
+        // Starts loading a save the way the Load button does. It returns at once, the loading screen runs over the next frames.
+        private static string LoadSave(Dictionary<string, string> a)
+        {
+            string name = Str(a, "name");
+            if (string.IsNullOrEmpty(name) || !name.All(ch => char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' || ch == ' '))
+                return Fail("RK1001", "name may only contain letters, digits, space, dash and underscore");
+            if (!File.Exists(GenFilePaths.FilePathForSavedGame(name))) return Fail("RK3001", "no save named " + name);
+            LongEventHandler.QueueLongEvent(delegate
+            {
+                Verse.Profile.MemoryUtility.ClearAllMapsAndWorld();
+                Current.Game = new Game();
+                Current.Game.InitData = new GameInitData();
+                Current.Game.InitData.gameToLoad = name;
+            }, "Play", "LoadingLongEvent", true, null);
+            return OkBool(true);
         }
 
         private static string SaveFiles(Dictionary<string, string> a)

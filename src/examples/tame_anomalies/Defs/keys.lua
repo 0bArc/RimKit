@@ -2,11 +2,11 @@
 def("KeyBindingDef", "RimLua_TameAnomalyClaim", {
   label = "Tame Anomalies: recruit selected",
   category = "Game",
-  defaultKeyCodeA = "F6",
+  defaultKeyCodeA = "LeftBracket",
 })
 
 def("KeyBindingDef", "RimLua_TameAnomalyRelease", {
   label = "Tame Anomalies: release recruited",
   category = "Game",
-  defaultKeyCodeA = "F7",
+  defaultKeyCodeA = "RightBracket",
 })

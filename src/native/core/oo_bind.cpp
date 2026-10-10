@@ -663,11 +663,35 @@ end)");
         if (it == event_handlers_.end()) {
             return;
         }
-        const size_t count = it->second.size();
-        event_handlers_.erase(it);
+        // Only this mod's handlers go. Another mod listening to the same event keeps its own.
+        const std::string owner = current_mod_;
+        auto mine = [&](const ModFn& f) { return f.mod == owner; };
+        auto cut = std::remove_if(it->second.begin(), it->second.end(), mine);
+        const size_t count = static_cast<size_t>(it->second.end() - cut);
+        it->second.erase(cut, it->second.end());
+        if (it->second.empty()) {
+            event_handlers_.erase(it);
+        }
         for (size_t i = 0; i < count; ++i) {
             unsubscribe_named_event(name);
         }
+    };
+    // How many handlers listen to an event, for one mod when a package id is given. Useful in tests of hot reload.
+    events["count"] = [this](const std::string& requested, sol::optional<std::string> mod) {
+        auto it = event_handlers_.find(canonical_event_name(requested));
+        if (it == event_handlers_.end()) {
+            return 0;
+        }
+        if (!mod) {
+            return static_cast<int>(it->second.size());
+        }
+        int n = 0;
+        for (const ModFn& f : it->second) {
+            if (f.mod == *mod) {
+                ++n;
+            }
+        }
+        return n;
     };
     events["list"] = [this]() {
         sol::table out = lua_->create_table();
@@ -679,6 +703,12 @@ end)");
     logt["info"] = [this](const std::string& msg) {
         if (callbacks_.log) {
             callbacks_.log(msg.c_str());
+        }
+    };
+    logt["warn"] = [this](const std::string& msg) {
+        if (callbacks_.log) {
+            std::string m = "[warn] " + msg;
+            callbacks_.log(m.c_str());
         }
     };
     logt["error"] = [this](const std::string& msg) {

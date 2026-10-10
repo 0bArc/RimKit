@@ -177,6 +177,38 @@ function dev.actions()
   return out
 end
 
+-- A hot reload drops what the old version of a mod published or added, so a name the new version no longer uses does not linger.
+function dev.forget_mod(mod)
+  for name, a in pairs(actions) do if a.mod == mod then actions[name] = nil end end
+  if game.interop and game.interop.unpublish_mod then game.interop.unpublish_mod(mod) end
+  if game.itest and game.itest.forget_mod then game.itest.forget_mod(mod) end
+end
+
+-- Helm: sends the events a client asked for. A pattern is a name, "prefix.*" or "*". Each event gets one handler, the first time
+-- somebody wants it, and the handler publishes only while somebody still does. "*" installs every event patch, so use it on purpose.
+local helm_wanted, helm_hooked = {}, {}
+function dev.helm_watch(pattern, on)
+  if type(pattern) ~= "string" then return false end
+  local prefix = nil
+  if pattern == "*" then prefix = "" elseif pattern:sub(-1) == "*" then prefix = pattern:sub(1, -2) end
+  for _, e in ipairs(game.events.list()) do
+    local name = type(e) == "table" and e.name or e
+    if name == pattern or (prefix and name:sub(1, #prefix) == prefix) then
+      helm_wanted[name] = math.max(0, (helm_wanted[name] or 0) + (on and 1 or -1))
+      if on and not helm_hooked[name] then
+        helm_hooked[name] = true
+        game.events.on(name, function(payload)
+          if (helm_wanted[name] or 0) <= 0 then return end
+          local ok, text = pcall(game.json.encode, payload)
+          if not ok then text = game.json.encode({ text = game.dev.show(payload) }) end
+          pcall(game.dev.helm_publish, name, text)
+        end)
+      end
+    end
+  end
+  return true
+end
+
 function dev.run(name)
   local a = actions[name]
   if not a then error("RK3001: no debug action " .. tostring(name), 2) end
@@ -239,6 +271,337 @@ function dev.record_stop() recording = false return #recorded end
 function dev.record_log() return recorded end
 function dev.record_clear() recorded = {} return true end
 function dev.recording() return recording end
+)LUA";
+
+// game.itest: tests that run inside the real game (docs/guide/testing.md, "Testing in the game").
+const char* kItestLua = R"LUA(
+local game = game
+local itest = {}
+local suites = {}          -- every suite registered by loaded game tests
+local run = nil            -- the active run, nil when idle
+local installed = false
+local frame = 0
+local watchers = {}        -- event name -> { watcher lists }
+local last = nil           -- report of the newest finished run
+
+local function owner() return game.dev.current_mod() end
+
+local function now_ticks()
+  local ok, ticks = pcall(game.time.ticks)
+  return ok and ticks or 0
+end
+
+-- game.itest.suite(name [, body]) -> builder. Tests are registered with builder.test(name, fn); fn gets the test context.
+function itest.suite(name, body)
+  if type(name) ~= "string" or name == "" then error("RK1001: itest.suite needs a name", 2) end
+  local suite = { name = name, mod = owner(), tests = {}, before = nil, after = nil }
+  local builder = {}
+  function builder.test(test_name, fn, opts)
+    if type(test_name) ~= "string" or type(fn) ~= "function" then error("RK1001: suite.test needs a name and a function", 2) end
+    suite.tests[#suite.tests + 1] = { name = test_name, fn = fn, opts = opts or {} }
+  end
+  function builder.skip(test_name, reason) suite.tests[#suite.tests + 1] = { name = test_name, skip = reason or "skipped", opts = {} } end
+  function builder.before_each(fn) suite.before = fn end
+  function builder.after_each(fn) suite.after = fn end
+  suites[#suites + 1] = suite
+  if type(body) == "function" then body(builder) end
+  return builder
+end
+
+function itest.suites()
+  local out = {}
+  for _, s in ipairs(suites) do out[#out + 1] = { name = s.name, mod = s.mod, tests = #s.tests } end
+  return out
+end
+
+function itest.clear(mod)
+  for i = #suites, 1, -1 do
+    if mod == nil or suites[i].mod == mod then table.remove(suites, i) end
+  end
+end
+
+-- A hot reload drops the suites the old version of a mod registered.
+function itest.forget_mod(mod) itest.clear(mod) end
+
+-- Loads <mod>/Tests/Game/*.lua(u), where a mod keeps tests that need the real game. Returns the number of files.
+function itest.load(package_id, source)
+  if type(package_id) ~= "string" or package_id == "" then error("RK1001: itest.load needs a package id", 2) end
+  local env = game.dev.test_env()
+  if not env and not game.dev.mode() then
+    error("RK4001: in-game tests need Development mode. Turn it on in the game options.", 2)
+  end
+  itest.clear(package_id)
+  return __rk_itest_load(package_id, env and env.source or source)
+end
+
+local function fail_text(err)
+  if type(err) == "table" then return err.rk_test or err.rk_skip or game.dev.show(err) end
+  return tostring(err)
+end
+
+local function dispatch(name, payload)
+  local set = watchers[name]
+  if type(set) ~= "table" then return end
+  for i = 1, #set do
+    local list = set[i]
+    if list.active then
+      local ok = true
+      local k, v = next(list.filter)
+      while k ~= nil do
+        if payload[k] ~= v then ok = false break end
+        k, v = next(list.filter, k)
+      end
+      if ok then list[#list + 1] = payload end
+    end
+  end
+end
+
+-- The context a test function receives.
+local function make_context()
+  local t = { _cleanups = {}, _lists = {}, _log = {} }
+  t.expect = game.test.expect
+  function t.log(text) t._log[#t._log + 1] = tostring(text) end
+  function t.ticks() return now_ticks() end
+  function t.cleanup(fn) t._cleanups[#t._cleanups + 1] = fn end
+  function t.skip(reason) error({ rk_skip = reason or "skipped" }, 0) end
+  function t.fail(message) error({ rk_test = message }, 0) end
+
+  function t.map()
+    local map = game.maps.current()
+    if not map then t.skip("no map is loaded") end
+    return map
+  end
+
+  function t.center()
+    local info = game.maps.info(t.map())
+    return math.floor(info.width / 2), math.floor(info.height / 2)
+  end
+
+  -- A thing that is removed again when the test ends.
+  function t.spawn(def, x, z, opts)
+    local thing = game.things.spawn_at(def, t.map(), x, z, opts)
+    t.cleanup(function() pcall(game.things.destroy_with, thing, "Vanish") end)
+    return thing
+  end
+
+  function t.spawn_pawn(opts)
+    local o = opts or {}
+    local cx, cz = t.center()
+    local pawn = game.pawns.generate({
+      kind = o.kind or "Colonist", faction = o.faction or "player", gender = o.gender, age = o.age,
+      map = t.map(), x = o.x or cx, z = o.z or cz,
+    })
+    t.cleanup(function() pcall(game.things.destroy_with, pawn, "Vanish") end)
+    return pawn
+  end
+
+  function t.wait_ticks(n) coroutine.yield({ kind = "ticks", target = now_ticks() + (n or 1) }) end
+
+  function t.wait_until(pred, timeout_ticks, message)
+    local limit = timeout_ticks or 600
+    coroutine.yield({ kind = "until", pred = pred, deadline = now_ticks() + limit, limit = limit, message = message })
+  end
+
+  -- Records the payloads of an event while the test runs. The list is a plain table: #list, list[1].
+  function t.watch(event, filter)
+    local list = { active = true, filter = filter or {} }
+    if not watchers[event] then
+      watchers[event] = {}
+      game.events.on(event, function(payload) dispatch(event, payload or {}) end)
+    end
+    table.insert(watchers[event], list)
+    t._lists[#t._lists + 1] = list
+    return list
+  end
+
+  function t.wait_event(event, filter, timeout_ticks)
+    local list = t.watch(event, filter)
+    t.wait_until(function() return #list > 0 end, timeout_ticks or 600, "event " .. event .. " did not fire")
+    return list[1]
+  end
+
+  -- Changes the game speed for this test. The old speed comes back when it ends.
+  function t.set_speed(name)
+    local before = game.time.speed()
+    game.time.set_speed(name)
+    t.cleanup(function() game.time.set_speed(before) end)
+  end
+
+  return t
+end
+
+local function finish_test(r, status, message)
+  local t, entry = r.t, r.entry
+  for i = #t._cleanups, 1, -1 do pcall(t._cleanups[i]) end
+  for _, list in ipairs(t._lists) do list.active = false end
+  if r.suite.after and status ~= "skip" then pcall(r.suite.after, t) end
+  local row = { suite = r.suite.name, name = entry.name, mod = r.suite.mod, status = status,
+                ticks = now_ticks() - r.started_tick, message = message, log = t._log }
+  run.results[#run.results + 1] = row
+  run[status] = run[status] + 1
+  local line = "RKTEST " .. string.upper(status) .. " " .. r.suite.name .. " > " .. entry.name
+  if message then line = line .. " :: " .. message end
+  game.log.info(line)
+  run.current = nil
+end
+
+local function begin_test(suite, entry)
+  local t = make_context()
+  local r = { suite = suite, entry = entry, t = t, started_tick = now_ticks(), frame0 = frame, wait = nil }
+  run.current = r
+  if entry.skip then
+    finish_test(r, "skip", entry.skip)
+    return
+  end
+  r.co = coroutine.create(function()
+    if suite.before then suite.before(t) end
+    entry.fn(t)
+  end)
+end
+
+local function frame_limit(r) return r.entry.opts.max_frames or run.max_frames end
+
+local function advance(r)
+  local w = r.wait
+  if w then
+    if w.kind == "ticks" then
+      if now_ticks() < w.target then
+        if frame - r.frame0 > frame_limit(r) then
+          return finish_test(r, "fail", "timed out waiting for game ticks. Is the game paused?")
+        end
+        return
+      end
+    elseif w.kind == "until" then
+      local ok, done = pcall(w.pred)
+      if not ok then return finish_test(r, "fail", fail_text(done)) end
+      if not done then
+        if now_ticks() >= w.deadline or frame - r.frame0 > frame_limit(r) then
+          return finish_test(r, "fail", w.message or ("condition not met within " .. w.limit .. " ticks"))
+        end
+        return
+      end
+    end
+    r.wait = nil
+  end
+  local ok, yielded = coroutine.resume(r.co)
+  if not ok then
+    if type(yielded) == "table" and yielded.rk_skip then return finish_test(r, "skip", yielded.rk_skip) end
+    return finish_test(r, "fail", fail_text(yielded))
+  end
+  if coroutine.status(r.co) == "dead" then return finish_test(r, "pass") end
+  r.wait = yielded
+end
+
+local function matches(suite, entry, filter)
+  if not filter or filter == "" then return true end
+  return (suite.name .. " " .. entry.name):find(filter, 1, true) ~= nil
+end
+
+local function build_queue(opts)
+  local queue = {}
+  for _, suite in ipairs(suites) do
+    local wanted = opts.mods == nil
+    if opts.mods then
+      for _, m in ipairs(opts.mods) do
+        if m == suite.mod then wanted = true end
+      end
+    end
+    if wanted then
+      for _, entry in ipairs(suite.tests) do
+        if matches(suite, entry, opts.filter) then queue[#queue + 1] = { suite, entry } end
+      end
+    end
+  end
+  return queue
+end
+
+local function safe(fn)
+  local ok, v = pcall(fn)
+  return ok and v or "unknown"
+end
+
+local function finish_run()
+  local r, opts = run, run.opts
+  local report = {
+    schema = 1, rimkit = safe(game.version.rimkit), game = safe(function() return game.version.rimworld().text end),
+    pass = r.pass, fail = r.fail, skip = r.skip, tests = r.results,
+  }
+  if opts.report then
+    local ok, err = pcall(game.dev.write_report, opts.report, game.json.encode(report))
+    if not ok then game.log.error("RKTEST could not write the report: " .. tostring(err)) end
+  end
+  game.log.info(string.format("RKTEST DONE pass=%d fail=%d skip=%d", r.pass, r.fail, r.skip))
+  last = report
+  run = nil
+  if r.on_done then pcall(r.on_done, report) end
+  if opts.quit then pcall(game.dev.quit, report.fail == 0 and 0 or 1) end
+end
+
+local function drive()
+  frame += 1
+  if not run then return end
+  if run.unpause and game.time.paused() then game.time.set_speed(run.unpause) end
+  if not run.current then
+    local item = table.remove(run.queue, 1)
+    if not item then return finish_run() end
+    begin_test(item[1], item[2])
+  end
+  local r = run and run.current
+  if r and r.co then advance(r) end
+end
+
+-- game.itest.run{ mods = {"my.mod"}, filter = "text", report = "path.json", quit = false, on_done = fn }
+function itest.run(opts)
+  opts = opts or {}
+  if run then error("RK3003: an in-game test run is already going", 2) end
+  if type(opts.mods) == "string" then opts.mods = { opts.mods } end
+  if not installed then
+    installed = true
+    game.events.on_tick(drive)
+  end
+  local queue = build_queue(opts)
+  run = { opts = opts, queue = queue, results = {}, pass = 0, fail = 0, skip = 0, total = #queue,
+          max_frames = opts.max_frames or 18000, on_done = opts.on_done }
+  if game.time.paused() then run.unpause = "Fast" end
+  game.log.info("RKTEST START " .. #queue .. " tests")
+  return true
+end
+
+-- Stops the active run without a report. Tests that already ran keep their cleanup; the one in progress is cleaned up too.
+function itest.abort()
+  local r = run and run.current
+  if r then
+    for i = #r.t._cleanups, 1, -1 do pcall(r.t._cleanups[i]) end
+    for _, list in ipairs(r.t._lists) do list.active = false end
+  end
+  run = nil
+  return true
+end
+
+function itest.running() return run ~= nil end
+function itest.progress() return run and { done = #run.results, total = run.total } or nil end
+function itest.report() return last end
+
+-- Starts the run that the rimkit mod test --in-game launcher asked for, once the game has a map and has ticked a little.
+function itest.autorun()
+  local env = game.dev.test_env()
+  if not env or itest._autorun then return false end
+  itest._autorun = true
+  local started = false
+  game.events.on_tick(function()
+    if started then return end
+    if not game.maps.current() or now_ticks() < 120 then return end
+    started = true
+    for _, id in ipairs(env.mods or {}) do
+      local ok, err = pcall(itest.load, id, env.source)
+      if not ok then game.log.error("RKTEST could not load the tests of " .. id .. ": " .. tostring(err)) end
+    end
+    itest.run({ mods = env.mods, filter = env.filter, report = env.report, quit = env.quit })
+  end)
+  return true
+end
+
+game.itest = itest
 )LUA";
 
 const char* kTestLua = R"LUA(
@@ -333,7 +696,7 @@ local function capture()
   T.capture_definitions()
   for _, holder in ipairs({ log, game.log, rim }) do
     if type(holder) == "table" then
-      for _, name in ipairs({ "info", "error", "log", "message" }) do
+      for _, name in ipairs({ "info", "warn", "error", "log", "message" }) do
         local orig = holder[name]
         if type(orig) == "function" then
           holder[name] = function(msg, ...)
@@ -393,6 +756,20 @@ end
 function T.emit(name, payload) __rk_test_emit(name, payload or {}) end
 function T.tick(n) for _ = 1, (n or 1) do __rk_test_tick() end end
 function T.start() capture() __rk_test_start() end
+
+-- Hot reload under test: runs the mod's Lua again, as game.dev.reload does in the game. Returns true when it loaded without errors.
+-- Without an argument it reloads the mod under test. The mod's on_load callbacks run again, like in the game.
+function T.reload(package_id)
+  if package_id == nil then
+    local mods = __rk_test_mods()
+    if #mods ~= 1 then error("RK1001: t.reload needs a package id when " .. #mods .. " mods are loaded", 2) end
+    package_id = mods[1]
+  end
+  return __rk_test_reload(package_id)
+end
+
+-- How many Lua handlers hold the host patch behind an event. After a reload this must not grow.
+function T.subscriptions(event) return __rk_test_subscriptions(event) end
 
 function T.run()
   local pass, failed = 0, 0
@@ -699,6 +1076,27 @@ function T.generate(mod)
   add("    game.test.start()")
   add("    expect(game.test.errors()).to_be(0)")
   add("  end)")
+  -- Hot reload: running the mod again must leave exactly the handlers it had before, see docs/standard/rks.md.
+  local distinct = {}
+  for _, reg in ipairs(__rk_registered_events) do
+    if string.find(reg.event, ".", 1, true) and not distinct[reg.event] then
+      distinct[reg.event] = true
+      distinct[#distinct + 1] = reg.event
+    end
+  end
+  table.sort(distinct)
+  add("")
+  add("  it(\"survives a hot reload\", function()")
+  add("    game.test.start()")
+  for _, event in ipairs(distinct) do
+    add("    local before_" .. event:gsub("[^%w]", "_") .. " = game.test.subscriptions(" .. string.format("%q", event) .. ")")
+  end
+  add("    for _ = 1, 3 do expect(game.test.reload()).to_be(true) end")
+  add("    expect(game.test.errors()).to_be(0)")
+  for _, event in ipairs(distinct) do
+    add("    expect(game.test.subscriptions(" .. string.format("%q", event) .. ")).to_be(before_" .. event:gsub("[^%w]", "_") .. ")")
+  end
+  add("  end)")
   local per_event, seen = {}, {}
   for _, reg in ipairs(__rk_registered_events) do per_event[reg.event] = (per_event[reg.event] or 0) + 1 end
   for _, reg in ipairs(__rk_registered_events) do
@@ -900,7 +1298,72 @@ bool Engine::try_mock(const std::string& op, const sol::table& args, sol::object
     return true;
 }
 
+// ---- eval for the host
+
+const char* Engine::eval_for_host(const char* code) {
+    sol::state& L = *lua_;
+    eval_cache_.clear();
+    if (!code) {
+        eval_cache_ = "error: no code";
+        return eval_cache_.c_str();
+    }
+    const std::string saved_mod = swap_mod("");
+    auto run = [&](const std::string& src, std::string& message) -> bool {
+        sol::load_result lr = L.load(src, "=helm");
+        if (!lr.valid()) {
+            sol::error e = lr;
+            message = e.what();
+            return false;
+        }
+        sol::protected_function pf = lr;
+        sol::protected_function_result r = pf();
+        if (!r.valid()) {
+            sol::error e = r;
+            message = e.what();
+            return false;
+        }
+        sol::object dev = L["game"]["dev"];
+        sol::protected_function show = dev.is<sol::table>() ? dev.as<sol::table>()["show"] : sol::object(sol::lua_nil);
+        std::string out;
+        for (int i = 0; i < r.return_count(); ++i) {
+            if (i) out += ", ";
+            sol::object v = r.get<sol::object>(i);
+            if (show.valid()) {
+                sol::protected_function_result s = show(v);
+                out += s.valid() ? s.get<std::string>() : std::string("?");
+            }
+        }
+        eval_cache_ = out;
+        return true;
+    };
+    std::string message;
+    if (!run(std::string("return ") + code, message)) {
+        std::string second;
+        if (!run(code, second)) {
+            eval_cache_ = "error: " + (second.empty() ? message : second);
+        }
+    }
+    swap_mod(saved_mod);
+    return eval_cache_.c_str();
+}
+
 // ---- reload and watch
+
+// Reloads when nothing is iterating the callback lists, otherwise at the start of the next tick. A mod that calls
+// game.dev.reload from its own handler would otherwise erase the list that is being walked.
+int Engine::request_reload(const std::string& package_id) {
+    auto it = mods_.find(package_id);
+    if (it == mods_.end() || it->second.lua_dir.empty()) {
+        return 1;
+    }
+    if (iterating_ > 0 || in_reload_) {
+        if (std::find(pending_reloads_.begin(), pending_reloads_.end(), package_id) == pending_reloads_.end()) {
+            pending_reloads_.push_back(package_id);
+        }
+        return 0;
+    }
+    return reload_mod(package_id);
+}
 
 int Engine::reload_mod(const std::string& package_id) {
     auto it = mods_.find(package_id);
@@ -908,6 +1371,10 @@ int Engine::reload_mod(const std::string& package_id) {
         return 1;
     }
     in_reload_ = true;
+    struct ReloadGuard {
+        bool& flag;
+        ~ReloadGuard() { flag = false; }
+    } reload_guard{in_reload_};
     {
         // The old version's gizmos, alerts, tabs, columns, tools, status lines and settings pages go first; the new version adds its own.
         sol::table a = lua_->create_table();
@@ -919,8 +1386,30 @@ int Engine::reload_mod(const std::string& package_id) {
     on_load_.erase(std::remove_if(on_load_.begin(), on_load_.end(), mine), on_load_.end());
     on_tick_.erase(std::remove_if(on_tick_.begin(), on_tick_.end(), mine), on_tick_.end());
     timers_.erase(std::remove_if(timers_.begin(), timers_.end(), [&](const TimerEntry& t) { return t.mod == package_id; }), timers_.end());
+    // Handlers go, and so does their claim on the host patch behind the event. Without this a reload leaves the patch installed
+    // for ever and the count grows by one per reload.
+    std::vector<std::string> released_events;
     for (auto& kv : event_handlers_) {
-        kv.second.erase(std::remove_if(kv.second.begin(), kv.second.end(), mine), kv.second.end());
+        const auto cut = std::remove_if(kv.second.begin(), kv.second.end(), mine);
+        for (auto h = cut; h != kv.second.end(); ++h) {
+            released_events.push_back(kv.first);
+        }
+        kv.second.erase(cut, kv.second.end());
+    }
+    for (const std::string& ev : released_events) {
+        unsubscribe_named_event(ev);
+    }
+    {
+        sol::object dev_obj = (*lua_)["game"]["dev"];
+        if (dev_obj.is<sol::table>()) {
+            sol::object forget = dev_obj.as<sol::table>()["forget_mod"];
+            if (forget.is<sol::protected_function>()) {
+                forget.as<sol::protected_function>()(package_id);
+            }
+        }
+    }
+    if (test_mode_) {
+        (*lua_)["__rk_registered_events"] = lua_->create_table();
     }
     std::vector<int> hook_ids;
     for (const auto& kv : hooks_) {
@@ -989,7 +1478,6 @@ int Engine::reload_mod(const std::string& package_id) {
         }
     }
     swap_mod(prev);
-    in_reload_ = false;
     if (callbacks_.log) {
         const std::string msg = "[RimKit] reloaded " + package_id + (rc == 0 ? "" : " with errors");
         callbacks_.log(msg.c_str());
@@ -1000,6 +1488,13 @@ int Engine::reload_mod(const std::string& package_id) {
 // Runs every tick: the file watcher once a second and the per-mod budget once per window.
 void Engine::watch_tick() {
     const int tick = current_tick();
+    if (!pending_reloads_.empty() && iterating_ == 0 && !in_reload_) {
+        std::vector<std::string> due;
+        due.swap(pending_reloads_);
+        for (const std::string& mod : due) {
+            reload_mod(mod);
+        }
+    }
     if (dev_watch_ && ++watch_counter_ >= 60) {
         watch_counter_ = 0;
         std::vector<std::string> changed;
@@ -1076,6 +1571,67 @@ void Engine::bind_ecosystem() {
         need_test_mode();
         call_on_load();
     };
+    L["__rk_test_reload"] = [this, need_test_mode](const std::string& package_id) {
+        need_test_mode();
+        const int rc = reload_mod(package_id);
+        if (rc == 1) {
+            throw sol::error("RK3001: mod " + package_id + " has no Lua folder loaded");
+        }
+        return rc == 0;
+    };
+    L["__rk_test_subscriptions"] = [this, need_test_mode](const std::string& name) {
+        need_test_mode();
+        auto it = named_event_subscriptions_.find(canonical_event_name(name));
+        return it == named_event_subscriptions_.end() ? 0 : it->second;
+    };
+    // Loads <mod root>/Tests/Game for game.itest. The folder is not part of the mod's Lua, so a hot reload does not treat it as such.
+    L["__rk_itest_load"] = [this](const std::string& package_id, sol::optional<std::string> source) {
+        if (!test_mode_) {
+            const bool allowed = current_mod_.empty() || current_mod_ == "stratware.rimkit" ||
+                                 (mods_.count(current_mod_) && mods_[current_mod_].caps.count("dev"));
+            if (!allowed) {
+                throw sol::error("RK4001: mod " + current_mod_ + " did not declare the capability 'dev' that loading in-game tests needs.");
+            }
+        }
+        auto it = mods_.find(package_id);
+        if (it == mods_.end() || it->second.root.empty()) {
+            throw sol::error("RK3001: mod " + package_id + " has no Lua loaded");
+        }
+        // The launcher can name the source folder, because a shipped mod does not carry its tests.
+        const fs::path dir = fs::path(source && !source->empty() ? *source : it->second.root) / "Tests" / "Game";
+        std::error_code ec;
+        if (!fs::is_directory(dir, ec)) {
+            return 0;
+        }
+        std::vector<fs::path> files;
+        for (auto fit = fs::recursive_directory_iterator(dir, ec); !ec && fit != fs::recursive_directory_iterator(); fit.increment(ec)) {
+            if (fit->is_regular_file(ec) && (fit->path().extension() == ".lua" || fit->path().extension() == ".luau")) {
+                files.push_back(fit->path());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        allow_lua_root(dir.string());
+        const std::string prev = swap_mod(package_id);
+        int loaded = 0;
+        for (const fs::path& file : files) {
+            if (load_script(file.string()) == 0) {
+                ++loaded;
+            }
+        }
+        swap_mod(prev);
+        return loaded;
+    };
+    L["__rk_test_mods"] = [this, need_test_mode]() {
+        need_test_mode();
+        sol::table out = lua_->create_table();
+        int n = 1;
+        for (const auto& kv : mods_) {
+            if (!kv.second.lua_dir.empty() && !kv.first.empty()) {
+                out[n++] = kv.first;
+            }
+        }
+        return out;
+    };
 
     // The only way to compile a string. Gated: Development mode, and the RimKit dev tools or a mod that declared "dev".
     L["__rk_compile"] = [this](const std::string& code, sol::this_state ts) -> std::tuple<sol::object, sol::object> {
@@ -1143,7 +1699,7 @@ void Engine::bind_ecosystem() {
     };
     dev["reload"] = [this](const std::string& package_id) {
         require_capability("dev", "game.dev.reload");
-        const int rc = reload_mod(package_id);
+        const int rc = request_reload(package_id);
         if (rc == 1) {
             throw sol::error("RK3001: mod " + package_id + " has no Lua folder loaded");
         }
@@ -1183,14 +1739,15 @@ void Engine::bind_ecosystem() {
     };
     game["mods"] = mods;
 
-    sol::protected_function_result r1 = L.safe_script(kInteropLua, sol::script_pass_on_error);
-    sol::protected_function_result r2 = L.safe_script(kDevLua, sol::script_pass_on_error);
-    sol::protected_function_result r3 = L.safe_script(kTestLua, sol::script_pass_on_error);
+    sol::protected_function_result r1 = L.safe_script(kInteropLua, sol::script_pass_on_error, "=rimkit/interop");
+    sol::protected_function_result r2 = L.safe_script(kDevLua, sol::script_pass_on_error, "=rimkit/dev");
+    sol::protected_function_result r3 = L.safe_script(kTestLua, sol::script_pass_on_error, "=rimkit/test");
     if (r3.valid()) {
-        r3 = L.safe_script(kTestSugarLua, sol::script_pass_on_error);
+        r3 = L.safe_script(kTestSugarLua, sol::script_pass_on_error, "=rimkit/test_sugar");
     }
-    sol::protected_function_result r4 = L.safe_script(kSaveLua, sol::script_pass_on_error);
-    for (sol::protected_function_result* r : {&r1, &r2, &r3, &r4}) {
+    sol::protected_function_result r4 = L.safe_script(kSaveLua, sol::script_pass_on_error, "=rimkit/save");
+    sol::protected_function_result r5 = L.safe_script(kItestLua, sol::script_pass_on_error, "=rimkit/itest");
+    for (sol::protected_function_result* r : {&r1, &r2, &r3, &r4, &r5}) {
         if (!r->valid()) {
             log_lua_error("[RimKit] ecosystem bootstrap", *r);
         }

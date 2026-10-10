@@ -118,6 +118,13 @@ name: string Display name of the mod
 path: string Folder of the mod
 assemblies: string[] Names of its loaded assemblies
 
+@class RimTestEnv
+mods: string[] Package ids of the mods whose game tests to run
+report?: string File the JSON report goes to
+filter?: string Only tests whose suite and name contain this text
+source?: string The mod's source folder, when the shipped copy does not carry Tests/Game
+quit: boolean Whether to close the game when the run is done
+
 @kit domain=classes op=classes subject=none title="Lua classes" page=classes
 register_fn(family: string, name: string, fn: string, callback: function) -> boolean | One function of a Lua class. Prefer game.classes.define, which registers every function of a table.
 list() -> RimClassInfo[] | Registered Lua classes and the functions each defines.
@@ -171,6 +178,11 @@ deactivate(package_id: string) -> boolean | Turns a mod off in the mod list, eff
 mode() -> boolean | Whether Development mode is on.
 export_defs(path?: string) -> string | Writes every def name by def type to a JSON file for the editor's name completion. Returns the path.
 bundle(profile?: string, path?: string) -> string | Writes a diagnostics folder (log, mod list, versions, profiler numbers). Nothing is sent anywhere. Returns the folder.
+helm_publish(event: string, json: string) -> boolean | Sends an event to the Helm clients that subscribed to it. Raises RK3003 when no Helm session is running.
+helm_active() -> boolean | Whether this game is being operated through Helm.
+test_env() -> RimTestEnv? | The in-game test run that rimkit mod test --in-game asked for, or nil when the game was started normally.
+write_report(path: string, text: string) -> string | Writes a test report. A relative path is inside the RimKitTests folder next to the game's config folder. The only absolute path allowed is the one the launcher passed. Returns the path.
+quit(code?: integer) -> boolean | Closes the game with an exit code. Only works when rimkit mod test --in-game started the game.
 
 @kit domain=save op=save subject=thing:RimThingRef title="Saving" page=save
 forget_thing(package_id: string) -> integer | Removes everything a mod stored for this thing with scope thing.

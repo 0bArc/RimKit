@@ -37,6 +37,8 @@
           "title": "Quality",
           "children": [
             { "title": "Testing", "path": "guide/testing.md" },
+            { "title": "Hot reload", "path": "guide/hot-reload.md" },
+            { "title": "Operate with Helm", "path": "guide/helm.md" },
             { "title": "Save safety", "path": "guide/save-safety.md" },
             { "title": "Performance", "path": "guide/performance.md" },
             { "title": "Security", "path": "guide/security.md" },
@@ -162,6 +164,7 @@
     {
       "title": "Project",
       "children": [
+        { "title": "Changes", "path": "changes.md" },
         { "title": "Roadmap and status", "path": "missing.md" },
         { "title": "Gaps and next steps", "path": "gaps.md" },
         { "title": "Mod ideas", "path": "mod-ideas.md" }

@@ -299,3 +299,6 @@ end)
 if game.interop and game.interop.publish then
   game.interop.publish("rimkit.devtools", "1.0.0", { view = view, on_event = on_event })
 end
+
+-- rimkit mod test --in-game starts the game with RIMKIT_TEST_* variables. This runs the mod's Tests/Game scripts once a map is up.
+if game.itest then game.itest.autorun() end

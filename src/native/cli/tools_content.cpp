@@ -2,10 +2,12 @@
 #include "tools.hpp"
 
 #include "aliases.hpp"
+#include "json_lite.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <fstream>
@@ -599,6 +601,125 @@ int cmd_release_check(const fs::path& mod_dir) {
     std::cout << "Legal reminder: do not ship game files, the RimWorld logo or other people's art without their permission, and follow Ludeon's modding rules (rimworldgame.com/eula).\n";
     std::cout << "release check: " << rep.errors << " failed, " << rep.warnings << " warning(s)\n";
     return rep.errors ? 1 : 0;
+}
+
+// ---------------------------------------------------------------- conform
+
+namespace {
+
+// Every .lua and .luau file under a folder, skipping Tests/Game when asked.
+std::vector<fs::path> lua_files(const fs::path& dir, bool skip_game_tests) {
+    std::vector<fs::path> out;
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec)) return out;
+    for (auto it = fs::recursive_directory_iterator(dir, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+        if (!it->is_regular_file(ec)) continue;
+        const fs::path ext = it->path().extension();
+        if (ext != ".lua" && ext != ".luau") continue;
+        const std::string generic = it->path().generic_string();
+        if (skip_game_tests && (generic.find("/Tests/Game/") != std::string::npos || generic.find("/tests/game/") != std::string::npos)) continue;
+        out.push_back(it->path());
+    }
+    return out;
+}
+
+}  // namespace
+
+int cmd_conform(const fs::path& mod_dir, const std::vector<std::string>& args) {
+    Report rep;
+    ModMeta m;
+    std::string err;
+    int wanted = 1;
+    std::string game_report;
+    for (size_t i = 0; i + 1 < args.size(); ++i) {
+        if (args[i] == "--level") wanted = std::atoi(args[i + 1].c_str());
+        if (args[i] == "--report") game_report = args[i + 1];
+    }
+    std::cout << "RimKit Standard check for " << mod_dir.filename().string() << "\n";
+    if (!load_meta(mod_dir, m, err)) {
+        std::cout << "  [fail] " << err << "\n";
+        return 1;
+    }
+
+    // Level 1: declared. The mod says what it is and what it may do, and ships what players need.
+    std::cout << "level 1, declared\n";
+    Report l1;
+    if (m.api_level < 1) l1.error("meta.api_level = 1 is not set. Strict mode refuses removed names and unchecked results.");
+    else l1.ok("api_level " + std::to_string(m.api_level));
+    if (!m.caps_declared) l1.error("meta.capabilities is not declared. Write the list, an empty one is fine.");
+    else l1.ok("capabilities declared");
+    if (m.mod_version.empty() || !semver_ok(m.mod_version)) l1.error("meta.mod_version is missing or not a semantic version");
+    else l1.ok("mod version " + m.mod_version);
+    const fs::path changelog = mod_dir / "CHANGELOG.md";
+    if (!fs::exists(changelog) || (!m.mod_version.empty() && read_all(changelog).find(m.mod_version) == std::string::npos)) l1.error("CHANGELOG.md has no entry for " + m.mod_version);
+    else l1.ok("changelog entry");
+    bool license = false;
+    for (const char* n : {"LICENSE", "LICENSE.md", "LICENSE.txt"}) license = license || fs::exists(mod_dir / n);
+    if (!license) l1.error("no LICENSE file");
+    else l1.ok("licence file");
+    if (content_check(mod_dir, true) != 0) l1.error("rimkit mod check reports errors");
+    else l1.ok("content check");
+    int level = l1.errors == 0 ? 1 : 0;
+
+    // Level 2: tested. Logic runs against the mock host and survives a hot reload.
+    std::cout << "level 2, tested\n";
+    Report l2;
+    const fs::path tests = fs::exists(mod_dir / "Tests") ? mod_dir / "Tests" : mod_dir / "tests";
+    const std::vector<fs::path> test_files = lua_files(tests, true);
+    bool reload_test = false;
+    for (const fs::path& f : test_files) {
+        const std::string text = read_all(f);
+        if (text.find("reload(") != std::string::npos) reload_test = true;
+    }
+    if (test_files.empty()) l2.error("no tests in Tests/. Run rimkit mod gen-tests for a start.");
+    else l2.ok(std::to_string(test_files.size()) + " test file(s)");
+    if (!test_files.empty() && !reload_test) l2.error("no test calls reload(). A test must show the mod survives a hot reload: rimkit mod gen-tests writes one.");
+    else if (reload_test) l2.ok("a test covers hot reload");
+    int legacy = 0;
+    for (const fs::path& f : lua_files(mod_dir / "Lua", false)) {
+        std::istringstream lines(read_all(f));
+        std::string line;
+        while (std::getline(lines, line)) {
+            const size_t first = line.find_first_not_of(" \t");
+            if (first == std::string::npos || line.compare(first, 2, "--") == 0) continue;
+            if (std::regex_search(line, std::regex("(^|[^A-Za-z0-9_.])rim\\.(pawn|map|thing|faction|hooks|events|on_load|on_tick|log|message)\\b"))) ++legacy;
+        }
+    }
+    if (legacy > 0) l2.error(std::to_string(legacy) + " use(s) of the pre-1.0 rim.* names in Lua/. Run rimkit migrate --write.");
+    else l2.ok("no pre-1.0 names");
+    if (l2.errors == 0 && level == 1) {
+        std::cout << "  running the tests\n";
+        if (cmd_test(mod_dir, {}) != 0) l2.error("the tests do not pass");
+        else l2.ok("tests pass");
+    }
+    if (l2.errors == 0 && level == 1) level = 2;
+
+    // Level 3: verified in the game. Scripts in Tests/Game ran in a real game and the report says nothing failed.
+    std::cout << "level 3, verified in the game\n";
+    Report l3;
+    const std::vector<fs::path> game_files = [&]() {
+        std::vector<fs::path> files;
+        for (const fs::path& f : lua_files(tests / "Game", false)) files.push_back(f);
+        return files;
+    }();
+    bool has_suite = false;
+    for (const fs::path& f : game_files) has_suite = has_suite || read_all(f).find("itest.suite") != std::string::npos;
+    if (!has_suite) l3.error("no game.itest.suite in Tests/Game");
+    else l3.ok("in-game tests exist");
+    if (game_report.empty()) {
+        l3.error("pass --report <file> with the report of rimkit mod test --in-game");
+    } else {
+        rimlua::json::Value root;
+        if (!rimlua::json::parse(read_all(game_report), root) || !root.is_object()) l3.error(game_report + " is not a test report");
+        else if (root.get_int("fail", 1) != 0 || root.get_int("pass", 0) == 0) l3.error("the in-game report has failures or no passing tests");
+        else l3.ok("in-game report: " + std::to_string(root.get_int("pass")) + " passed");
+    }
+    if (l3.errors == 0 && level == 2) level = 3;
+
+    static const char* const kNames[] = {"not conforming", "Declared", "Tested", "Verified in the game"};
+    std::cout << "RimKit Standard level: " << level << " (" << kNames[level] << ")\n";
+    if (level > 0) std::cout << "For your Workshop.md: Built to the RimKit Standard, level " << level << " (" << kNames[level] << ").\n";
+    return level >= wanted ? 0 : 1;
 }
 
 // ---------------------------------------------------------------- scaffold

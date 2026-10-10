@@ -592,7 +592,8 @@ sol::object Engine::decode_response(const std::string& json) {
 // Ops that add something to the screen (gizmos, alerts, tabs, tools, status lines, settings pages).
 static bool registers_ui(const std::string& op) {
     static const char* const kOps[] = {"gizmo.add", "gizmo.add_toggle", "gizmo.add_slider", "alert.add", "hud.status", "tabs.add_main",
-                                       "tabs.add_inspect", "tabs.add_column", "designator.add", "options.page"};
+                                       "tabs.add_inspect", "tabs.add_column", "designator.add", "options.page",
+                                       "stat.modify", "stat.add_offset", "stat.add_factor", "widgets.open"};
     for (const char* o : kOps) {
         if (op == o) return true;
     }
@@ -1465,6 +1466,11 @@ int Engine::load_directory(const std::string& dir) {
             continue;
         }
         if (it->path().extension() == ".lua" || it->path().extension() == ".luau") {
+            // Tests/Game holds tests for the real game (game.itest). They load only when a run asks for them.
+            const std::string generic = it->path().generic_string();
+            if (generic.find("/Tests/Game/") != std::string::npos || generic.find("/tests/game/") != std::string::npos) {
+                continue;
+            }
             files.push_back(it->path());
         }
     }
@@ -1480,7 +1486,10 @@ int Engine::load_directory(const std::string& dir) {
 
 void Engine::call_on_load() {
     wire_global_handlers();
-    for (auto& cb : on_load_) {
+    IterationGuard walking(iterating_);
+    // By index and by copy: an on_load callback may register another one, which can move the list.
+    for (size_t i = 0; i < on_load_.size(); ++i) {
+        const ModFn cb = on_load_[i];
         if (!mod_enabled(cb.mod)) {
             continue;
         }
@@ -1495,19 +1504,28 @@ void Engine::call_on_load() {
 
 void Engine::call_on_tick() {
     int tick = current_tick();
+    watch_tick();
+    IterationGuard walking(iterating_);
+    // Take the due timers out first. A timer callback that starts another timer (the usual way to repeat) would otherwise
+    // grow the list it is being walked in.
+    std::vector<TimerEntry> due;
     for (auto it = timers_.begin(); it != timers_.end();) {
         if (it->fire_tick <= tick) {
-            if (mod_enabled(it->mod)) {
-                ModScope scope(*this, it->mod, PROF_TIMER);
-                sol::protected_function_result r = it->fn();
-                if (!r.valid()) {
-                    log_lua_error("[RimKit] timer", r);
-                    record_mod_error(it->mod, "timer");
-                }
-            }
+            due.push_back(std::move(*it));
             it = timers_.erase(it);
         } else {
             ++it;
+        }
+    }
+    for (TimerEntry& timer : due) {
+        if (!mod_enabled(timer.mod)) {
+            continue;
+        }
+        ModScope scope(*this, timer.mod, PROF_TIMER);
+        sol::protected_function_result r = timer.fn();
+        if (!r.valid()) {
+            log_lua_error("[RimKit] timer", r);
+            record_mod_error(timer.mod, "timer");
         }
     }
 
@@ -1519,8 +1537,8 @@ void Engine::call_on_tick() {
         (*lua_)["selected_pawn"] = sol::lua_nil;
     }
 
-    watch_tick();
-    for (auto& cb : on_tick_) {
+    for (size_t i = 0; i < on_tick_.size(); ++i) {
+        const ModFn cb = on_tick_[i];
         if (!mod_enabled(cb.mod)) {
             continue;
         }

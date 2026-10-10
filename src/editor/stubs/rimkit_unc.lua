@@ -458,6 +458,15 @@ function game.events.off(name) end
 ---@return RimEventInfo[]
 function game.events.list() end
 
+--- How many handlers listen to an event, or how many of one mod's when a package id is given.
+---@param name string
+---@param mod? string
+---@return integer
+function game.events.count(name, mod) end
+
+---@param msg string
+function game.log.warn(msg) end
+
 ---@param msg string
 function game.log.error(msg) end
 

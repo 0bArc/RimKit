@@ -41,3 +41,4 @@ Stored data lives in `RimKit.MapComponent_LuaData`, `RimKit.WorldComponent_LuaDa
 | `game.save.set_autosave_interval` | `days` | `number` | Sets the autosave interval, 0.125 to 14 days. |
 | `game.save.now` | `name?` | `string` | Saves the game under a name and returns the name. |
 | `game.save.files` |  | `RimSaveFile[]` | Saved games on disk. |
+| `game.save.load` | `name` | `boolean` | Loads a saved game by name, like the Load button. The maps and the world are replaced and the game goes through its loading screen, so wait for the tick to come back (info.playing) before the next call. Mods keep running. |

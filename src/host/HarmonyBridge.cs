@@ -1231,6 +1231,9 @@ namespace RimKit
                 }
             }
 
+            // Helm opens its channel only when the launcher asked for it (HELM_ENDPOINT and HELM_TOKEN) and pAuth agrees.
+            HelmBridge.TryStart();
+
             if (!onLoadFired)
             {
                 onLoadFired = true;
@@ -1255,6 +1258,8 @@ namespace RimKit
             {
                 Log.Error("[RimKit] on_tick failed: " + e);
             }
+
+            HelmBridge.Pump();
         }
     }
 }

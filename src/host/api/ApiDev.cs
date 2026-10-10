@@ -22,6 +22,11 @@ namespace RimKit
             R("dev.export_defs", ExportDefs);
             R("dev.bundle", Bundle);
             R("dev.unregister_mod", UnregisterMod);
+            ApiRegistry.Register("dev.helm_publish", a => HelmPublish(a), "advanced", "0.11.0");
+            ApiRegistry.Register("dev.helm_active", a => OkBool(HelmBridge.Active), "advanced", "0.11.0");
+            ApiRegistry.Register("dev.test_env", a => TestEnv(a), "advanced", "0.11.0");
+            ApiRegistry.Register("dev.write_report", a => WriteReport(a), "advanced", "0.11.0");
+            ApiRegistry.Register("dev.quit", a => Quit(a), "advanced", "0.11.0");
             R("mods.order", Order);
             R("mods.deactivate", Deactivate);
         }
@@ -32,6 +37,61 @@ namespace RimKit
         private static string UnregisterMod(Dictionary<string, string> a) => OkInt(ModOwnership.Release(Str(a, "package_id")));
 
         private static string DevMode(Dictionary<string, string> a) => OkBool(Prefs.DevMode);
+
+        // Sends an event to the Helm clients that asked for it. Helm session only.
+        private static string HelmPublish(Dictionary<string, string> a)
+        {
+            if (!HelmBridge.Active) return Fail("RK3003", "no Helm session is running");
+            return OkBool(HelmBridge.Publish(Str(a, "event"), Str(a, "json")));
+        }
+
+        // The launcher (rimkit mod test --in-game) tells the game what to run through environment variables, so nothing in the
+        // player's settings or mod list changes: RIMKIT_TEST_MODS (comma separated package ids), RIMKIT_TEST_REPORT, RIMKIT_TEST_FILTER, RIMKIT_TEST_QUIT=1.
+        private static string TestEnv(Dictionary<string, string> a)
+        {
+            string mods = Environment.GetEnvironmentVariable("RIMKIT_TEST_MODS");
+            if (string.IsNullOrWhiteSpace(mods)) return OkJson("null");
+            var list = Jb.Arr();
+            foreach (string id in mods.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0)) list.AddS(id);
+            string report = Environment.GetEnvironmentVariable("RIMKIT_TEST_REPORT");
+            string filter = Environment.GetEnvironmentVariable("RIMKIT_TEST_FILTER");
+            var obj = Jb.Obj().Raw("mods", list.ToString()).B("quit", Environment.GetEnvironmentVariable("RIMKIT_TEST_QUIT") == "1");
+            if (!string.IsNullOrEmpty(report)) obj.S("report", report);
+            if (!string.IsNullOrEmpty(filter)) obj.S("filter", filter);
+            string source = Environment.GetEnvironmentVariable("RIMKIT_TEST_SOURCE");
+            if (!string.IsNullOrEmpty(source)) obj.S("source", source);
+            return obj.Ok();
+        }
+
+        private static string TestFolder() => Path.GetFullPath(Path.Combine(GenFilePaths.ConfigFolderPath, "..", "RimKitTests"));
+
+        // Test reports are the only thing a script may write through this op, and only into the RimKitTests folder or to the one file the launcher named.
+        private static string WriteReport(Dictionary<string, string> a)
+        {
+            string path = Str(a, "path");
+            if (string.IsNullOrEmpty(path)) return Fail("RK1001", "path is required");
+            string allowed = Environment.GetEnvironmentVariable("RIMKIT_TEST_REPORT");
+            string full = Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(TestFolder(), path));
+            bool launcherFile = !string.IsNullOrEmpty(allowed) && string.Equals(full, Path.GetFullPath(allowed), StringComparison.OrdinalIgnoreCase);
+            bool inFolder = full.StartsWith(TestFolder() + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            if (!launcherFile && !inFolder) return Fail("RK4001", "reports can only be written inside " + TestFolder());
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(full));
+                File.WriteAllText(full, Str(a, "text") ?? "", new UTF8Encoding(false));
+            }
+            catch (Exception e) { return Fail("RK5001", "could not write " + full + ": " + e.Message); }
+            return OkStr(full);
+        }
+
+        private static string Quit(Dictionary<string, string> a)
+        {
+            if (Environment.GetEnvironmentVariable("RIMKIT_TEST_QUIT") != "1") return Fail("RK4001", "quit only works when rimkit mod test --in-game started the game");
+            int code = a.ContainsKey("code") ? Int(a, "code") : 0;
+            Log.Message("[RimKit] closing the game after the test run, exit code " + code);
+            Application.Quit(code);
+            return OkBool(true);
+        }
 
         private static string Quote(string s)
         {

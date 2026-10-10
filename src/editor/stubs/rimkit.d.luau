@@ -92,6 +92,37 @@ declare extern type RimExpect with
   not_to_have_been_called: (match: any?) -> ()
   to_have_been_called_times: (n: any) -> ()
 end
+declare extern type RimTestContext with
+  expect: (value: any) -> ()
+  log: (text: any) -> ()
+  ticks: () -> any
+  cleanup: (fn: any) -> ()
+  skip: (reason: any?) -> ()
+  fail: (message: any) -> ()
+  map: () -> any
+  center: () -> any
+  spawn: (def: any) -> ()
+  spawn_pawn: (opts: any?) -> ()
+  wait_ticks: (n: any?) -> ()
+  wait_until: (pred: any) -> ()
+  watch: (event: any) -> ()
+  wait_event: (event: any) -> ()
+  set_speed: (name: any) -> ()
+end
+declare extern type RimTestSuite with
+  test: (name: any) -> ()
+  skip: (name: any) -> ()
+  before_each: (fn: any) -> ()
+  after_each: (fn: any) -> ()
+end
+declare extern type RimTestRun with
+  mods: {string}?
+  filter: string?
+  report: string?
+  quit: boolean?
+  max_frames: number?
+  on_done: (report: any) -> ()?
+end
 declare extern type RimWorkGiverInfo with
   def: string
   label: string?
@@ -488,6 +519,13 @@ declare extern type RimModInfo with
   name: string
   path: string
   assemblies: {string}
+end
+declare extern type RimTestEnv with
+  mods: {string}
+  report: string?
+  filter: string?
+  source: string?
+  quit: boolean
 end
 declare extern type RimFactionInfo with
   name: string
@@ -1214,6 +1252,11 @@ declare extern type RimTimeNow with
   is_night: boolean?
   ticks_per_hour: number
   ticks_per_day: number
+end
+declare extern type RimTimeStep with
+  before: number
+  after: number
+  ran: number
 end
 declare extern type RimWidgetNode with
   type: string
@@ -2052,6 +2095,140 @@ end
 declare extern type WindowOpenedEvent with
   class: any
 end
+declare extern type PawnLeftColonyEvent with
+  pawn: RimPawn
+  to: any
+end
+declare extern type PawnEscapedEvent with
+  pawn: RimPawn
+  initiator: any
+end
+declare extern type WorkCompletedEvent with
+  pawn: RimPawn
+  job: RimObject
+  work_type: any
+end
+declare extern type ItemCraftedEvent with
+  thing: RimThing
+  recipe: any
+  pawn: RimPawn
+end
+declare extern type MiningCompletedEvent with
+  def: string
+  x: any
+  z: any
+  pawn: RimPawn
+end
+declare extern type ConstructionStartedEvent with
+  frame: any
+  def: string
+  pawn: RimPawn
+end
+declare extern type BuildingDeconstructedEvent with
+  pawn: RimPawn
+  thing: RimThing
+  def: string
+  x: any
+  z: any
+end
+declare extern type ThingRepairedEvent with
+  pawn: RimPawn
+  thing: RimThing
+  def: string
+end
+declare extern type ThingHauledEvent with
+  pawn: RimPawn
+  thing: RimThing
+  def: string
+end
+declare extern type ThingDroppedEvent with
+  pawn: RimPawn
+  thing: RimThing
+  def: string
+  x: any
+  z: any
+end
+declare extern type HediffHealedEvent with
+  pawn: RimPawn
+  hediff: RimObject
+end
+declare extern type ImmunityGainedEvent with
+  pawn: RimPawn
+  disease: any
+end
+declare extern type ThoughtLostEvent with
+  pawn: RimPawn
+  thought: any
+end
+declare extern type SocialFightStartedEvent with
+  pawn: RimPawn
+  other: RimPawn
+end
+declare extern type SkillLearningSaturatedEvent with
+  pawn: RimPawn
+  skill: any
+end
+declare extern type FireStartedEvent with
+  fire: any
+  map: RimMap
+  x: any
+  z: any
+end
+declare extern type FireEndedEvent with
+  fire: any
+  map: RimMap
+  x: any
+  z: any
+end
+declare extern type WorldGeneratedEvent with
+  seed: any
+end
+declare extern type CaravanArrivedEvent with
+  caravan: any
+  tile: any
+end
+declare extern type SiteVisitedEvent with
+  caravan: any
+  site: any
+  def: string
+end
+declare extern type GoodsDeliveredEvent with
+  thing: RimThing
+  map: RimMap
+  x: any
+  z: any
+end
+declare extern type SilverChangedEvent with
+  silver: any
+  delta: any
+end
+declare extern type ResearchMilestoneEvent with
+  project: any
+  percent: any
+end
+declare extern type RoomChangedEvent with
+  map: RimMap
+end
+declare extern type FactionRelationChangedEvent with
+  faction: RimFaction
+  other: RimPawn
+  previous: any
+  kind: string
+end
+declare extern type FactionLeaderChangedEvent with
+  faction: RimFaction
+  leader: any
+end
+declare extern type GizmoClickedEvent with
+  label: string
+  class: any
+end
+declare extern type KeyPressedEvent with
+  key: any
+  shift: any
+  control: any
+  alt: any
+end
 
 type Rimkit_ai = {
   danger: (pawn: RimPawnRef, x: number, z: number) -> string,
@@ -2248,8 +2425,11 @@ type Rimkit_dev = {
   current_mod: () -> string,
   eval: (code: string) -> (boolean, string),
   export_defs: (path: string?) -> string,
+  helm_active: () -> boolean,
+  helm_publish: (event: string, json: string) -> boolean,
   mode: () -> boolean,
   open_tools: () -> boolean,
+  quit: (code: number?) -> boolean,
   record_clear: () -> boolean,
   record_log: () -> {{ [any]: any }},
   record_start: (filter: string?) -> boolean,
@@ -2258,7 +2438,9 @@ type Rimkit_dev = {
   reload: (package_id: string) -> boolean,
   run: (name: string) -> (boolean, string?),
   show: (value: any) -> string,
+  test_env: () -> RimTestEnv?,
   watch: (on: boolean) -> boolean,
+  write_report: (path: string, text: string) -> string,
 }
 type Rimkit_dlc = {
   active: (dlc: string) -> boolean,
@@ -2292,6 +2474,7 @@ type Rimkit_effects = {
   text: ((map: RimMapRef, x: number, z: number, text: string, color: string?) -> boolean) & ((anchor: RimThing | RimPawn, text: string, color: string?) -> boolean),
 }
 type Rimkit_events = {
+  count: (name: string, mod: string?) -> number,
   list: () -> {RimEventInfo},
   off: (name: string) -> (),
   on_load: (fn: () -> ()) -> (),
@@ -2386,6 +2569,34 @@ type Rimkit_events = {
   on_selection_changed: (fn: (e: SelectionChangedEvent) -> (), filter: EventFilter?) -> (),
   on_selection_cleared: (fn: (e: SelectionClearedEvent) -> (), filter: EventFilter?) -> (),
   on_window_opened: (fn: (e: WindowOpenedEvent) -> (), filter: EventFilter?) -> (),
+  on_pawn_left_colony: (fn: (pawn: RimPawn, e: PawnLeftColonyEvent) -> (), filter: EventFilter?) -> (),
+  on_pawn_escaped: (fn: (pawn: RimPawn, e: PawnEscapedEvent) -> (), filter: EventFilter?) -> (),
+  on_work_completed: (fn: (pawn: RimPawn, e: WorkCompletedEvent) -> (), filter: EventFilter?) -> (),
+  on_item_crafted: (fn: (pawn: RimPawn, e: ItemCraftedEvent) -> (), filter: EventFilter?) -> (),
+  on_mining_completed: (fn: (pawn: RimPawn, e: MiningCompletedEvent) -> (), filter: EventFilter?) -> (),
+  on_construction_started: (fn: (pawn: RimPawn, e: ConstructionStartedEvent) -> (), filter: EventFilter?) -> (),
+  on_building_deconstructed: (fn: (pawn: RimPawn, e: BuildingDeconstructedEvent) -> (), filter: EventFilter?) -> (),
+  on_thing_repaired: (fn: (pawn: RimPawn, e: ThingRepairedEvent) -> (), filter: EventFilter?) -> (),
+  on_thing_hauled: (fn: (pawn: RimPawn, e: ThingHauledEvent) -> (), filter: EventFilter?) -> (),
+  on_thing_dropped: (fn: (pawn: RimPawn, e: ThingDroppedEvent) -> (), filter: EventFilter?) -> (),
+  on_hediff_healed: (fn: (pawn: RimPawn, e: HediffHealedEvent) -> (), filter: EventFilter?) -> (),
+  on_immunity_gained: (fn: (pawn: RimPawn, e: ImmunityGainedEvent) -> (), filter: EventFilter?) -> (),
+  on_thought_lost: (fn: (pawn: RimPawn, e: ThoughtLostEvent) -> (), filter: EventFilter?) -> (),
+  on_social_fight_started: (fn: (pawn: RimPawn, e: SocialFightStartedEvent) -> (), filter: EventFilter?) -> (),
+  on_skill_learning_saturated: (fn: (pawn: RimPawn, e: SkillLearningSaturatedEvent) -> (), filter: EventFilter?) -> (),
+  on_fire_started: (fn: (e: FireStartedEvent) -> (), filter: EventFilter?) -> (),
+  on_fire_ended: (fn: (e: FireEndedEvent) -> (), filter: EventFilter?) -> (),
+  on_world_generated: (fn: (e: WorldGeneratedEvent) -> (), filter: EventFilter?) -> (),
+  on_caravan_arrived: (fn: (e: CaravanArrivedEvent) -> (), filter: EventFilter?) -> (),
+  on_site_visited: (fn: (e: SiteVisitedEvent) -> (), filter: EventFilter?) -> (),
+  on_goods_delivered: (fn: (thing: RimThing, e: GoodsDeliveredEvent) -> (), filter: EventFilter?) -> (),
+  on_silver_changed: (fn: (e: SilverChangedEvent) -> (), filter: EventFilter?) -> (),
+  on_research_milestone: (fn: (e: ResearchMilestoneEvent) -> (), filter: EventFilter?) -> (),
+  on_room_changed: (fn: (e: RoomChangedEvent) -> (), filter: EventFilter?) -> (),
+  on_faction_relation_changed: (fn: (e: FactionRelationChangedEvent) -> (), filter: EventFilter?) -> (),
+  on_faction_leader_changed: (fn: (e: FactionLeaderChangedEvent) -> (), filter: EventFilter?) -> (),
+  on_gizmo_clicked: (fn: (e: GizmoClickedEvent) -> (), filter: EventFilter?) -> (),
+  on_key_pressed: (fn: (e: KeyPressedEvent) -> (), filter: EventFilter?) -> (),
 }
 type Rimkit_factions = {
   adjust_goodwill: (faction: RimFactionRef, other: RimFactionRef, delta: number) -> number,
@@ -2520,6 +2731,16 @@ type Rimkit_inventory = {
   count_def: (pawn: RimPawnRef, def: string) -> number,
   drop_carried: (pawn: RimPawnRef) -> boolean,
 }
+type Rimkit_itest = {
+  abort: () -> boolean,
+  load: (package_id: string) -> number,
+  progress: () -> { [any]: any },
+  report: () -> { [any]: any }?,
+  run: (opts: RimTestRun?) -> boolean,
+  running: () -> boolean,
+  suite: (name: string, body: ((suite: any) -> ())?) -> RimTestSuite,
+  suites: () -> { [any]: any },
+}
 type Rimkit_jobs = {
   can_reserve: (pawn: RimPawnRef, thing: RimThing) -> boolean,
   clean: (pawn: RimPawnRef, filth: RimThing, queue: boolean?) -> boolean,
@@ -2548,6 +2769,7 @@ type Rimkit_json = {
 type Rimkit_log = {
   error: (msg: string) -> (),
   info: (msg: string) -> (),
+  warn: (msg: string) -> (),
 }
 type Rimkit_maps = {
   add_designation: (map: RimMapRef, def: string, thing: RimThing?, x: number?, z: number?) -> boolean,
@@ -2882,6 +3104,7 @@ type Rimkit_save = {
   game_version: () -> RimGameVersions,
   get: (package_id: string, scope: string, key: string, h: RimMapRef?) -> string?,
   keys: (package_id: string, scope: string, h: RimMapRef?) -> {string},
+  load: (name: string) -> boolean,
   migrate: (package_id: string, steps: {(...any) -> ...any}) -> number,
   now: (name: string?) -> string,
   purge: (package_id: string) -> number,
@@ -2951,9 +3174,11 @@ type Rimkit_test = {
   logged: (part: string) -> boolean,
   logs: () -> {string},
   mock: (op: string, answer: any) -> (),
+  reload: (package_id: string?) -> boolean,
   reset_mocks: (...any) -> ...any,
   run: () -> number,
   start: (...any) -> ...any,
+  subscriptions: (event: string) -> number,
   tick: (n: number?) -> (),
   tweak: (name: string) -> ((...any) -> ...any)?,
 }
@@ -2973,6 +3198,7 @@ type Rimkit_time = {
   set_paused: (paused: boolean) -> boolean,
   set_speed: (speed: string | number) -> string,
   speed: () -> string,
+  step: (ticks: number) -> RimTimeStep,
   ticks: () -> number,
 }
 type Rimkit_timer = {
@@ -3082,6 +3308,7 @@ declare game: {
   input: Rimkit_input,
   interop: Rimkit_interop,
   inventory: Rimkit_inventory,
+  itest: Rimkit_itest,
   jobs: Rimkit_jobs,
   json: Rimkit_json,
   log: Rimkit_log,

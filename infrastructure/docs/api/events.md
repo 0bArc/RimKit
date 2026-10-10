@@ -18,7 +18,8 @@ Every event also has its own function, `game.events.on_pawn_damaged(fn, filter?)
 |----------|------|
 | `events.on(name, fn)` | Subscribes. A canonical name (it contains a dot) installs its patch on the first subscription |
 | `events.on(name, filter, fn)` | Subscribes, and runs `fn` only when the payload matches the filter table. See [Filters](#filters) |
-| `events.off(name)` | Removes every handler you registered for the name. The patch is removed when the last handler goes |
+| `events.off(name)` | Removes the handlers your mod registered for the name. Other mods keep theirs. The patch is removed when the last handler goes |
+| `events.count(name, package_id?)` | How many handlers listen to the event, or how many of one mod's. Handy in a hot reload test |
 | `events.list()` | Every event as `{ name, description, hot, installed }` |
 
 ## Filters
@@ -156,6 +157,34 @@ end)
 | `selection.changed` | `count` | no | Something was selected. |
 | `selection.cleared` | none | no | The selection was cleared. |
 | `window.opened` | `class` | no | A window was opened. |
+| `pawn.left_colony` | `pawn`, `to` | no | A pawn is leaving the player faction (released, kicked out, turned hostile). |
+| `pawn.escaped` | `pawn`, `initiator` | no | A prisoner took part in a prison break. |
+| `work.completed` | `pawn`, `job`, `work_type` | no | A pawn finished a work job (anything started by a work giver). |
+| `item.crafted` | `thing`, `recipe`, `pawn` | no | A bill produced one finished item. |
+| `mining.completed` | `def`, `x`, `z`, `pawn` | no | A pawn mined out a rock or ore cell. |
+| `construction.started` | `frame`, `def`, `pawn` | no | A blueprint became a frame (or a finished building) because a pawn began building. |
+| `building.deconstructed` | `pawn`, `thing`, `def`, `x`, `z` | no | A pawn finished deconstructing a building. |
+| `thing.repaired` | `pawn`, `thing`, `def` | no | A pawn finished repairing a building. |
+| `thing.hauled` | `pawn`, `thing`, `def` | no | A pawn picked up a thing to haul it. |
+| `thing.dropped` | `pawn`, `thing`, `def`, `x`, `z` | no | A pawn put down what it was carrying. |
+| `hediff.healed` | `pawn`, `hediff` | no | An injury was healed away completely. |
+| `immunity.gained` | `pawn`, `disease` | no | A pawn became fully immune to a disease it was fighting. |
+| `thought.lost` | `pawn`, `thought` | no | A memory thought was removed. |
+| `social_fight.started` | `pawn`, `other` | no | Two pawns started a social fight. |
+| `skill.learning_saturated` | `pawn`, `skill` | no | A pawn reached the daily full-rate learning limit for a skill. |
+| `fire.started` | `fire`, `map`, `x`, `z` | no | A fire started burning. |
+| `fire.ended` | `fire`, `map`, `x`, `z` | no | A fire went out. |
+| `world.generated` | `seed` | no | A new world was generated. |
+| `caravan.arrived` | `caravan`, `tile` | no | A caravan reached the end of its path. |
+| `site.visited` | `caravan`, `site`, `def` | no | A caravan arrived at a site it was sent to. |
+| `goods.delivered` | `thing`, `map`, `x`, `z` | no | A trade ship or order dropped goods onto the map. |
+| `silver.changed` | `silver`, `delta` | no | The colony's silver changed since the last game hour. |
+| `research.milestone` | `project`, `percent` | no | The current research project passed 25, 50 or 75 percent. |
+| `room.changed` | `map` | no | Rooms on a map were rebuilt after a wall, door or roof changed. |
+| `faction.relation_changed` | `faction`, `other`, `previous`, `kind` | no | The relation kind between two factions changed (neutral, hostile, ally). |
+| `faction.leader_changed` | `faction`, `leader` | no | A faction got a new leader. |
+| `gizmo.clicked` | `label`, `class` | no | The player clicked a gizmo. |
+| `key.pressed` | `key`, `shift`, `control`, `alt` | yes | A key went down in the game window. |
 
 Naming: `<domain>.<past tense verb>`. See [naming](naming.md).
 

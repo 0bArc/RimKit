@@ -1,0 +1,32 @@
+import "rimworld"
+
+# Scripts for the RimWorld adapter. Run one with: helm run scripts/rimworld.hlm --script smoke
+
+# Lua that more than one script uses
+lua colonist {
+  local m = game.maps.current()
+  local p = game.pawns.generate({kind = 'Colonist', faction = 'player', map = m, x = 125, z = 125})
+  p:damage(7, 'Cut')
+  return p.is_colonist
+}
+
+script smoke for rimworld {
+  info expect playing == true
+  info expect adapter == rimkit
+  subscribe pawn.damaged
+  step 600 expect ran == 600
+  lua -> {
+    return 1 + 2
+  } expect result == 3
+  lua colonist expect result == true
+  wait event pawn.damaged within 10s
+  call time.now expect year == 5500
+  shutdown
+}
+
+script mansion for rimworld {
+  info expect playing == true
+  blueprint mansion x=60 z=60
+  step 30
+  print "the mansion is built"
+}

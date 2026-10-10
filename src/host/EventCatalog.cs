@@ -57,7 +57,7 @@ namespace RimKit
             Add("pawn.died", "A pawn is dying. Payload: pawn, damage, culprit.", false,
                 () => AccessTools.Method(typeof(Pawn), nameof(Pawn.Kill), new[] { typeof(DamageInfo?), typeof(Hediff) }), nameof(EventPatches.PawnDied), true);
             Add("pawn.damaged", "A pawn took damage. Hot. Payload: pawn, damage, dealt. Use a filter, for example { humanlike = true }.", true,
-                () => AccessTools.Method(typeof(Pawn), nameof(Pawn.TakeDamage), new[] { typeof(DamageInfo) }), nameof(EventPatches.PawnDamaged), false);
+                () => AccessTools.Method(typeof(Thing), nameof(Thing.TakeDamage), new[] { typeof(DamageInfo) }), nameof(EventPatches.PawnDamaged), false);
             Add("pawn.resurrected", "A pawn was resurrected. Payload: pawn.", false,
                 () => AccessTools.Method(typeof(Pawn_HealthTracker), nameof(Pawn_HealthTracker.Notify_Resurrected), new[] { typeof(bool), typeof(float) }), nameof(EventPatches.PawnResurrected), false);
 
@@ -117,6 +117,7 @@ namespace RimKit
                 () => AccessTools.Method(typeof(FactionManager), nameof(FactionManager.Add), new[] { typeof(Faction) }), nameof(EventPatches.FactionAdded), false);
 
             AddMore();
+            AddWork();
         }
 
         private static void Add(string name, string description, bool hot, Func<MethodBase> target, string patchMethod, bool prefix)
@@ -318,12 +319,13 @@ namespace RimKit
             });
         }
 
-        public static void PawnDamaged(Pawn __instance, DamageInfo dinfo, DamageWorker.DamageResult __result)
+        // Pawn does not override TakeDamage, so the patch sits on Thing.TakeDamage and keeps only pawns.
+        public static void PawnDamaged(Thing __instance, DamageInfo dinfo, DamageWorker.DamageResult __result)
         {
-            if (!Playing || __instance == null) return;
+            if (!Playing || !(__instance is Pawn pawn)) return;
             Emit("pawn.damaged", sb =>
             {
-                Field(sb, "pawn", __instance, true);
+                Field(sb, "pawn", pawn, true);
                 Field(sb, "damage", dinfo);
                 Field(sb, "dealt", __result != null ? __result.totalDamageDealt : 0f);
             });
